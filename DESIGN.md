@@ -1,13 +1,16 @@
-# DESIGN — ga-SDK 0.1 설계 초안 (CMD-GA1 rev 1, 2026-10-02)
+# DESIGN — ga-SDK 0.1 설계 초안 (CMD-GA1 rev 2, 2026-10-02)
 
-> 명세는 [`METHOD.md`](METHOD.md)(method-1, `78019c2`, baseline 소유)다. 이 문서는 **어떻게 짓는가**만 적는다.
+> 명세는 [`METHOD.md`](METHOD.md)(method-1, `2867c25`, baseline 소유)다. 이 문서는 **어떻게 짓는가**만 적는다.
 > 상태: **초안 — 아직 코드 없음.** 아래는 계획이지 결과가 아니다.
+> rev 1(`60c9a95`, METHOD `78019c2` 기준) → rev 2: §0 정신(hard/soft) · §3.2 보고 꼴 · §4b(G8) · §5 강도를 반영했다.
 
-## 0. 제약 (CMD-GA1 에서)
+## 0. 제약과 정신
 
 - Python ≥ 3.10, 핵심은 표준 라이브러리만. (git · pip 는 하위 프로세스로 부른다 — import 하지 않는다.)
 - 저장소 · 세션 id · 브랜치 이름은 코드에 없고 모두 설정에서 온다.
 - 1판: LLM 호출 없음, GitHub · 원격 세션 어댑터 없음(인터페이스만 그것을 담을 수 있게).
+- **SDK 는 안전만 막고 나머지는 알린다**(METHOD §0). 그래서 검사 결과는 늘 `hard`(막음) · `soft`(알림)를 가진다.
+  기계 머리가 틀린 것은 거부하지만, 사람이 읽는 본문 칸이 비어 있는 것은 거부하지 않는다(G1).
 
 ## 1. 패키지 모양
 
@@ -18,10 +21,11 @@ ga/
   forms/        §3  directive/1 · report/1 · verdict/1 · round/1 · decision/1 · stage/1 · question/1
                     각 꼴 = dataclass + validate(dict) -> list[Problem] + parse/dump
   records.py    §3.4 기록 저장소(파일) + Markdown 렌더 (G2)
-  rules.py      §5  R1–R13 검사기 -> list[Violation]  (G4)
+  rules.py      §5  R1–R13 검사기 -> list[Violation(rule, strength, evidence)]  (G4)
   gates.py      §6  게이트 일곱 -> question/1 을 내고 멈춤 (G7)
+  prompts.py    §4b 허브 · 작업 세션의 첫 프롬프트 만들기 (G8)
   hub.py        §2  고리 1–6 (받기 → 통합 → 재현 → 판정 → 기록 → 다음) + tick (G3 · G5)
-  config.py         허브 설정(JSON): 저장소 · 브랜치 · 소유표 · 시험 명령 · 환경 변수 · 예산
+  config.py         허브 설정(JSON): 저장소 · 브랜치 · 세션(이름 · 머리글자 · 통로) · 소유표 · 시험 명령 · 환경 변수 · 예산 · 규칙 강도 올림
   adapters/
     base.py     §4  Channel · Waker · Vcs · Bundle · Ticker · Judge  (typing.Protocol)
     mailbox.py      파일 우편함 Channel + 없는 Waker
@@ -29,35 +33,58 @@ ga/
     venv.py         Bundle (a) 경로 방식 · (b) 깨끗한 venv 에 sha 고정 설치
     human.py        Judge 사람 입력 구현(답을 파일에서 읽는다)
     ticker.py       Ticker: tick() 한 번 = 고리 [1] 한 번. 주기는 바깥(cron 등)이 정한다
-  __main__.py       python -m ga  check | tick [--dry-run] | render | bundle
+  __main__.py       python -m ga  check | tick [--dry-run] | render | bundle | prompt
 tests/              unittest (표준 라이브러리)
 ```
 
-## 2. 형식의 겉모양 (§3 "사람이 읽는 텍스트 + 기계가 읽는 머리")
+## 2. 형식의 겉모양 (§3)
 
-- 표준 라이브러리에 YAML 이 없으므로 **머리는 JSON** 으로 한다. 글 맨 앞의 ```` ```ga ```` 펜스 블록 하나에 JSON, 그 뒤가 사람 글.
-  GitHub 댓글에서도 그대로 보이고, 파일 우편함에서도 같은 꼴이다.
-- 모든 꼴에 `"schema": "directive/1"` 처럼 판이 붙는다. 모르는 판 · 모르는 칸 · 빠진 필수 칸은 거부한다.
-- 지시 id 는 `CMD-<머리글자 1자 이상><번호>` (`CMD-GA1`, `CMD-K8` 모두 받는다).
+- 머리는 **JSON**, 글 맨 앞의 ```` ```ga ```` 펜스 블록 하나에 둔다. 그 뒤가 사람 글. GitHub 댓글과 파일 우편함이 같은 꼴이다. (baseline 승인, #12)
+- 모든 꼴에 `"schema": "<꼴>/1"` 이 붙는다. 모르는 판 · 빠지거나 틀린 **머리** 필수 칸은 거부한다.
+- 지시 id 는 `CMD-[A-Z]+\d+` (`CMD-GA1`, `CMD-K8`, `CMD-G1` 모두 받고 서로 구분된다). 머리글자 중복은 설정 검사에서 잡는다. (baseline 승인, #12)
+- **report/1** (METHOD §3.2 rev 2):
+  - 머리: `from` · `handled[]{id, rev_seen, status, reason}` · `commits[]`(커밋이 있을 때). 이것만 검사한다.
+  - 본문: `Task · Execution · Result · Evidence · Deviation · Blocker · Proposal · Request` — `## <칸>` 제목으로 읽는다. 모두 선택이다.
+  - Evidence 의 주장 표시(`verified` · `partially verified` · `not verified` · `assumption` · `blocked`)와 Proposal 의 문제 등급(`blocking` · `current` · `future` · `optional`)은 읽어 내되, 없어도 거부하지 않고 soft 알림만 낸다.
+  - 변경 크기(`implementation` · `component` · `interface` · `architecture` · `baseline`)는 머리의 선택 칸 `change_size` 로 받는다. `architecture` 이상이면 게이트 2 로 간다.
+  - Deviation 칸에 글이 있으면 허브는 그것을 지시와의 부딪힘 후보로 판정에 올린다(F2).
 - 기록은 **정규 JSON**(키 정렬 · `ensure_ascii=False` · 끝 줄바꿈)으로 쓰고 Markdown 은 거기서 렌더한다 → G2 의 "같은 입력이면 같은 바이트".
 
-## 3. 고리와 상태
+## 3. 규칙 강도 (§5)
+
+- 각 규칙은 기본 강도를 가진다: hard = R2 · R3 · R4 · R5 · R6 · R9 · R12, soft = R1 · R7 · R8 · R10 · R11 · R13.
+- 설정 `rules.raise = ["R7", …]` 으로 soft 를 hard 로 올릴 수 있다. hard 를 soft 로 내리는 설정은 설정 읽기에서 거부한다.
+- hard 위반은 그 동작(통합 · push · 지시 보내기)을 하지 않는다. soft 위반은 판정 · 회차 기록에 알림으로만 남는다.
+
+## 4. 고리와 상태
 
 - 허브 상태 파일(`state.json`): 통로마다 마지막으로 읽은 글 id, 저장소마다 마지막 통합 sha.
   tick 은 이것과 비교해 새 것이 없으면 **아무것도 쓰지 않는다**(상태 파일도 안 건드림) → G5 · R9.
-- 통합은 ff-only. 실패하면 합치지 않고 판정 `막힘(cause=의존성|구현)` 으로 넘긴다(R4).
-- 통합 전 diff 를 훑어 R2(소유표 — 경로 glob → 세션) · R6(비밀값 패턴) 를 본다. 걸리면 통합하지 않는다.
+- 통합은 ff-only. 실패하면 합치지 않고 판정 `막힘` 으로 넘긴다(R4).
+- 통합 전 diff 를 훑어 R2(소유표 — 경로 glob → 세션) · R6(비밀값 패턴)를 본다. 걸리면 통합하지 않는다.
 - 판정 `verdict/1`: 숫자(시험 수 · 건너뜀 · 보고 수와 재현 수의 차)는 기계가 채우고, `class` · `next` 는 `Judge` 가 제안한다.
   1판의 `Judge` 는 사람 입력이므로 시험에서는 미리 적어 둔 답 파일을 쓴다.
 - 엇갈림(F1): 허브는 지시의 최신 `rev` 를 알고, 보고의 `handled[].rev_seen` 이 그보다 낮으면 `부분 성공(엇갈림)` 으로 가른다.
+  (이 설계 초안 rev 1 이 실제로 그랬다 — METHOD `78019c2` 를 보고 썼는데 지시는 이미 rev 2 였다. 시험 사례로 넣는다.)
 
-## 4. Bundle (G3 · F3 · F4)
+## 5. Bundle (G3 · F3 · F4)
 
 - (a) 경로 방식: 저장소들을 통합 머리에 체크아웃하고 `PYTHONPATH` 에 나란히 둔 채 설정의 시험 명령을 돈다.
 - (b) 설치 방식: 빈 venv 에 `pip install <repo>@<sha>` 를 묶음 전체로 한 번에 넣는다. `ResolutionImpossible` 류 실패를 `고정 충돌` 로 가른다.
 - 시험 결과는 unittest/pytest 요약 줄을 읽어 통과 · 실패 · 건너뜀 수로 만든다. **건너뜀 수는 판정에 올린다**(F4).
 
-## 5. 검증 계획 (§9)
+## 6. 세션 시작 프롬프트 (G8, §4b)
+
+- `ga.prompts.worker_prompt(config, session)` · `hub_prompt(config)` 가 문자열을 낸다. `python -m ga prompt <세션>` 로 찍는다.
+- 작업 세션 = 한 줄 머리(세션 이름 · 태그 · 허브 저장소) + **작업 세션 안내 전문** + 통로 주소와 깨우기 방법 + 소유표의 그 세션 줄 + 첫 지시 주소(있으면) + "baseline 이랑 통신 시작해라".
+- 허브 = 허브 역할 머리 + **허브 안내 전문** + 통로 · 세션 목록 + 소유표.
+- 안내 전문은 코드에 넣지 않는다. 설정이 파일 경로를 가리킨다(baseline `GUIDANCE.md` · `SESSION_GUIDANCE.md`). 시험은 baseline 실제 설정 · 문서 사본(fixture)으로 "두 전문 · 통로 · 소유 줄이 들어간다"를 확인한다.
+
+## 7. 짓는 순서
+
+G1 → G8 → G2 → G4 → G6(우편함 · git) → G3 → G5 → G7. §9 검증 2(엇갈림)는 G6 와 함께 시험으로 만든다.
+
+## 8. 검증 계획 (§9)
 
 | # | 무엇 | 필요한 것 | 지금 |
 |---|---|---|---|
@@ -65,7 +92,7 @@ tests/              unittest (표준 라이브러리)
 | 2 | A4/A5 · K1 엇갈림을 파일 우편함으로 흉내 | 없음 | 시험으로 짓는다 |
 | 3 | action `2f4791e` + `3995fdb` 섞은 고정에서 (b) 실패 | action 저장소 읽기 + pip 의 GitHub 접근 | 1 과 같음 |
 
-## 6. 위험 · 가정
+## 9. 위험 · 가정
 
-- (가정) 시험 환경에서 (b) 의 로컬 git 저장소 설치는 PyPI 접근 없이 돌아야 한다 → `--no-build-isolation` + 시스템 setuptools 로 짓는다. 실제 stage 재현은 네트워크가 필요하다.
-- (가정) 시험 수는 각 저장소의 시험 명령 출력에서 읽는다. 명령은 설정으로 받고, 지금 baseline 이 쓴 명령을 기본값 예시로 둔다.
+- (assumption) 시험 환경에서 (b) 의 로컬 git 저장소 설치는 PyPI 접근 없이 돌아야 한다 → `--no-build-isolation` + 시스템 setuptools 로 짓는다. 시험으로 확인한다(baseline 요구). 실제 stage 재현은 네트워크가 필요하다.
+- (assumption) 시험 수는 각 저장소의 시험 명령 출력에서 읽는다. 명령은 설정으로 받고, 지금 baseline 이 쓴 명령을 기본값 예시로 둔다.
