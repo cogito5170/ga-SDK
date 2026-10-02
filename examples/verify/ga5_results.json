@@ -1,0 +1,47 @@
+{
+  "model": "haiku",
+  "executable": "claude",
+  "sandbox_available": true,
+  "turns": [
+    {
+      "session": "A",
+      "directive": "CMD-A1",
+      "error": "",
+      "cost": 0.060585799999999995,
+      "seconds": 28.038,
+      "sandboxed": true
+    },
+    {
+      "session": "B",
+      "directive": "CMD-B1",
+      "error": "",
+      "cost": 0.06766090000000001,
+      "seconds": 29.553,
+      "sandboxed": true
+    }
+  ],
+  "guard": {
+    "A": {
+      "calls": 10,
+      "denied": []
+    },
+    "B": {
+      "calls": 14,
+      "denied": [
+        "other_repo"
+      ]
+    }
+  },
+  "reports_received": 1,
+  "integrated": [
+    "alpha"
+  ],
+  "verdict": "success",
+  "alpha_integ_moved": true,
+  "alpha_file_ok": true,
+  "beta_integ_moved": false,
+  "beta_file_ok": false,
+  "runs": 2,
+  "cost_total_usd": 0.128247,
+  "note": "B was not integrated and the cause is not known: this harness version recorded no diagnostics and the temporary world was deleted. The guard denied one of B's commands under rule other_repo (--git-dir/--work-tree). Diagnostics were added to the harness afterwards; not re-run (budget of 2 runs used)."
+}
