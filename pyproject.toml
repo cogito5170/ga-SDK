@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ga-sdk"
+version = "0.1.0"
+description = "Hub loop SDK: directive / report / verdict forms, integration, rules, gates, records"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+ga = "ga.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["ga*"]

@@ -1,0 +1,76 @@
+"""Session start prompts (METHOD §4b, G8).
+
+The guidance texts are not in code: the config points at the hub's files.
+"""
+from __future__ import annotations
+
+from .config import Config
+
+
+def _ownership_table(cfg: Config, session: str) -> str:
+    rows = cfg.ownership_rows(session)
+    if not rows:
+        return "(소유표에 줄 없음)"
+    lines = ["| 저장소 | 경로 | 소유 |", "|---|---|---|"]
+    lines += [f"| {r['repo']} | `{r['path']}` | {r['session']} |" for r in rows]
+    return "\n".join(lines)
+
+
+def _fmt(template: str, cfg: Config, **extra: str) -> str:
+    values = {"hub_name": cfg.hub_name, "hub_repo": cfg.hub["repo"], **extra}
+    return template.format(**values)
+
+
+def worker_prompt(cfg: Config, session: str) -> str:
+    s = cfg.sessions[session]
+    head = _fmt(cfg.hub["worker_head"], cfg, name=s.name, tag=s.tag)
+    guidance = cfg.read_text(cfg.hub["session_guidance"]).rstrip("\n")
+    branches = ", ".join(f"{r}@`{s.branch_for(r)}`" for r in s.repos) or "(없음)"
+    wake = _fmt(cfg.hub["wake"], cfg, tag=s.tag, link="<글 링크>")
+    channel = [
+        "## 통로 (ga-SDK 가 설정에서 만든 부분)",
+        "",
+        f"- 보고 · 질문 · 요청: {s.channel or '(설정에 없음)'} — 보고 하나 = 글 하나, 머리 `[{s.tag}]`. 지시 머리글자는 `CMD-{s.prefix}`.",
+        f"- 보고 뒤 깨우기: 허브 세션 `{cfg.hub.get('session_id') or '(설정에 없음)'}` 에 한 줄 `{wake}`.",
+        f"- 자기 브랜치: {branches}. 새 일을 시작할 때 통합 브랜치 `{cfg.integration_branch}` 를 먼저 합친다.",
+        "- 세션끼리는 직접 말하지 않는다. 다른 세션의 일은 `요청: <대상 세션> …` 으로 허브에 낸다.",
+        "",
+        "### 소유",
+        "",
+        _ownership_table(cfg, s.name),
+    ]
+    if s.first_directive:
+        channel += ["", "### 첫 지시", "", s.first_directive]
+    tail = _fmt(cfg.hub["worker_tail"], cfg)
+    return "\n".join([head, "", guidance, "", *channel, "", tail]) + "\n"
+
+
+def hub_prompt(cfg: Config) -> str:
+    guidance = cfg.read_text(cfg.hub["guidance"]).rstrip("\n")
+    head = (
+        f"넌 이제부터 {cfg.hub_name} 세션이야. 허브로서 기준선을 쥐고 지시 · 판정 · 기록을 한다. "
+        f"결정의 원본은 <{cfg.hub['repo']}> 레포다. 세션끼리는 직접 말하지 않고 모두 {cfg.hub_name}를 거친다. "
+        "단계 마감 · PR · 기본 브랜치 합치기 · 태그 · 기준선 변경은 사용자에게 묻는다."
+    )
+    sessions = ["| 세션 | 머리글자 | 통로 | 세션 id | 브랜치 |", "|---|---|---|---|---|"]
+    for s in cfg.sessions.values():
+        branches = ", ".join(f"{r}@`{s.branch_for(r)}`" for r in s.repos) or "-"
+        sessions.append(f"| {s.name} | `CMD-{s.prefix}` | {s.channel or '-'} | `{s.session_id or '-'}` | {branches} |")
+    owners = ["| 저장소 | 경로 | 소유 |", "|---|---|---|"]
+    owners += [f"| {r['repo']} | `{r['path']}` | {r['session']} |" for r in cfg.ownership]
+    parts = [
+        head,
+        "",
+        guidance,
+        "",
+        "## 세션과 통로 (ga-SDK 가 설정에서 만든 부분)",
+        "",
+        "\n".join(sessions),
+        "",
+        f"통합 브랜치: `{cfg.integration_branch}` (저장소마다, ff-only).",
+        "",
+        "### 소유표 (위에서부터 처음 맞는 줄)",
+        "",
+        "\n".join(owners),
+    ]
+    return "\n".join(parts) + "\n"

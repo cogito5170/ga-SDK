@@ -1,0 +1,50 @@
+{
+  "schema": "ga-config/1",
+  "hub": {
+    "name": "baseline",
+    "repo": "cogito5170/baseline",
+    "session_id": "session_013GnrUQPpcfK4ea1a1Y6SuY",
+    "guidance": "GUIDANCE.md",
+    "session_guidance": "SESSION_GUIDANCE.md"
+  },
+  "integration_branch": "claude/gracious-meitner-vp49xe",
+  "repos": {
+    "baseline": {"url": "https://github.com/cogito5170/baseline", "slug": "cogito5170/baseline"},
+    "Telemetry": {"url": "https://github.com/cogito5170/Telemetry", "slug": "cogito5170/Telemetry"},
+    "Sensor": {"url": "https://github.com/cogito5170/Sensor", "slug": "cogito5170/Sensor"},
+    "MS": {"url": "https://github.com/cogito5170/MS", "slug": "cogito5170/MS"},
+    "DC": {"url": "https://github.com/cogito5170/DC", "slug": "cogito5170/DC"},
+    "ga-SDK": {"url": "https://github.com/cogito5170/ga-SDK", "slug": "cogito5170/ga-SDK",
+               "test": ["{python}", "-m", "unittest", "discover", "-s", "tests"], "package": "ga-sdk"}
+  },
+  "sessions": {
+    "Telemetry": {"prefix": "T", "branch": "claude/jolly-einstein-3y9icv", "repos": ["Telemetry", "Sensor", "MS"],
+                  "channel": "https://github.com/cogito5170/baseline/issues/1"},
+    "MS": {"prefix": "M", "branch": "claude/eloquent-turing-m33zjw", "repos": ["MS"],
+           "channel": "https://github.com/cogito5170/baseline/issues/2"},
+    "Sensor": {"prefix": "S", "branch": "claude/nice-wright-50oyvm", "repos": ["Sensor"],
+               "channel": "https://github.com/cogito5170/baseline/issues/3"},
+    "DC": {"prefix": "D", "branch": "claude/nifty-volta-3u5ygl", "repos": ["DC", "Sensor"],
+           "channel": "https://github.com/cogito5170/baseline/issues/4"},
+    "ga-SDK": {"prefix": "GA", "tag": "ga", "branch": "claude/amazing-johnson-ijp9md", "repos": ["ga-SDK"],
+               "channel": "https://github.com/cogito5170/baseline/issues/12",
+               "session_id": "session_01L1Sd43LpUVDA9dsnnuWVKt",
+               "first_directive": "CMD-GA1 — https://github.com/cogito5170/baseline/issues/12"}
+  },
+  "ownership": [
+    {"repo": "baseline", "path": "*", "session": "baseline"},
+    {"repo": "Telemetry", "path": "*", "session": "Telemetry"},
+    {"repo": "Sensor", "path": "llmsensor/telemetry/*", "session": "Telemetry"},
+    {"repo": "Sensor", "path": "schema/*", "session": "Telemetry"},
+    {"repo": "Sensor", "path": "llmsensor/state/export.py", "session": "DC"},
+    {"repo": "Sensor", "path": "tests/test_state_export.py", "session": "DC"},
+    {"repo": "Sensor", "path": "*", "session": "Sensor"},
+    {"repo": "DC", "path": "*", "session": "DC"},
+    {"repo": "MS", "path": "ms/l0.py", "session": "Telemetry"},
+    {"repo": "MS", "path": "tests/test_l0.py", "session": "Telemetry"},
+    {"repo": "MS", "path": "*", "session": "MS"},
+    {"repo": "ga-SDK", "path": "METHOD.md", "session": "baseline"},
+    {"repo": "ga-SDK", "path": "*", "session": "ga-SDK"}
+  ],
+  "budget": {"llm_runs": 6}
+}
