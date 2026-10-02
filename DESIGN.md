@@ -1,9 +1,10 @@
-# DESIGN — ga-SDK 0.1 설계 (CMD-GA1 rev 3, 2026-10-02)
+# DESIGN — ga-SDK 0.1 설계 (CMD-GA1 rev 4, 2026-10-02)
 
-> 명세는 [`METHOD.md`](METHOD.md)(method-1 rev 3, `f6a4c36`, baseline 소유)다. 이 문서는 **어떻게 짓는가**만 적는다.
-> 상태: 짓는 중. G1 · G8 · G2 는 코드와 시험이 있다. 나머지는 계획이다.
+> 명세는 [`METHOD.md`](METHOD.md)(method-1 rev 4, `5cfa73a`, baseline 소유)다. 이 문서는 **어떻게 짓는가**만 적는다.
+> 상태: G1–G9 를 지었다. 시험은 76개이고 Python 3.10–3.13 에서 돈다. §9 검증 결과는 [`examples/verify/RESULTS.md`](examples/verify/RESULTS.md) 에 있다. 명세와 다르게 한 곳과 남긴 것은 맨 아래 §10 에 있다.
 > rev 1(`60c9a95`, METHOD `78019c2` 기준) → rev 2: §0 정신(hard/soft) · §3.2 보고 꼴 · §4b(G8) · §5 강도를 반영했다.
 > rev 2 → rev 3: §4c Runner(Waker 대신) · 로컬 배치(세션마다 worktree · pre-push 훅) · G9 를 반영했다.
+> rev 3 → rev 4: §3.5 교신 `exchange/1` · R1b(어떤 지시에도 속하지 않는 변경은 통합하지 않음) · 프롬프트의 교신 원칙을 반영했다(BD-133).
 
 ## 0. 제약과 정신
 
@@ -19,7 +20,7 @@ import 이름 `ga`, 배포 이름 `ga-sdk`.
 
 ```
 ga/
-  forms/        §3  directive/1 · report/1 · verdict/1 · round/1 · decision/1 · stage/1 · question/1
+  forms/        §3  directive/1 · report/1 · verdict/1 · round/1 · decision/1 · stage/1 · question/1 · exchange/1
                     각 꼴 = dataclass + validate(dict) -> list[Problem] + parse/dump
   records.py    §3.4 기록 저장소(파일) + Markdown 렌더 (G2)
   rules.py      §5  R1–R13 검사기 -> list[Violation(rule, strength, evidence)]  (G4)
@@ -57,6 +58,17 @@ tests/              unittest (표준 라이브러리)
 - 각 규칙은 기본 강도를 가진다: hard = R2 · R3 · R4 · R5 · R6 · R9 · R12, soft = R1 · R7 · R8 · R10 · R11 · R13.
 - 설정 `rules.raise = ["R7", …]` 으로 soft 를 hard 로 올릴 수 있다. hard 를 soft 로 내리는 설정은 설정 읽기에서 거부한다.
 - hard 위반은 그 동작(통합 · push · 지시 보내기)을 하지 않는다. soft 위반은 판정 · 회차 기록에 알림으로만 남는다.
+
+## 3b. 교신과 R1b (§3.5, rev 4)
+
+교신은 정보일 뿐 action 이 아니다. 기계는 이것을 다음처럼 지킨다.
+- 허브가 통합하는 커밋은 **보고가 지시 아래에서 주장한 커밋**뿐이다.
+  - 보고의 `commits[].sha` 가 그 주장이고, 같은 보고의 `handled` 에 허브가 **그 세션에** 보낸 지시가 하나 이상 있어야 한다.
+  - 통합은 주장한 sha 까지만 한다. 그 뒤에 더 쌓인 커밋은 들이지 않고, 몇 개인지 회차 알림에 적는다.
+- 아무도 주장하지 않은 브랜치 움직임은 새 것으로 치지 않는다. 보고가 아직 오지 않은 것이기 때문이다. 그래서 tick 은 조용하고, 통합도 하지 않는다.
+- 지시 없는 주장(교신만을 근거로 한 변경, 남의 지시 id)은 R1b hard 위반이다. 결과는 통합하지 않음과 판정 "막힘(요구사항)" 이다.
+- 세션이 올릴 수 있는 꼴은 `report/1` 과 `exchange/1` 이다. 교신은 회차 알림과 `JudgeContext.exchanges` 에 들어가고, 그 자체로는 아무것도 움직이지 않는다.
+- 남의 통로에 쓴 글은 R1 soft 알림을 낸다("보고되지 않은 교신?").
 
 ## 4. 고리와 상태
 
@@ -105,3 +117,14 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 
 - (assumption) 시험 환경에서 (b) 의 로컬 git 저장소 설치는 PyPI 접근 없이 돌아야 한다 → `--no-build-isolation` + 시스템 setuptools 로 짓는다. 시험으로 확인한다(baseline 요구). 실제 stage 재현은 네트워크가 필요하다.
 - (assumption) 시험 수는 각 저장소의 시험 명령 출력에서 읽는다. 명령은 설정으로 받고, 지금 baseline 이 쓴 명령을 기본값 예시로 둔다.
+
+## 10. 명세와 다르게 한 것 · 남긴 것 (0.1)
+
+- **R7 `done_when`:** §3.1 에서는 필수 칸이지만 §5 R7 은 soft 다. 그래서 없으면 거부하지 않고 R7 soft 알림을 낸다. 설정 `rules.raise: ["R7"]` 로 hard 로 올릴 수 있다.
+- **기록의 커밋 · push(§2 5단계):** 하지 않았다. 기록은 `.ga/records/` 에 파일로 쓰고 Markdown 으로 렌더하는 데까지만 한다. 허브 저장소에 커밋하는 일은 사람이나 다음 판의 몫이다.
+- **판정 클래스:** 기계가 증명할 수 있는 클래스는 기계가 정한다. 막힘(R2 · R3 · R4 · R6), 실패(시험 실패 · 고정 충돌), 정보 부족(출력을 못 읽음), 부분 성공(엇갈림 · 건너뜀)이 그것이다. Judge 가 제안한 클래스는 더 엄한 쪽으로만 바뀐다.
+- **게이트 승인:** 사용자가 질문의 **첫 선택지**를 고르고, 그 decision 을 Judge 의 제안이 `approved_by` 로 인용할 때만 그 게이트를 통과한다. 다른 답이면 계속 멈춘다.
+- **원격이 없는 로컬 모드의 R3:** push 가 없으므로 pre-push 훅이 할 일이 없다. 허브가 기록한 것과 다른 통합 브랜치 움직임은 잡는다. 하지만 세션이 남의 세션 브랜치에 직접 커밋하는 것은 아직 잡지 못한다(future).
+- **Bundle (b) 의 시험:** 설치된 패키지에 대고, 내보낸 소스 트리에서 돈다. flat 배치 저장소는 현재 디렉터리가 sys.path 앞에 오므로 설치본 대신 소스를 import 할 수 있다(partially verified).
+- **Python ≥ 3.12:** venv 에 setuptools 가 없으므로 Bundle 이 setuptools 를 먼저 깐다. 설정의 pip 인자를 쓰고, 오프라인이면 `--find-links` 를 쓴다.
+- **§10 "게이트는 설정으로 더 넣을 수만 있다":** 게이트를 더 넣는 설정은 아직 없다. 일곱 개는 고정이고 끌 수 없다.

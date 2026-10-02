@@ -120,6 +120,19 @@ class VenvBundle:
             return file_url(Path(url) if Path(url).is_absolute() else self.vcs.repo_dir(repo) / url)
         return file_url(self.vcs.repo_dir(repo))
 
+    def _seed_build_backend(self, vpy: str, env: dict[str, str]) -> str:
+        """Installs build without isolation need setuptools in the venv; Python >= 3.12 venvs have none.
+        Seed it with the configured pip args (online, or offline with --find-links). Returns an error text or ""."""
+        if subprocess.run([vpy, "-c", "import setuptools"], capture_output=True).returncode == 0:
+            return ""
+        argv = [vpy, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *self.pip_args, "setuptools"]
+        p = subprocess.run(argv, capture_output=True, env=env, timeout=self.timeout)
+        if p.returncode != 0:
+            return "no build backend in the clean venv and setuptools could not be installed: " + (p.stdout + p.stderr).decode(errors="replace")[-2000:]
+        # setuptools < 70.1 builds wheels only with the separate 'wheel' package; best effort
+        subprocess.run([vpy, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *self.pip_args, "wheel"], capture_output=True, env=env, timeout=self.timeout)
+        return ""
+
     def run_install(self, heads: dict[str, str]) -> BundleResult:
         base = self.work / "install" / self._key(heads)
         if base.exists():
@@ -129,6 +142,9 @@ class VenvBundle:
         vpy = str(venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
         reqs = self.requirements(heads)
         env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        seeded = self._seed_build_backend(vpy, env)
+        if seeded:
+            return BundleResult("install", False, [], "install_failed", seeded)
         if reqs:
             argv = [vpy, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "--no-build-isolation", *self.pip_args, *reqs]
             p = subprocess.run(argv, capture_output=True, env=env, timeout=self.timeout)

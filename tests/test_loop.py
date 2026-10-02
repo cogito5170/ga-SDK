@@ -126,6 +126,73 @@ class LoopTest(unittest.TestCase):
             w.close()
 
 
+class ExchangeR1bTest(unittest.TestCase):
+    """METHOD rev 4 (BD-133): an exchange is not an action; only changes claimed under a directive are integrated."""
+
+    def setUp(self):
+        self.w = World()
+        self.w.hub.send(directive("CMD-A1", "A"))
+        self.w.hub.send(directive("CMD-B1", "B"))
+        self.start = self.w.integ("alpha")
+
+    def tearDown(self):
+        self.w.close()
+
+    def test_unreported_commit_is_not_new_and_not_integrated(self):
+        w = self.w
+        w.work("A", "alpha", {"x.txt": "1\n"})
+        res = w.hub.tick()
+        self.assertTrue(res.quiet)
+        self.assertEqual(w.integ("alpha"), self.start)
+
+    def test_commit_under_no_directive_is_blocked(self):
+        w = self.w
+        sha = w.work("A", "alpha", {"from_exchange.txt": "B told me\n"})
+        w.report("A", [], [("alpha", sha)], body="## Result\nB 와 교신하고 바꿨다\n")
+        res = w.hub.tick()
+        self.assertEqual(res.integrated, {})
+        self.assertEqual(w.integ("alpha"), self.start)
+        self.assertEqual((res.verdict["class"], res.verdict["cause"]), ("blocked", "requirement"))
+        self.assertIn("R1b", [p.rule for p in res.findings if p.strength == "hard"])
+
+    def test_directive_of_another_session_does_not_cover(self):
+        w = self.w
+        sha = w.work("A", "alpha", {"y.txt": "1\n"})
+        w.report("A", [("CMD-B1", 1, "done")], [("alpha", sha)])
+        res = w.hub.tick()
+        self.assertEqual(res.integrated, {})
+        self.assertIn("R1b", [p.rule for p in res.findings])
+
+    def test_only_the_claimed_commit_is_integrated(self):
+        w = self.w
+        claimed = w.work("A", "alpha", {"a.txt": "1\n"})
+        w.work("A", "alpha", {"b.txt": "2\n"}, msg="after the report")
+        w.report("A", [("CMD-A1", 1, "done")], [("alpha", claimed[:7])])
+        res = w.hub.tick()
+        self.assertEqual(res.integrated, {"alpha": claimed})
+        self.assertEqual(w.integ("alpha"), claimed)
+        rounds = RecordStore(w.ga / "records").all("round/1")
+        self.assertTrue(any("1 commit(s) after the claimed" in n for n in rounds[-1]["notices"]))
+
+    def test_exchange_is_information_not_action(self):
+        w = self.w
+        ex = {"schema": "exchange/1", "from": "A", "to": "B", "why": "급했다", "asked": "beta 의 V 값", "got": "2",
+              "proposal": "alpha 도 2 로 맞춘다"}
+        w.mail.post("A", "A", dump_text(ex))
+        res = w.hub.tick()
+        self.assertFalse(res.quiet)  # the hub judges it (§3.5)
+        self.assertEqual(res.integrated, {})
+        self.assertEqual(w.contexts[-1].exchanges, [ex])
+        rounds = RecordStore(w.ga / "records").all("round/1")
+        self.assertTrue(any(n.startswith("exchange A→B (not an action") for n in rounds[-1]["notices"]))
+
+    def test_exchange_written_into_another_channel_is_flagged(self):
+        w = self.w
+        w.mail.post("B", "A", "B 야, 너 V 몇이야?")
+        res = w.hub.tick()
+        self.assertIn("R1", [p.rule for p in res.findings])
+
+
 class GateStopTest(unittest.TestCase):
     """G7: every gate stops — the proposed directive is not sent and no turn is run."""
 

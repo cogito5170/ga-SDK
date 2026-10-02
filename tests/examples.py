@@ -61,6 +61,15 @@ VALID = {
         "established": ["SDK 설계"],
         "deferred": ["PyPI"],
     },
+    "exchange/1": {
+        "schema": "exchange/1",
+        "from": "Sensor",
+        "to": "DC",
+        "why": "export 꼴의 칸 뜻을 바로 물어야 했다",
+        "asked": "action: 칸의 단위",
+        "got": "ms 단위",
+        "proposal": "Sensor 쪽 주석을 고친다",
+    },
     "question/1": {
         "schema": "question/1",
         "gate": 1,

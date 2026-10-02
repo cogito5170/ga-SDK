@@ -132,8 +132,12 @@ class RulesTest(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual(rules.r13_commands(self.c, f"```sh\n{text}\n```"), [])
 
+    def test_r1b_unclaimed_change(self):
+        self.assertCaught(rules.r1b_unclaimed(self.c, "MS", "MS", "a" * 40, "no directive"), "R1b", "hard")
+
     def test_every_rule_has_a_check(self):
-        self.assertEqual(sorted(rules.ALL, key=lambda r: int(r[1:])), [f"R{i}" for i in range(1, 14)])
+        self.assertEqual(list(rules.ALL), list(gacfg.RULE_IDS))
+        self.assertEqual(gacfg.RULE_IDS, ("R1", "R1b", *(f"R{i}" for i in range(2, 14))))
 
 
 class GateDetectTest(unittest.TestCase):

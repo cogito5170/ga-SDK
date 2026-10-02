@@ -128,6 +128,17 @@ REPORT = [
     Field("tests", _counts, required=False),
     Field("change_size", one_of(*CHANGE_SIZES), required=False),
     Field("needs", list_of(one_of(*NEEDS)), required=False),
+    # exchanges this session took part in since its last report (§3.5): post ids or one-line notes
+    Field("exchanges", list_of(is_str), required=False),
+]
+
+EXCHANGE = [
+    Field("from", is_str),
+    Field("to", is_str),
+    Field("why", is_str),
+    Field("asked", is_str),
+    Field("got", is_str),
+    Field("proposal", is_str, required=False),
 ]
 
 VERDICT = [
@@ -213,6 +224,12 @@ def _directive_cross(doc: dict[str, Any]) -> list[Problem]:
     return []
 
 
+def _exchange_cross(doc: dict[str, Any]) -> list[Problem]:
+    if doc.get("from") == doc.get("to"):
+        return [Problem("$.to", "an exchange is between two different sessions")]
+    return []
+
+
 SCHEMAS: dict[str, tuple[list[Field], Callable[[dict[str, Any]], list[Problem]] | None]] = {
     "directive/1": (DIRECTIVE, _directive_cross),
     "report/1": (REPORT, None),
@@ -221,6 +238,7 @@ SCHEMAS: dict[str, tuple[list[Field], Callable[[dict[str, Any]], list[Problem]] 
     "decision/1": (DECISION, None),
     "stage/1": (STAGE, None),
     "question/1": (QUESTION, _question_cross),
+    "exchange/1": (EXCHANGE, _exchange_cross),
 }
 
 

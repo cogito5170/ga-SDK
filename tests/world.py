@@ -44,6 +44,22 @@ TEST_SKIP = TEST_OK + "\n    @unittest.skip('needs install metadata')\n    def t
 TEST_FAIL = TEST_OK + "\n    def test_bad(self):\n        self.assertEqual(1, 2)\n"
 
 
+def find_links() -> list[str]:
+    """A local directory holding a setuptools wheel, for offline seeding of Python >= 3.12 venvs."""
+    import ensurepip
+    import glob
+    cands = ["/usr/share/python-wheels", os.path.join(os.path.dirname(ensurepip.__file__), "_bundled")]
+    cands += glob.glob("/usr/lib/python3*/ensurepip/_bundled")
+
+    def version(whl: str) -> tuple[int, ...]:
+        return tuple(int(x) for x in os.path.basename(whl).split("-")[1].split(".") if x.isdigit())
+
+    wheels = [w for d in cands for w in glob.glob(os.path.join(d, "setuptools-*.whl"))]
+    if not wheels:
+        return []
+    return ["--find-links", os.path.dirname(max(wheels, key=version))]
+
+
 def pyproject(name: str, deps: list[str] | None = None) -> str:
     dep = ", ".join(f'"{d}"' for d in deps or [])
     return (
@@ -89,7 +105,7 @@ class World:
                 {"repo": "beta", "path": "*", "session": "B"},
             ],
             "budget": budget or {"runs": 50},
-            "bundle": {"pip_args": ["--no-index"], "timeout": 600},
+            "bundle": {"pip_args": ["--no-index", *find_links()], "timeout": 600},
         }
         (self.tmp / "G.md").write_text("허브 안내\n", encoding="utf-8")
         (self.tmp / "SG.md").write_text("세션 안내\n", encoding="utf-8")

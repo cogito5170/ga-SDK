@@ -100,6 +100,7 @@ class JudgeContext:
     findings: list[Any]  # rule Problems
     open_directives: list[dict[str, Any]]
     answers: list[dict[str, Any]] = field(default_factory=list)  # gate questions the user answered since last round
+    exchanges: list[dict[str, Any]] = field(default_factory=list)  # exchange/1 heads: information, never actions (§3.5)
 
 
 class Judge(Protocol):

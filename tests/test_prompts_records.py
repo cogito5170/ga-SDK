@@ -34,6 +34,8 @@ class PromptTest(unittest.TestCase):
         self.assertIn("| ga-SDK | `*` | ga-SDK |", text)
         self.assertNotIn("| ga-SDK | `METHOD.md` |", text)  # not this session's row
         self.assertIn("CMD-GA1 — https://github.com/cogito5170/baseline/issues/12", text)
+        self.assertIn("교신은 action 이 아니다", text)
+        self.assertIn("exchange/1", text)
         self.assertTrue(text.rstrip().endswith("baseline이랑 통신 시작해라"))
 
     def test_worker_prompt_for_each_session(self):

@@ -85,6 +85,10 @@ class GitVcs:
         out = git(self.repo_dir(repo), "rev-parse", "--verify", "--quiet", name + "^{commit}", check=False)
         return out or None
 
+    def resolve(self, repo: str, rev: str) -> str | None:
+        """Full sha of a (possibly short) commit id, or None if the repository does not have it."""
+        return git(self.repo_dir(repo), "rev-parse", "--verify", "--quiet", rev + "^{commit}", check=False) or None
+
     def integration_head(self, repo: str) -> str | None:
         return self.ref(repo, self.cfg.integration_branch)
 

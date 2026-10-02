@@ -193,6 +193,25 @@ class Hub:
                     res.findings += rules.r1_post(self.cfg, name, p.author)
         for repo in self.cfg.repos:
             self.vcs.fetch(repo)
+        reports, exchanges, notices = self._parse_posts(new_posts)
+        # R1b: a change is integrated only as far as a report claims it under a directive sent to that session.
+        # Commits nobody claims are not new work for the hub (the report is still to come) and are never integrated.
+        claims: dict[tuple[str, str], str] = {}
+        for r in reports:
+            session = r["post"].channel
+            under = [h["id"] for h in r["head"].get("handled", []) if st["directives"].get(h["id"], {}).get("to") == session]
+            for c in r["head"].get("commits", []):
+                if c["repo"] not in self.cfg.repos:
+                    notices.append(f"post {r['post'].id}: commit in unknown repo {c['repo']}")
+                    continue
+                if not under:
+                    res.findings += rules.r1b_unclaimed(self.cfg, c["repo"], session, c["sha"], "the report handles no directive sent to this session")
+                    continue
+                full = self.vcs.resolve(c["repo"], c["sha"])
+                if full is None:
+                    res.findings += rules.r1b_unclaimed(self.cfg, c["repo"], session, c["sha"], "the claimed commit is not in the repository")
+                    continue
+                claims[(c["repo"], session)] = full  # a later report overrides an earlier one
         heads: dict[str, str] = {}
         candidates: list[tuple[str, str, str]] = []
         for repo in self.cfg.repos:
@@ -206,9 +225,17 @@ class Hub:
                 st["alerts"].append(alert)  # report a foreign move once, not on every tick (R9)
                 res.findings += moved_now
             for s in self.cfg.sessions_of_repo(repo):
+                claim = claims.get((repo, s.name))
+                if claim is None or self.vcs.is_ancestor(repo, claim, ih):
+                    continue  # nothing claimed, or already integrated
                 sh = self.vcs.session_head(repo, s.name)
-                if sh and sh != st["branches"].get(repo, {}).get(s.name) and not self.vcs.is_ancestor(repo, sh, ih):
-                    candidates.append((repo, s.name, sh))
+                if sh is None or not self.vcs.is_ancestor(repo, claim, sh):
+                    res.findings += rules.r1b_unclaimed(self.cfg, repo, s.name, claim, f"the claimed commit is not on {s.branch_for(repo)}")
+                    continue
+                if sh != claim:
+                    extra = len(self.vcs.commit_subjects(repo, claim, sh))
+                    notices.append(f"R1b: {repo} {s.name}: {extra} commit(s) after the claimed {claim[:7]} are not integrated (no directive claims them)")
+                candidates.append((repo, s.name, claim))
         answered = [qid for qid, q in st["questions"].items() if q["status"] == "answered" and not q.get("processed")]
         pending = st.get("pending")
         if not new_posts and not candidates and not answered and not pending and not hard(res.findings):
@@ -245,7 +272,7 @@ class Hub:
                 st["integration"][repo] = h
 
         # ---------------------------------------------------------- 3 reproduce
-        reports, notices = self._parse_reports(new_posts)
+        notices += [self._exchange_note(x) for x in exchanges]
         if pending is None:
             evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st)
             pending = {
@@ -256,6 +283,7 @@ class Hub:
                 "findings": [p.__dict__ for p in res.findings],
                 "notices": notices,
                 "integrated": integrated,
+                "exchanges": [{"post": x["post"].__dict__, "head": x["head"]} for x in exchanges],
             }
         else:
             # a judgement was pending: fold in anything that arrived meanwhile
@@ -264,6 +292,7 @@ class Hub:
             pending["notices"] += notices
             pending["integrated"].update(integrated)
             pending["findings"] += [p.__dict__ for p in res.findings]
+            pending.setdefault("exchanges", []).extend({"post": x["post"].__dict__, "head": x["head"]} for x in exchanges)
         for p in new_posts:
             st["seen"][p.channel] = max(st["seen"].get(p.channel) or "", p.id)
         if dry_run:
@@ -284,6 +313,7 @@ class Hub:
             open_directives=[d["doc"] for d in st["directives"].values() if d["status"] == "open"],
         )
         ctx.answers = [dict(st["questions"][q], id=q) for q in answered]
+        ctx.exchanges = [x["head"] for x in pending.get("exchanges", [])]
         try:
             proposal = self.judge.propose(ctx)
         except NeedJudgement as e:
@@ -386,19 +416,36 @@ class Hub:
 
     # ================================================================== helpers
 
-    def _parse_reports(self, posts: list[Post]) -> tuple[list[dict[str, Any]], list[str]]:
-        reports, notices = [], []
+    def _parse_posts(self, posts: list[Post]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+        """Split new posts into reports (report/1) and exchanges (exchange/1, §3.5). Anything else is a notice."""
+        reports, exchanges, notices = [], [], []
         for p in posts:
             try:
-                head, body, notes = parse_post(p.text, "report/1")
+                head, body, notes = parse_post(p.text)
             except FormError as e:
-                notices.append(f"post {p.id} by {p.author} is not a report/1: {e}")
+                notices.append(f"post {p.id} by {p.author} is not a report/1 or exchange/1: {e}")
+                continue
+            if head["schema"] == "exchange/1":
+                if head["from"] != p.channel:
+                    notices.append(f"post {p.id}: exchange from {head['from']} posted in {p.channel}'s channel")
+                exchanges.append({"post": p, "head": head, "body": body})
+                continue
+            if head["schema"] != "report/1":
+                notices.append(f"post {p.id} by {p.author}: a session may post report/1 or exchange/1, not {head['schema']}")
                 continue
             if head["from"] != p.channel:
                 notices.append(f"post {p.id}: report from {head['from']} in {p.channel}'s channel")
             reports.append({"post": p, "head": head, "body": body})
             notices += [f"post {p.id}: {n}" for n in notes]
-        return reports, notices
+        return reports, exchanges, notices
+
+    @staticmethod
+    def _exchange_note(x: dict[str, Any]) -> str:
+        h = x["head"]
+        note = f"exchange {h['from']}→{h['to']} (not an action; BD-133): why {h['why']} · asked {h['asked']} · got {h['got']}"
+        if h.get("proposal"):
+            note += f" · proposal {h['proposal']}"
+        return note
 
     def _reproduce(self, heads, integrated, reports, findings, st):
         tested = {r: heads[r] for r in heads if self.cfg.repos[r].test or self.cfg.repos[r].package}
@@ -411,8 +458,8 @@ class Hub:
                 machine = {"class": cls, "cause": cause, **({"subclass": sub} if sub else {})}
 
         for p in hard(findings):
-            if p.rule in ("R2", "R3", "R4", "R6"):
-                worse("blocked", {"R2": "requirement", "R3": "environment", "R4": "implementation", "R6": "implementation"}[p.rule])
+            if p.rule in ("R1b", "R2", "R3", "R4", "R6"):
+                worse("blocked", {"R1b": "requirement", "R2": "requirement", "R3": "environment", "R4": "implementation", "R6": "implementation"}[p.rule])
         if tested and (integrated or reports):
             results = {}
             if "path" in self.modes:

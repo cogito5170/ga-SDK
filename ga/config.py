@@ -34,8 +34,8 @@ DEFAULT_WORKER_HEAD = (
 DEFAULT_WORKER_TAIL = "{hub_name}이랑 통신 시작해라"
 DEFAULT_WAKE = "[{tag}] 보고 {link}"
 
-RULE_IDS = tuple(f"R{i}" for i in range(1, 14))
-HARD_RULES = ("R2", "R3", "R4", "R5", "R6", "R9", "R12")
+RULE_IDS = ("R1", "R1b", *(f"R{i}" for i in range(2, 14)))
+HARD_RULES = ("R1b", "R2", "R3", "R4", "R5", "R6", "R9", "R12")
 
 
 @dataclass

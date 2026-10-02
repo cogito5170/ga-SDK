@@ -36,10 +36,20 @@ def _v(cfg: Config, rule: str, where: str, message: str) -> Problem:
 
 
 def r1_post(cfg: Config, channel: str, author: str) -> list[Problem]:
-    """Sessions do not talk to each other: only the channel's session and the hub write in a channel."""
+    """By default a session talks to the hub only: only the channel's session and the hub write in a channel.
+    A session that had to talk to another one reports it as exchange/1 in its own channel (§3.5)."""
     if author in (channel, cfg.hub_name):
         return []
-    return [_v(cfg, "R1", f"channel {channel}", f"{author} wrote in {channel}'s channel; send a Request to the hub instead")]
+    return [_v(cfg, "R1", f"channel {channel}", f"{author} wrote in {channel}'s channel: an unreported exchange? "
+               "send a Request to the hub, or report the exchange as exchange/1 in your own channel")]
+
+
+# ----------------------------------------------------------------------------- R1b
+
+
+def r1b_unclaimed(cfg: Config, repo: str, session: str, sha: str, why: str) -> list[Problem]:
+    """An exchange is not an action: every integrated change belongs to a directive (BD-133)."""
+    return [_v(cfg, "R1b", f"{repo}@{sha[:7]} ({session})", f"not integrated: {why}; changes need a directive (turn it into a Proposal)")]
 
 
 def requests_of(body: str) -> list[tuple[str, str]]:
@@ -261,7 +271,7 @@ def r13_commands(cfg: Config, text: str) -> list[Problem]:
 
 
 ALL = {
-    "R1": r1_post, "R2": r2_ownership, "R3": r3_push, "R4": r4_ff, "R5": r5_action, "R6": r6_secrets,
+    "R1": r1_post, "R1b": r1b_unclaimed, "R2": r2_ownership, "R3": r3_push, "R4": r4_ff, "R5": r5_action, "R6": r6_secrets,
     "R7": r7_done_when, "R8": r8_duplicate, "R9": r9_quiet, "R10": r10_wait, "R11": r11_counts,
     "R12": r12_budget, "R13": r13_commands,
 }
