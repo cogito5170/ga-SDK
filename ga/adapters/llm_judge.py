@@ -108,7 +108,7 @@ class LLMJudge:
         timeout: float = 300,
         max_runs: int | None = None,
         max_budget_usd: float | None = None,
-        use_json_schema: bool = True,
+        use_json_schema: bool = False,  # --json-schema with --tools "" is not verified against the real CLI yet
         extra_env: dict[str, str] | None = None,
     ):
         self.home = Path(home)

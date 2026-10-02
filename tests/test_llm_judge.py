@@ -27,7 +27,7 @@ class JudgePathsTest(unittest.TestCase):
         return LLMJudge(stub.dir / "jhome", executable=stub.exe, model="haiku", extra_env={"GA_STUB_DIR": str(stub.dir)}, **kw), stub
 
     def test_valid_reply(self):
-        j, stub = self.judge([{"do": "reply", "text": json.dumps(GOOD), "cost": 0.004}])
+        j, stub = self.judge([{"do": "reply", "text": json.dumps(GOOD), "cost": 0.004}], use_json_schema=True)
         out = j.propose(ctx())
         self.assertEqual(out["verdict"]["class"], "success")
         self.assertEqual(out["verdict"]["next"]["choice"], "wait")

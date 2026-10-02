@@ -141,3 +141,15 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - **한계(future):** pre-push 훅은 클라이언트 쪽이라 `git push --no-verify`로 건너뛸 수 있다.
   - 허용 도구에서 `--no-verify` 꼴은 빼 두었지만, `git -C <dir> push … --no-verify`처럼 앞머리가 같은 명령까지 다 막지는 못한다.
   - 확실한 자리는 원격 쪽 훅(bare 저장소의 `pre-receive`)이나 2판의 PreToolUse 훅이다.
+
+## 12. 받는 쪽 R3 · LLM Judge (CMD-GA3)
+
+- **pre-receive(`ga setup`):** 로컬 bare 원격에 R3 정책을 건다. pre-push 와 달리 받는 쪽에서 돌므로 `--no-verify` 로 건너뛸 수 없다.
+  - push 한 쪽의 이름은 `GA_SESSION` 이다. 세션 worktree 마다 `remote.<r>.receivepack = GA_SESSION=<세션> git-receive-pack`(worktree 설정)으로 붙고, 허브는 자기 이름으로 push 한다.
+  - 정책: 세션은 자기 브랜치만 push 하고, 허브는 통합 브랜치만 push 한다. 이름이 없는 push 는 관리하는 ref 에 쓸 수 없다. force 와 지우기는 거부한다. 거부할 때마다 원격의 `ga-refused.log` 에 한 줄을 남긴다.
+  - **한계:** 이름은 push 하는 쪽이 정한다. 셸을 마음대로 쓰는 쪽(`--receive-pack=…`)은 이름을 꾸밀 수 있다. 이 훅이 막는 것은 `--no-verify` 와 실수까지다. 악의를 막으려면 원격이 사람마다 신원을 확인해야 한다(GitHub 브랜치 보호 등).
+- **LLM Judge(`ga/adapters/llm_judge.py`):** `claude -p` 한 번이 판정 한 번이다.
+  - 도구는 쓰지 않는다(`--tools ""`). 세션을 저장하지 않고, 깨끗한 환경 · 임시 HOME 에서 돈다. 문맥은 stdin 의 JSON 이다.
+  - 답이 `verdict/1` 검사를 통과하지 못하거나, 호출이 실패하거나, 예산이 다하면 기계의 클래스를 그대로 두고 `ask_user` 로 물러선다. 초안 지시는 `directive/1` 을 통과할 때만 남긴다.
+  - 허브는 기계의 클래스를 바닥으로 지키고(더 엄하게만), 게이트에서 멈추며, 판정 호출의 수(비용 · 시간)를 남긴다.
+  - `--json-schema` 는 스텁으로만 시험했다. 실제 CLI 에서 `--tools ""` 와 함께 쓸 수 있는지 확인하지 않았기 때문에 기본은 끈다.

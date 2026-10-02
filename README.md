@@ -31,6 +31,12 @@ pip install -e .
 - 설정의 `budget`(예: `{"runs": 6, "cost": 1.0}`)을 넘을 턴은 실행하기 전에 멈추고 게이트 6으로 간다.
 - 실제 실행 기록은 [`examples/verify/headless_results.json`](examples/verify/headless_results.json)에 있다.
 
+## 받는 쪽 R3 와 LLM Judge
+
+- `ga setup`: 로컬 bare 원격에 pre-receive 훅을 단다. 남의 브랜치 push, force push, 지우기는 `--no-verify` 로 보내도 원격에서 막힌다.
+- 설정에 `"judge": {"kind": "llm", "model": "haiku", "max_runs": 10}` 을 넣으면 `claude -p` 가 판정과 다음 지시 초안을 제안한다. 기계의 클래스와 게이트가 그 위에 선다.
+- 실제 실행 기록은 [`examples/verify/ga3_results.json`](examples/verify/ga3_results.json) 에 있고, 재생에 쓴 사례는 [`judge_cases.json`](examples/verify/judge_cases.json) 이다.
+
 ## 시험
 
 ```sh

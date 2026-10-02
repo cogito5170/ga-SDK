@@ -1,0 +1,130 @@
+{
+  "model": "haiku",
+  "executable": "claude",
+  "max_runs": 6,
+  "pre_receive": {
+    "sent": true,
+    "turn_error": "",
+    "cost_usd": 0.039419800000000005,
+    "seconds": 16.979,
+    "refused_lines": 1,
+    "refused_no_verify_to_sess_a": true,
+    "sess_a_absent_on_beta_remote": true,
+    "own_branch_pushed": true
+  },
+  "judge_replay": {
+    "cases": [
+      {
+        "id": "r51-A4",
+        "truth": {
+          "class": "partial",
+          "subclass": "crossed",
+          "cause": null
+        },
+        "confidence": "high",
+        "predicted": {
+          "class": "partial",
+          "subclass": null,
+          "cause": "requirement",
+          "next": "refine"
+        },
+        "class_match": true,
+        "cause_match": null,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.04656199999999999,
+        "seconds": 71.377
+      },
+      {
+        "id": "r56-M20",
+        "truth": {
+          "class": "partial",
+          "subclass": null,
+          "cause": "hub_directive"
+        },
+        "confidence": "high",
+        "predicted": {
+          "class": "partial",
+          "subclass": "skipped",
+          "cause": "hub_directive",
+          "next": "ask_user"
+        },
+        "class_match": true,
+        "cause_match": true,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.035003,
+        "seconds": 59.048
+      },
+      {
+        "id": "r79-K2",
+        "truth": {
+          "class": "partial",
+          "subclass": null,
+          "cause": "hub_directive"
+        },
+        "confidence": "high",
+        "predicted": {
+          "class": "partial",
+          "subclass": null,
+          "cause": "hub_directive",
+          "next": "ask_user"
+        },
+        "class_match": true,
+        "cause_match": true,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.032124,
+        "seconds": 56.388
+      },
+      {
+        "id": "r90-K7",
+        "truth": {
+          "class": "success",
+          "subclass": null,
+          "cause": null
+        },
+        "confidence": "high",
+        "predicted": {
+          "class": "success",
+          "subclass": null,
+          "cause": null,
+          "next": "ask_user"
+        },
+        "class_match": true,
+        "cause_match": null,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.037849,
+        "seconds": 52.592
+      },
+      {
+        "id": "r12-T10",
+        "truth": {
+          "class": "failure",
+          "subclass": null,
+          "cause": "implementation"
+        },
+        "confidence": "medium",
+        "predicted": {
+          "class": "partial",
+          "subclass": null,
+          "cause": "measurement",
+          "next": "verify"
+        },
+        "class_match": false,
+        "cause_match": false,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.043102,
+        "seconds": 78.392
+      }
+    ],
+    "class_match": "4/5",
+    "cause_match": "2/3",
+    "valid_replies": "5/5",
+    "cost_usd": 0.19464
+  },
+  "runs_used": 6,
+  "cost_total_usd": 0.23406
+}
