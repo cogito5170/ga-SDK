@@ -1,0 +1,76 @@
+{
+  "model": "haiku",
+  "executable": "claude",
+  "max_runs": 6,
+  "steps": [
+    {
+      "send": "CMD-A1",
+      "sent": true,
+      "gates": [],
+      "findings": []
+    },
+    {
+      "send": "CMD-B1",
+      "sent": true,
+      "gates": [],
+      "findings": []
+    },
+    {
+      "tick": 1,
+      "integrated": [
+        "alpha",
+        "beta"
+      ],
+      "verdict": "success",
+      "sent": [
+        "CMD-A2"
+      ],
+      "hard": []
+    },
+    {
+      "tick": 2,
+      "integrated": [
+        "alpha"
+      ],
+      "verdict": "success",
+      "quiet": false,
+      "hard": []
+    }
+  ],
+  "runs": 3,
+  "cost_total_usd": 0.205965,
+  "turns": [
+    {
+      "session": "A",
+      "directive": "CMD-A1",
+      "error": "",
+      "cost_usd": 0.05631510000000001,
+      "seconds": 20.852,
+      "resumed_previous": false
+    },
+    {
+      "session": "B",
+      "directive": "CMD-B1",
+      "error": "",
+      "cost_usd": 0.0639411,
+      "seconds": 25.597,
+      "resumed_previous": false
+    },
+    {
+      "session": "A",
+      "directive": "CMD-A2",
+      "error": "",
+      "cost_usd": 0.08570830000000002,
+      "seconds": 13.893,
+      "resumed_previous": true
+    }
+  ],
+  "session_id_reused_by_cli": true,
+  "resume_recalled_word": true,
+  "a1_integrated": true,
+  "b1_integrated": true,
+  "foreign_push_blocked": true,
+  "seconds_total": 61.0,
+  "child_traces_in_real_claude_dir": 0,
+  "note": "This run's script measured a fingerprint of the whole ~/.claude and reported false: the parent session's own transcript (projects/-home-user) changed during the run. Checked afterwards: ~/.claude/projects holds only -home-user, no project dir for the run's /tmp/ga-world-* paths, and the run's code word appears nowhere outside the parent's transcript. The script now measures child traces directly."
+}

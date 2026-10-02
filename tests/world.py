@@ -6,6 +6,7 @@ is played by functions here.
 from __future__ import annotations
 
 import io
+import json
 import os
 import shutil
 import subprocess
@@ -109,6 +110,8 @@ class World:
         }
         (self.tmp / "G.md").write_text("허브 안내\n", encoding="utf-8")
         (self.tmp / "SG.md").write_text("세션 안내\n", encoding="utf-8")
+        self.raw = raw
+        (self.tmp / "ga.json").write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")  # for the ga CLI
         self.cfg = gacfg.from_dict(raw, self.tmp)
         self.ga = self.tmp / ".ga"
         self.mail = FileMailbox(self.ga / "mailbox")

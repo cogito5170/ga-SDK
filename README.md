@@ -23,6 +23,14 @@ pip install -e .
    - 게이트에 걸리면 `.ga/questions/`에 질문이 생긴다. 사용자는 `ga answer <질문> <선택지>`로 답한다.
 6. 새 것이 없을 때 `ga tick`은 아무것도 쓰지 않는다. 그래서 cron에 걸어 안전망으로 쓸 수 있다.
 
+## 헤드리스 Runner (2판 첫째)
+
+설정에 `"runner": {"kind": "headless", "model": "haiku", "max_budget_usd": 0.5}`를 넣으면, `ga send`와 `ga tick`이 지시를 보낼 때 작업 세션의 한 턴을 `claude -p`로 직접 돌린다.
+- 턴이 끝나면 세션 id를 받아 두고, 다음 턴은 `--resume`으로 이어 간다. 턴마다 비용과 시간을 `.ga/state.json`에 수로만 남긴다.
+- 자식 실행은 깨끗한 환경에서 돈다. HOME과 `CLAUDE_CONFIG_DIR`은 `.ga/headless/home` 아래이고, 이 프로세스의 `CLAUDE_CODE_*` 변수는 넘기지 않는다. 권한은 `--permission-mode acceptEdits`와 허용 도구 목록으로 좁힌다.
+- 설정의 `budget`(예: `{"runs": 6, "cost": 1.0}`)을 넘을 턴은 실행하기 전에 멈추고 게이트 6으로 간다.
+- 실제 실행 기록은 [`examples/verify/headless_results.json`](examples/verify/headless_results.json)에 있다.
+
 ## 시험
 
 ```sh

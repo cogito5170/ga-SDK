@@ -128,3 +128,16 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - **Bundle (b) 의 시험:** 설치된 패키지에 대고, 내보낸 소스 트리에서 돈다. flat 배치 저장소는 현재 디렉터리가 sys.path 앞에 오므로 설치본 대신 소스를 import 할 수 있다(partially verified).
 - **Python ≥ 3.12:** venv 에 setuptools 가 없으므로 Bundle 이 setuptools 를 먼저 깐다. 설정의 pip 인자를 쓰고, 오프라인이면 `--find-links` 를 쓴다.
 - **§10 "게이트는 설정으로 더 넣을 수만 있다":** 게이트를 더 넣는 설정은 아직 없다. 일곱 개는 고정이고 끌 수 없다.
+
+## 11. 2판 첫째: 로컬 헤드리스 Runner (CMD-GA2)
+
+- `ga/adapters/headless.py`: 한 턴 = `claude -p --output-format json` 한 번이다.
+  - 프롬프트는 stdin으로 넘긴다. 다음 턴은 `--resume <session id>`로 이어 간다.
+  - 권한은 `--permission-mode` · `--allowedTools` · `--disallowedTools`로 좁히고, 턴마다 `--max-budget-usd`로 비용을 막는다.
+  - 깨끗한 환경에서 돈다: 임시 HOME · `CLAUDE_CONFIG_DIR`을 쓰고 `CLAUDE_CODE_*`는 넘기지 않는다.
+- `TurnResult`에 `error` · `seconds`를 더했다. 둘 다 기본값이 있어 0.1의 Runner들은 그대로 돈다.
+- 허브는 턴마다 수만 남긴다(`state.turns`): 비용 · 시간 · 이어 간 id · 오류. 프롬프트, transcript, 답 글은 남기지 않는다.
+- R12는 한도에 이미 닿은 비용도 실행 전에 멈춘다. 다음 턴의 비용은 미리 알 수 없기 때문이다.
+- **한계(future):** pre-push 훅은 클라이언트 쪽이라 `git push --no-verify`로 건너뛸 수 있다.
+  - 허용 도구에서 `--no-verify` 꼴은 빼 두었지만, `git -C <dir> push … --no-verify`처럼 앞머리가 같은 명령까지 다 막지는 못한다.
+  - 확실한 자리는 원격 쪽 훅(bare 저장소의 `pre-receive`)이나 2판의 PreToolUse 훅이다.
