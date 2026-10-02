@@ -114,6 +114,15 @@ class GuardProtocolTest(unittest.TestCase):
         p = subprocess.run(hook["hooks"][0]["command"], shell=True, capture_output=True, text=True,
                            input=json.dumps({"tool_name": "Bash", "tool_input": {"command": "git -c core.hooksPath=/x push"}}))
         self.assertEqual(json.loads(p.stdout)["hookSpecificOutput"]["permissionDecision"], "deny")
+        # in a sandboxed turn, a rule the sandbox covers by structure logs instead of blocking ordinary work
+        cmd_sb = hook["hooks"][0]["command"] + " --sandboxed"
+        ev = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git --git-dir=beta/.git log -1"}})
+        self.assertEqual(json.loads(subprocess.run(cmd_sb, shell=True, capture_output=True, text=True, input=ev).stdout), {})
+        self.assertEqual(json.loads(subprocess.run(hook["hooks"][0]["command"], shell=True, capture_output=True, text=True, input=ev).stdout)
+                         ["hookSpecificOutput"]["permissionDecision"], "deny")  # not sandboxed: still denied
+        ev2 = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git push --no-verify origin x"}})
+        self.assertEqual(json.loads(subprocess.run(cmd_sb, shell=True, capture_output=True, text=True, input=ev2).stdout)
+                         ["hookSpecificOutput"]["permissionDecision"], "deny")  # only the covered rules relax
         no_guard = stub.runner(guard=False)
         self.assertNotIn("--settings", no_guard.argv(TurnRequest("A", "x", stub.dir)))
 

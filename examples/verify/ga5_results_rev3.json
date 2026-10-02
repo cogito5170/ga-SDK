@@ -1,0 +1,68 @@
+{
+  "model": "haiku",
+  "executable": "claude",
+  "sandbox_available": true,
+  "turns": [
+    {
+      "session": "A",
+      "directive": "CMD-A1",
+      "error": "",
+      "cost": 0.057856700000000004,
+      "seconds": 23.632,
+      "sandboxed": true
+    },
+    {
+      "session": "B",
+      "directive": "CMD-B1",
+      "error": "",
+      "cost": 0.05845070000000001,
+      "seconds": 31.838,
+      "sandboxed": true
+    }
+  ],
+  "guard": {
+    "A": {
+      "calls": 10,
+      "denied": []
+    },
+    "B": {
+      "calls": 8,
+      "denied": []
+    }
+  },
+  "reports_received": 2,
+  "integrated": [
+    "alpha",
+    "beta"
+  ],
+  "verdict": "success",
+  "alpha_integ_moved": true,
+  "alpha_file_ok": true,
+  "beta_integ_moved": true,
+  "beta_file_ok": true,
+  "diagnostics": {
+    "A": {
+      "commits_in_clone": 1,
+      "hub_pulled_branch": true,
+      "session_posts": 1,
+      "report_file_left_in_dir": true,
+      "report_file_parses": true,
+      "report_claims": 1,
+      "claimed_sha_known_to_hub": true,
+      "guard_rules_seen": []
+    },
+    "B": {
+      "commits_in_clone": 1,
+      "hub_pulled_branch": true,
+      "session_posts": 1,
+      "report_file_left_in_dir": true,
+      "report_file_parses": true,
+      "report_claims": 1,
+      "claimed_sha_known_to_hub": true,
+      "guard_rules_seen": []
+    }
+  },
+  "round_notices": [],
+  "runs": 2,
+  "cost_total_usd": 0.116307
+}

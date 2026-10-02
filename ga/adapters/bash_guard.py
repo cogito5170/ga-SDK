@@ -72,13 +72,21 @@ def decide(event: dict) -> tuple[str, str]:
     return "allow", ""
 
 
+# Rules whose harm the OS write sandbox already prevents by structure. In a sandboxed turn they only log
+# ("<rule>:sandbox-covered") instead of blocking, so they do not stop ordinary work (CMD-GA5 rev 3).
+SANDBOX_COVERED = {"other_repo"}
+
+
 def main(argv: list[str]) -> int:
     log = argv[argv.index("--log") + 1] if "--log" in argv else None
+    sandboxed = "--sandboxed" in argv
     try:
         event = json.loads(sys.stdin.read())
         if not isinstance(event, dict):
             raise ValueError("not an object")
         decision, rule = decide(event)
+        if decision == "deny" and sandboxed and rule in SANDBOX_COVERED:
+            decision, rule = "allow", f"{rule}:sandbox-covered"
         tool = event.get("tool_name")
     except Exception:  # closing side: what cannot be read is denied
         decision, rule, tool = "deny", "unreadable", None

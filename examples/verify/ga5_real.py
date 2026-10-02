@@ -86,6 +86,21 @@ def main() -> int:
                 "session_posts": sum(1 for x in w.mail.read(s) if x.author == s),
                 "report_file_left_in_dir": (w.ga / "worktrees" / s / "report.md").exists(),
             }
+            rp = w.ga / "worktrees" / s / "report.md"
+            if rp.exists():
+                from ga.forms import FormError, parse_post
+                try:
+                    head, _, _ = parse_post(rp.read_text(encoding="utf-8"), "report/1")
+                    diag[s]["report_file_parses"] = True
+                    diag[s]["report_claims"] = len(head.get("commits", []))
+                    claimed = head.get("commits", [{}])[0].get("sha", "")
+                    diag[s]["claimed_sha_known_to_hub"] = bool(claimed) and w.vcs.resolve(repo, claimed) is not None
+                except FormError as e:
+                    diag[s]["report_file_parses"] = False
+                    diag[s]["parse_problem"] = [p.message[:80] for p in e.problems][:3]
+            log = runner.guard_log(s)
+            rows = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
+            diag[s]["guard_rules_seen"] = sorted({r["rule"] for r in rows if r["rule"]})
         out["diagnostics"] = diag
         rounds = w.hub.records.all("round/1")
         out["round_notices"] = [n[:160] for r in rounds for n in r.get("notices", [])]
