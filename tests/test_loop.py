@@ -93,6 +93,47 @@ class LoopTest(unittest.TestCase):
         finally:
             w.close()
 
+    def test_pre_receive_holds_even_with_no_verify(self):
+        w = World(remote=True)
+        try:
+            self.assertEqual(len(w.hooks), 2)
+            w.hub.send(directive("CMD-A1", "A"))
+            wt = w.vcs.session_worktree("A", "alpha")
+            w.work("A", "alpha", {"x.txt": "1\n"})
+            for argv, why in (
+                (["push", "--no-verify", "origin", "HEAD:refs/heads/sess-b"], "may push only to refs/heads/sess-a"),
+                (["push", "--no-verify", "origin", "HEAD:refs/heads/integ"], "may push only to refs/heads/sess-a"),
+                (["push", "--no-verify", "origin", "HEAD:refs/heads/new-branch"], "may push only to refs/heads/sess-a"),
+                (["push", "--no-verify", "origin", ":sess-a"], "deleting"),
+            ):
+                with self.subTest(argv=argv):
+                    with self.assertRaises(GitError) as e:
+                        git(wt, *argv)
+                    self.assertIn(why, str(e.exception))
+            git(wt, "reset", "--quiet", "--hard", "HEAD~1")
+            git(wt, "commit", "--quiet", "--allow-empty", "-m", "rewrite")
+            with self.assertRaises(GitError) as e:
+                git(wt, "push", "--no-verify", "--force", "origin", "sess-a")
+            self.assertIn("non-fast-forward", str(e.exception))
+            log = (w.tmp / "remotes" / "alpha.git" / "ga-refused.log").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(log), 5)
+            self.assertIn("who=A ref=refs/heads/sess-b", log[0])
+            # an unnamed pusher (the person's own checkout) may not touch managed refs, but may push others
+            main = w.repos["alpha"]
+            git(main, "commit", "--quiet", "--allow-empty", "-m", "person's own commit")  # so the push is not a no-op
+            with self.assertRaises(GitError) as e:
+                git(main, "push", "--no-verify", "origin", "main:refs/heads/integ")
+            self.assertIn("managed by ga", str(e.exception))
+            git(main, "push", "--quiet", "--no-verify", "origin", "main:refs/heads/scratch")
+            # the hub's own fast-forward goes through (it names itself)
+            git(wt, "reset", "--quiet", "--hard", "origin/sess-a")
+            sha = git(wt, "rev-parse", "HEAD")
+            w.report("A", [("CMD-A1", 1, "done")], [("alpha", sha)])
+            self.assertEqual(w.hub.tick().integrated, {"alpha": sha})
+            self.assertEqual(git(w.tmp / "remotes" / "alpha.git", "rev-parse", "integ"), sha)
+        finally:
+            w.close()
+
     def test_runner_interface_takes_headless_and_remote_fakes(self):
         # headless: knows the end of the turn and the cost; the session works inside run_turn
         holder = {}

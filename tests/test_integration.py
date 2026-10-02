@@ -145,11 +145,14 @@ class IntegrationTest(unittest.TestCase):
         w.report("A", [("CMD-A1", 1, "done")], [("alpha", sha)])
         w.hub.tick()
         # someone pushes the integration branch directly (no hook in the person's checkout)
+        # (an admin moves it on the remote itself: an ordinary push is refused by the pre-receive hook)
         main = w.repos["alpha"]
         git(main, "fetch", "--quiet", "origin")
         git(main, "checkout", "--quiet", "-B", "tmp", "origin/integ")
         git(main, "commit", "--quiet", "--allow-empty", "-m", "direct")
-        git(main, "push", "--quiet", "origin", "tmp:integ")
+        bare = w.tmp / "remotes" / "alpha.git"
+        git(main, "push", "--quiet", "--no-verify", str(bare), "tmp:refs/heads/admin-tmp")
+        git(bare, "update-ref", "refs/heads/integ", git(main, "rev-parse", "tmp"))
         res = w.hub.tick()
         self.assertIn("R3", [p.rule for p in res.findings if p.strength == "hard"])
         self.assertEqual(res.verdict["class"], "blocked")

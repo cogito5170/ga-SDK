@@ -51,6 +51,16 @@ elif do == "badjson":
     print('{"type": "result", "session_id": ')
 elif do == "is_error":
     result(0.02, True, "error_max_turns")
+elif do == "reply":
+    out = {"type": "result", "subtype": "success", "is_error": False, "result": step.get("text", ""), "session_id": sid,
+           "total_cost_usd": step.get("cost", 0.004), "num_turns": 1}
+    if "structured" in step:
+        out["structured_output"] = step["structured"]
+    print(json.dumps(out, ensure_ascii=False))
+elif do == "cmd":
+    p = subprocess.run(step["argv"], cwd=os.getcwd(), capture_output=True, text=True)
+    (d / f"cmd-{n}.json").write_text(json.dumps({"code": p.returncode, "stderr": p.stderr[-2000:]}), encoding="utf-8")
+    result(step.get("cost", 0.01))
 elif do == "work":
     sys.path.insert(0, step["ga_root"])
     from ga.adapters.mailbox import FileMailbox

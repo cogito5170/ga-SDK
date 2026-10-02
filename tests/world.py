@@ -75,7 +75,7 @@ class World:
 
     def __init__(self, judge_fn: Callable[[JudgeContext], dict[str, Any]] | None = None, remote: bool = False,
                  modes: tuple[str, ...] = ("path",), runner=None, budget: dict | None = None, shared_alpha: bool = False,
-                 beta_deps: list[str] | None = None):
+                 beta_deps: list[str] | None = None, server_hooks: bool = True):
         self.tmp_obj = tempfile.TemporaryDirectory(prefix="ga-world-")
         self.tmp = Path(self.tmp_obj.name)
         isolate_git(self.tmp)
@@ -124,6 +124,8 @@ class World:
         self.hub = Hub(self.cfg, ga_dir=self.ga, channel=self.mail, vcs=self.vcs, judge=CallableJudge(self._judge),
                        runner=self.runner, bundle=VenvBundle(self.cfg, self.vcs, self.ga / "bundle"), modes=modes,
                        today=lambda: "2026-10-02")
+        if remote and server_hooks:
+            self.hooks = self.hub.setup()
 
     # ------------------------------------------------------------------ setup
 

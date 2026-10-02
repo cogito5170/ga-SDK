@@ -93,6 +93,10 @@ class Hub:
     def save_state(self, st: dict[str, Any]) -> None:
         self._write(self.state_path, canonical_json(st))
 
+    def setup(self) -> list[Path]:
+        """Install the receiving-side R3 hook on every local bare remote. Returns the hooks written."""
+        return [h for h in (self.vcs.install_pre_receive(r) for r in self.cfg.repos) if h is not None]
+
     # ================================================================== sending (stage 6)
 
     def send(self, directive: dict[str, Any], body: str = "", st: dict[str, Any] | None = None, round_n: int | None = None) -> tuple[Post | None, list[Problem], list[Gate]]:
@@ -331,6 +335,12 @@ class Hub:
             res.waiting_for = str(e.request_path)
             res.writes = self._writes + (1 if e.wrote else 0)
             return res
+        jrec = proposal.get("judge")
+        if isinstance(jrec, dict) and "cost" in jrec:  # an LLM judge call: numbers only
+            st.setdefault("judge_calls", []).append(dict(jrec, round=n))
+            st["spent"]["judge_runs"] = st["spent"].get("judge_runs", 0) + 1
+            if jrec.get("cost") is not None:
+                st["spent"]["cost"] = round(st["spent"].get("cost", 0) + jrec["cost"], 6)
         verdict = self._settle_verdict(proposal["verdict"], pending["machine"], pending["evidence"], findings, n)
         res.verdict = verdict
 
@@ -341,7 +351,9 @@ class Hub:
         for r in all_reports:
             gates += detect(self.cfg, report=r["head"], body=r["body"], findings=[], user_decision=self._is_user_decision)
             self._mark_handled(st, r["head"])
-        gates += detect(self.cfg, proposal={"action": proposal.get("action"), "next": verdict["next"]["choice"], "reason": verdict["next"]["reason"]},
+        # the judge's own "ask_user" is a gate only when nothing else already stops this round (one question, not two)
+        gates += detect(self.cfg, proposal={"action": proposal.get("action"), "next": None if gates else verdict["next"]["choice"],
+                                            "reason": verdict["next"]["reason"]},
                         findings=findings, user_decision=self._is_user_decision)
         gates = [g for g in gates if g.number not in approved]
 

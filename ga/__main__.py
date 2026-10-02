@@ -1,5 +1,6 @@
 """``python -m ga`` (or ``ga``) — the local, no-infrastructure front of the hub loop.
 
+    ga setup                                    install the receiving-side R3 hook on local bare remotes
     ga tick    [--dry-run]                      one pass of the loop (cron it for a safety net)
     ga post    --channel S --from S FILE         a session hands in a report (FILE: report/1 text, - = stdin)
     ga send    FILE                              the hub sends a directive (directive/1 text)
@@ -21,6 +22,7 @@ from . import config as gacfg
 from . import rules
 from .adapters.git import GitVcs
 from .adapters.human import FileJudge
+from .adapters.llm_judge import LLMJudge
 from .adapters.mailbox import FileMailbox
 from .adapters.headless import HeadlessRunner
 from .adapters.runner import ManualRunner
@@ -38,7 +40,19 @@ def _hub(args) -> Hub:
     cfg = gacfg.load(args.config)
     ga_dir = Path(args.ga_dir) if args.ga_dir else Path(args.config).resolve().parent / ".ga"
     return Hub(cfg, ga_dir=ga_dir, channel=FileMailbox(ga_dir / "mailbox"), vcs=GitVcs(cfg, ga_dir),
-               judge=FileJudge(ga_dir / "judge"), runner=make_runner(cfg, ga_dir))
+               judge=make_judge(cfg, ga_dir), runner=make_runner(cfg, ga_dir))
+
+
+def make_judge(cfg, ga_dir: Path):
+    """config "judge": {"kind": "file"} (default: a person answers in .ga/judge) or
+    {"kind": "llm", "model", "timeout", "max_runs", "max_budget_usd", "executable"}."""
+    j = dict(cfg.judge)
+    kind = j.pop("kind", "file")
+    if kind == "file":
+        return FileJudge(ga_dir / "judge")
+    if kind == "llm":
+        return LLMJudge(ga_dir / "judge" / "home", **j)
+    raise SystemExit(f"unknown judge kind {kind!r}")
 
 
 def make_runner(cfg, ga_dir: Path):
@@ -65,6 +79,12 @@ def cmd_tick(args) -> int:
         "findings": [str(p) for p in res.findings],
     }
     print(json.dumps(out, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_setup(args) -> int:
+    for hook in _hub(args).setup():
+        print(hook)
     return 0
 
 
@@ -144,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ga-dir", default=None)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("tick"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_tick)
+    p = sub.add_parser("setup"); p.set_defaults(fn=cmd_setup)
     p = sub.add_parser("post"); p.add_argument("--channel", required=True); p.add_argument("--from", dest="author", required=True)
     p.add_argument("file"); p.set_defaults(fn=cmd_post)
     p = sub.add_parser("send"); p.add_argument("file"); p.set_defaults(fn=cmd_send)

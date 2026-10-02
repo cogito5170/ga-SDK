@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import subprocess
 import tarfile
 from pathlib import Path
@@ -42,6 +43,62 @@ while read local_ref local_sha remote_ref remote_sha; do
 done
 exit $status
 """
+
+
+PRE_RECEIVE = """#!/bin/sh
+# ga-SDK pre-receive hook (METHOD R3, receiving side) for repository {repo}. Installed by ga; edit the ga config instead.
+# Unlike pre-push this runs on the remote, so `git push --no-verify` does not skip it.
+# The pusher is named by GA_SESSION, which ga sets per session worktree (remote.<name>.receivepack) and for the hub's own push.
+who="${{GA_SESSION:-}}"
+integ='refs/heads/{integ}'
+own_ref() {{
+  case "$1" in
+{own_cases}
+    *) echo "" ;;
+  esac
+}}
+managed() {{
+  case "$1" in
+{managed_cases}
+  esac
+  return 1
+}}
+status=0
+refuse() {{
+  echo "ga R3: $1" >&2
+  # audit trail in the remote (one line per refusal; no content)
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) who=${{who:-?}} ref=$ref $1" >> ga-refused.log 2>/dev/null
+  status=1
+}}
+while read old new ref; do
+  if expr "$new" : '0*$' >/dev/null; then
+    if [ -n "$who" ] || managed "$ref"; then
+      refuse "deleting $ref is refused"; continue
+    fi
+  fi
+  if [ "$who" = '{hub}' ]; then
+    if [ "$ref" != "$integ" ]; then refuse "the hub pushes only $integ, not $ref"; continue; fi
+  elif [ -n "$who" ]; then
+    allowed=$(own_ref "$who")
+    if [ -z "$allowed" ]; then refuse "unknown pusher $who"; continue; fi
+    if [ "$ref" != "$allowed" ]; then refuse "session $who may push only to $allowed, not $ref"; continue; fi
+  elif managed "$ref"; then
+    refuse "$ref is managed by ga; push it from its session worktree"; continue
+  fi
+  if ! expr "$old" : '0*$' >/dev/null && ! expr "$new" : '0*$' >/dev/null; then
+    if ! git merge-base --is-ancestor "$old" "$new" 2>/dev/null; then
+      refuse "non-fast-forward (force) push to $ref is refused"
+    fi
+  fi
+done
+exit $status
+"""
+
+SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+
+
+def _receivepack(who: str) -> str:
+    return f"GA_SESSION={who} git-receive-pack"
 
 
 class GitError(RuntimeError):
@@ -145,8 +202,9 @@ class GitVcs:
             raise GitError(f"{repo}: {new[:7]} is not a fast-forward of {branch}@{old[:7]}")
         remote = self._remote(repo)
         if remote:
-            # no force: the remote refuses a non-fast-forward by itself
-            git(rd, "-c", "push.negotiate=false", "push", "--quiet", remote, f"{new}:refs/heads/{branch}")
+            # no force: the remote refuses a non-fast-forward by itself; the hub names itself to the pre-receive hook
+            git(rd, "-c", "push.negotiate=false", "push", "--quiet", f"--receive-pack={_receivepack(self.cfg.hub_name)}",
+                remote, f"{new}:refs/heads/{branch}")
             git(rd, "fetch", "--quiet", remote)
         local_old = git(rd, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False) or None
         if local_old is None or self.is_ancestor(repo, local_old, new):
@@ -180,7 +238,45 @@ class GitVcs:
                     raise GitError(f"{repo}: neither {branch} nor {self.cfg.integration_branch} exists")
                 git(rd, "worktree", "add", "--quiet", "-b", branch, str(wt), start)
         self.install_pre_push(session, repo)
+        if self._remote(repo):
+            # every push from this worktree names its session to the remote's pre-receive hook
+            git(wt, "config", "--worktree", f"remote.{self._remote(repo)}.receivepack", _receivepack(session))
         return wt
+
+    def local_remote_dir(self, repo: str) -> Path | None:
+        """The remote's directory when the remote is a local (bare) repository, else None."""
+        if not self._remote(repo):
+            return None
+        url = self.remote_url(repo)
+        if url.startswith("file://"):
+            url = url[len("file://"):]
+            url = url[len("localhost"):] if url.startswith("localhost/") else url
+        elif "://" in url or re.match(r"^[\w.-]+@[\w.-]+:", url):
+            return None
+        p = Path(url)
+        p = p if p.is_absolute() else (self.repo_dir(repo) / p)
+        return p.resolve() if p.exists() else None
+
+    def install_pre_receive(self, repo: str) -> Path | None:
+        """Install the R3 policy on a local bare remote (METHOD R3, receiving side). None if the remote is not local."""
+        remote_dir = self.local_remote_dir(repo)
+        if remote_dir is None:
+            return None
+        names = [self.cfg.hub_name, self.cfg.integration_branch]
+        own = {s.name: s.branch_for(repo) for s in self.cfg.sessions_of_repo(repo)}
+        for n in names + list(own) + list(own.values()):
+            if not SAFE_NAME.match(n):
+                raise GitError(f"name {n!r} is not safe to put in a hook")
+        own_cases = "\n".join(f"    '{s}') echo 'refs/heads/{b}' ;;" for s, b in own.items())
+        refs = [self.cfg.integration_branch, *own.values()]
+        managed_cases = "\n".join(f"    'refs/heads/{b}') return 0 ;;" for b in dict.fromkeys(refs))
+        hooks = (remote_dir / "hooks") if (remote_dir / "hooks").is_dir() or not (remote_dir / ".git").exists() else remote_dir / ".git" / "hooks"
+        hooks.mkdir(parents=True, exist_ok=True)
+        hook = hooks / "pre-receive"
+        hook.write_text(PRE_RECEIVE.format(repo=repo, integ=self.cfg.integration_branch, hub=self.cfg.hub_name,
+                                           own_cases=own_cases, managed_cases=managed_cases), encoding="utf-8")
+        hook.chmod(0o755)
+        return hook
 
     def install_pre_push(self, session: str, repo: str) -> Path:
         branch = self.cfg.sessions[session].branch_for(repo)

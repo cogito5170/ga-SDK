@@ -12,6 +12,7 @@ import unittest
 from pathlib import Path
 
 from ga.adapters.base import TurnRequest
+from ga.adapters.git import git
 from ga.adapters.headless import HeadlessRunner
 
 from world import GIT_ENV, World, directive, proposal
@@ -174,6 +175,20 @@ class HubWithHeadlessTest(unittest.TestCase):
         res = w.hub.tick()
         self.assertEqual([q["gate"] for q in res.gates], [6])
         self.assertEqual(len(stub.calls()), 1)
+
+    def test_no_verify_push_in_a_turn_is_refused_by_pre_receive(self):
+        stub = Stub([])
+        self.addCleanup(stub.close)
+        w = World(remote=True, runner=stub.runner())
+        self.addCleanup(w.close)
+        (stub.dir / "plan.json").write_text(json.dumps([
+            {"do": "cmd", "argv": ["git", "-C", "beta", "push", "--no-verify", "origin", "HEAD:refs/heads/sess-a"]},
+        ]), encoding="utf-8")
+        w.hub.send(directive("CMD-B1", "B"))
+        out = json.loads((stub.dir / "cmd-0.json").read_text(encoding="utf-8"))
+        self.assertNotEqual(out["code"], 0)
+        self.assertIn("ga R3: session B may push only to refs/heads/sess-b", out["stderr"])
+        self.assertFalse(git(w.tmp / "remotes" / "beta.git", "rev-parse", "--verify", "--quiet", "refs/heads/sess-a", check=False))
 
     def test_failed_turn_is_recorded_and_directive_stays_open(self):
         w, stub = self.make(lambda w: [{"do": "exit", "code": 2}])

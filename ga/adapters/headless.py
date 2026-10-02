@@ -15,6 +15,7 @@ import json
 import os
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -89,29 +90,45 @@ class HeadlessRunner:
         return argv + self.extra_args
 
     def run_turn(self, req: TurnRequest) -> TurnResult:
-        start = time.monotonic()
-        try:
-            p = subprocess.run(self.argv(req), input=req.prompt, text=True, capture_output=True,
-                               cwd=str(req.workdir), env=self.env(), timeout=self.timeout)
-        except subprocess.TimeoutExpired:
-            return TurnResult(ended=True, error="timeout", seconds=round(time.monotonic() - start, 3), note=f"killed after {self.timeout:g}s")
-        except OSError as e:
-            return TurnResult(ended=True, error="not_started", seconds=round(time.monotonic() - start, 3), note=type(e).__name__)
-        secs = round(time.monotonic() - start, 3)
-        try:
-            data = json.loads(p.stdout)
-            if not isinstance(data, dict):
-                raise ValueError("not an object")
-        except ValueError:
-            return TurnResult(ended=True, error="bad_json" if p.returncode == 0 else f"exit {p.returncode}", seconds=secs,
-                              note=f"stdout {len(p.stdout)} bytes, stderr {len(p.stderr)} bytes")
-        cost = data.get("total_cost_usd")
-        cost = float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None
-        sid = data.get("session_id") if isinstance(data.get("session_id"), str) else None
-        error = ""
-        if p.returncode != 0:
-            error = f"exit {p.returncode}"
-        elif data.get("is_error"):
-            error = f"is_error:{data.get('subtype', '?')}"
-        return TurnResult(ended=True, session_id=sid, cost=cost, error=error, seconds=secs,
-                          note=f"num_turns {data.get('num_turns')}" if "num_turns" in data else "")
+        call = run_claude(self.argv(req), req.prompt, Path(req.workdir), self.env(), self.timeout)
+        data = call.data or {}
+        return TurnResult(ended=True, session_id=call.session_id, cost=call.cost, error=call.error, seconds=call.seconds,
+                          note=f"num_turns {data.get('num_turns')}" if "num_turns" in data else call.note)
+
+
+@dataclass
+class ClaudeCall:
+    data: dict | None
+    error: str
+    seconds: float
+    cost: float | None = None
+    session_id: str | None = None
+    note: str = ""
+
+
+def run_claude(argv: list[str], stdin: str, cwd: Path, env: dict[str, str], timeout: float) -> ClaudeCall:
+    """One ``claude -p --output-format json`` call. Never raises; the kind of failure is in ``error``."""
+    start = time.monotonic()
+    try:
+        p = subprocess.run(argv, input=stdin, text=True, capture_output=True, cwd=str(cwd), env=env, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return ClaudeCall(None, "timeout", round(time.monotonic() - start, 3), note=f"killed after {timeout:g}s")
+    except OSError as e:
+        return ClaudeCall(None, "not_started", round(time.monotonic() - start, 3), note=type(e).__name__)
+    secs = round(time.monotonic() - start, 3)
+    try:
+        data = json.loads(p.stdout)
+        if not isinstance(data, dict):
+            raise ValueError("not an object")
+    except ValueError:
+        return ClaudeCall(None, "bad_json" if p.returncode == 0 else f"exit {p.returncode}", secs,
+                          note=f"stdout {len(p.stdout)} bytes, stderr {len(p.stderr)} bytes")
+    cost = data.get("total_cost_usd")
+    cost = float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None
+    sid = data.get("session_id") if isinstance(data.get("session_id"), str) else None
+    error = ""
+    if p.returncode != 0:
+        error = f"exit {p.returncode}"
+    elif data.get("is_error"):
+        error = f"is_error:{data.get('subtype', '?')}"
+    return ClaudeCall(data, error, secs, cost, sid)
