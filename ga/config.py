@@ -79,6 +79,7 @@ class Config:
     raised_rules: tuple[str, ...] = ()
     secret_patterns: list[str] = field(default_factory=list)
     bundle: dict[str, Any] = field(default_factory=dict)  # {"pip_args": [...], "timeout": seconds}
+    runner: dict[str, Any] = field(default_factory=dict)  # {"kind": "manual" | "headless", "model", "timeout", "max_budget_usd", ...}
     base_dir: Path = Path(".")
 
     # ------------------------------------------------------------------ lookups
@@ -186,7 +187,7 @@ def problems_of(raw: Any) -> list[Problem]:
     for rid in rules.get("raise", []):
         if rid not in RULE_IDS:
             bad("$.rules.raise", f"unknown rule {rid}")
-    known = {"schema", "hub", "integration_branch", "repos", "sessions", "ownership", "budget", "rules", "secret_patterns", "bundle"}
+    known = {"schema", "hub", "integration_branch", "repos", "sessions", "ownership", "budget", "rules", "secret_patterns", "bundle", "runner"}
     for k in raw:
         if k not in known:
             bad(f"$.{k}", "unknown key")
@@ -222,6 +223,7 @@ def from_dict(raw: dict[str, Any], base_dir: str | Path = ".") -> Config:
         raised_rules=tuple(raw.get("rules", {}).get("raise", [])),
         secret_patterns=list(raw.get("secret_patterns", [])),
         bundle=dict(raw.get("bundle", {})),
+        runner=dict(raw.get("runner", {})),
         base_dir=Path(base_dir),
     )
 

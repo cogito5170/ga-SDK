@@ -125,8 +125,17 @@ class Hub:
             st["directives"][sup["id"]].update(status="superseded", by=directive["id"])
         st["seen"].setdefault(to, None)
         workdir = self._prepare_worktrees(to)
-        result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text), workdir, st["resume"].get(to), budget=dict(directive.get("budget", {}))))
+        resume = st["resume"].get(to)
+        result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text), workdir, resume, budget=dict(directive.get("budget", {}))))
         self._writes += 1
+        # numbers only: no prompt, transcript or answer text is kept
+        st.setdefault("turns", []).append({
+            "session": to, "directive": directive["id"], "rev": directive["rev"], "runner": getattr(self.runner, "kind", "?"),
+            "ended": result.ended, "error": result.error, "cost": result.cost, "seconds": result.seconds,
+            "resumed": resume, "session_id": result.session_id,
+        })
+        if result.error:
+            findings.append(Problem(f"turn {to} {directive['id']}", f"runner {getattr(self.runner, 'kind', '?')}: {result.error}", "soft", None))
         spent = st["spent"]
         spent["runs"] = spent.get("runs", 0) + 1
         spent[f"runs:{to}"] = spent.get(f"runs:{to}", 0) + 1

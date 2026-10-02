@@ -39,6 +39,8 @@ class TurnResult:
     session_id: str | None = None
     cost: float | None = None  # None = unknown
     note: str = ""
+    error: str = ""  # "" = the turn ran; else e.g. "timeout", "exit 1", "bad_json", "is_error:<subtype>"
+    seconds: float | None = None  # wall time of the turn when the runner measured it
 
 
 class Runner(Protocol):

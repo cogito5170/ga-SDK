@@ -55,7 +55,7 @@ def turn_prompt(cfg: Config, session: str, directive_text: str) -> str:
         f"[{cfg.hub_name} → {s.tag}] 새 지시가 통로 {s.channel or session} 에 왔다. 아래가 그 글이다.\n\n"
         f"{directive_text.rstrip()}\n\n"
         f"작업은 자기 브랜치({', '.join(f'{r}@{s.branch_for(r)}' for r in s.repos) or '-'})에서 하고, "
-        f"끝나면 report/1 꼴로 보고한다: `ga post --channel {session} --from {session} <보고 파일>`.\n"
+        f"끝나면 report/1 꼴로 보고한다: `{cfg.hub.get('post_command', 'ga post --channel {session} --from {session} <보고 파일>').format(session=session)}`.\n"
     )
 
 

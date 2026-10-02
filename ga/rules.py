@@ -209,7 +209,10 @@ def r12_budget(cfg: Config, directive: dict[str, Any] | None, spent: dict[str, f
     for k, limit in cfg.budget.items():
         used = spent.get(k, 0)
         add = want.get(k, 0)
-        if used + add > limit:
+        if not isinstance(add, (int, float)) or isinstance(add, bool):
+            continue  # e.g. a model name in a directive budget: not a limit
+        # a limit already reached also stops a turn whose own cost is unknown in advance (e.g. "cost")
+        if used + add > limit or (add == 0 and limit > 0 and used >= limit):
             out.append(_v(cfg, "R12", k, f"{used:g} spent + {add:g} asked > limit {limit:g} (gate 6)"))
     return out
 

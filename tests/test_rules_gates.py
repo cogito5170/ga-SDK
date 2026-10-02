@@ -113,6 +113,10 @@ class RulesTest(unittest.TestCase):
         self.assertCaught(rules.r12_budget(self.c, d, {"llm_runs": 1}), "R12", "hard")
         self.assertEqual(rules.r12_budget(self.c, d, {}), [])
         self.assertCaught(rules.r12_budget(self.c, None, {"llm_runs": 7}), "R12", "hard")
+        exact = cfg(budget={"cost": 0.05})
+        self.assertCaught(rules.r12_budget(exact, None, {"cost": 0.05}), "R12", "hard")  # limit reached: next turn's cost is unknown
+        self.assertEqual(rules.r12_budget(exact, None, {"cost": 0.04}), [])
+        self.assertEqual(rules.r12_budget(self.c, {"budget": {"model": "haiku"}}, {}), [])  # non-numeric entries are not limits
 
     def test_r13_commands(self):
         bad = [

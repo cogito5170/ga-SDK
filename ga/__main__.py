@@ -22,6 +22,7 @@ from . import rules
 from .adapters.git import GitVcs
 from .adapters.human import FileJudge
 from .adapters.mailbox import FileMailbox
+from .adapters.headless import HeadlessRunner
 from .adapters.runner import ManualRunner
 from .forms import FormError, hard, parse_post, parse_text, validate
 from .hub import Hub
@@ -37,7 +38,19 @@ def _hub(args) -> Hub:
     cfg = gacfg.load(args.config)
     ga_dir = Path(args.ga_dir) if args.ga_dir else Path(args.config).resolve().parent / ".ga"
     return Hub(cfg, ga_dir=ga_dir, channel=FileMailbox(ga_dir / "mailbox"), vcs=GitVcs(cfg, ga_dir),
-               judge=FileJudge(ga_dir / "judge"), runner=ManualRunner(ga_dir / "outbox"))
+               judge=FileJudge(ga_dir / "judge"), runner=make_runner(cfg, ga_dir))
+
+
+def make_runner(cfg, ga_dir: Path):
+    """config "runner": {"kind": "manual"} (default) or {"kind": "headless", "model", "timeout", "max_budget_usd",
+    "executable", "permission_mode", "allowed_tools", "disallowed_tools"}."""
+    r = dict(cfg.runner)
+    kind = r.pop("kind", "manual")
+    if kind == "manual":
+        return ManualRunner(ga_dir / "outbox")
+    if kind == "headless":
+        return HeadlessRunner(ga_dir / "headless" / "home", **r)
+    raise SystemExit(f"unknown runner kind {kind!r}")
 
 
 def cmd_tick(args) -> int:
