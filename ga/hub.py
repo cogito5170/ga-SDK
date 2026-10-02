@@ -520,12 +520,12 @@ class Hub:
             for h in head.get("handled", []):
                 d = st["directives"].get(h["id"])
                 seen = h["rev_seen"][-1] if isinstance(h["rev_seen"], list) else h["rev_seen"]
+                # a crossing is a fact the machine proves (rev_seen), not a class floor: whether the result is
+                # still good is for the judge or the person (METHOD §3.3 rev 6, BD-138 — round 53's A5 was a success)
                 if d and d["status"] == "superseded":
                     evidence["notes"].append(f"crossed: {h['id']} was superseded by {d.get('by')} before this report")
-                    worse("partial", "hub_directive", "crossed")
                 elif d and seen < d["rev"]:
                     evidence["notes"].append(f"crossed: {h['id']} handled at rev {seen}, current rev {d['rev']}")
-                    worse("partial", "hub_directive", "crossed")
         return evidence, machine
 
     def _settle_verdict(self, proposed: dict[str, Any], machine: dict[str, Any] | None, evidence: dict[str, Any], findings, n: int) -> dict[str, Any]:
@@ -546,6 +546,8 @@ class Hub:
                 v.pop("subclass", None)
         if v["class"] == "success":
             v.pop("cause", None)
+        if not v.get("subclass") and any(n.startswith("crossed:") for n in evidence.get("notes", [])):
+            v["subclass"] = "crossed"
         return load(v, "verdict/1")
 
     def _mark_handled(self, st: dict[str, Any], head: dict[str, Any]) -> None:

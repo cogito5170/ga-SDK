@@ -53,6 +53,7 @@ class HeadlessRunner:
         max_budget_usd: float | None = None,
         extra_env: dict[str, str] | None = None,
         extra_args: Iterable[str] = (),
+        guard: bool = True,
     ):
         self.home = Path(home)
         self.executable = executable
@@ -64,6 +65,26 @@ class HeadlessRunner:
         self.max_budget_usd = max_budget_usd
         self.extra_env = dict(extra_env or {})
         self.extra_args = list(extra_args)
+        self.guard = guard
+
+    @property
+    def guard_log(self) -> Path:
+        return self.home / "ga-guard.jsonl"
+
+    def settings_file(self) -> Path:
+        """Turn settings with the PreToolUse guard (bash_guard.py) — only in the runner's own directory."""
+        import shlex
+        import sys
+
+        from . import bash_guard
+
+        self.home.mkdir(parents=True, exist_ok=True)
+        cmd = " ".join(shlex.quote(x) for x in (sys.executable, bash_guard.__file__, "--log", str(self.guard_log)))
+        settings = {"hooks": {"PreToolUse": [{"matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+                                              "hooks": [{"type": "command", "command": cmd}]}]}}
+        path = self.home / "ga-settings.json"
+        path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+        return path
 
     def env(self) -> dict[str, str]:
         self.home.mkdir(parents=True, exist_ok=True)
@@ -87,6 +108,8 @@ class HeadlessRunner:
             argv += ["--max-budget-usd", f"{cap:g}"]
         if req.resume_id:
             argv += ["--resume", req.resume_id]
+        if self.guard:
+            argv += ["--settings", str(self.settings_file())]
         return argv + self.extra_args
 
     def run_turn(self, req: TurnRequest) -> TurnResult:

@@ -357,9 +357,21 @@ class CrossingTest(unittest.TestCase):
         w.hub.send(directive("CMD-A4", "A", rev=2, supersedes={"id": "CMD-A4", "rev": 1}, scope="덧붙임: 범위가 넓어짐"))
         sha = w.work("A", "alpha", {"a4.txt": "1\n"})
         w.report("A", [("CMD-A4", [1, 1], "done")], [("alpha", sha)])
+        w.proposals.append(proposal("partial", "refine", "덧붙임을 반영해야 한다", cause="hub_directive"))
         res = w.hub.tick()
         self.assertEqual((res.verdict["class"], res.verdict["subclass"], res.verdict["cause"]), ("partial", "crossed", "hub_directive"))
         self.assertEqual(w.hub.load_state()["directives"]["CMD-A4"]["status"], "open")
+
+    def test_crossing_is_a_fact_not_a_floor(self):
+        """BD-138: round 53's A5 ran on a superseded directive and was still a success."""
+        w = self.w
+        w.hub.send(directive("CMD-A5", "A"))
+        w.hub.send(directive("CMD-A6", "A", supersedes={"id": "CMD-A5", "rev": 1}))
+        w.report("A", [("CMD-A5", 1, "done")])
+        res = w.hub.tick()  # the scripted judge proposes success
+        self.assertEqual((res.verdict["class"], res.verdict["subclass"]), ("success", "crossed"))
+        self.assertTrue(any(n.startswith("crossed:") for n in res.verdict["evidence"]["notes"]))
+        self.assertIsNone(w.contexts[-1].machine_class)
 
     def test_a5_ran_after_being_superseded(self):
         w = self.w
