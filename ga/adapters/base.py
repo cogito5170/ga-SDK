@@ -41,6 +41,7 @@ class TurnResult:
     note: str = ""
     error: str = ""  # "" = the turn ran; else e.g. "timeout", "exit 1", "bad_json", "is_error:<subtype>"
     seconds: float | None = None  # wall time of the turn when the runner measured it
+    sandboxed: bool | None = None  # True: ran in the OS write sandbox; False: did not; None: the runner cannot say
 
 
 class Runner(Protocol):

@@ -162,3 +162,15 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
   - 읽지 못한 입력은 막는다. 기록에는 규칙 이름만 남는다.
   - 겹 방어의 순서: 가드(턴 안) → pre-push(보내는 쪽) → pre-receive(받는 쪽).
   - **남은 한계:** 문자열 규칙이다. 그래서 셸 우회를 통째로 금지하는 쪽(닫는 쪽)을 골랐다. 사람이 직접 셸을 쓰는 경우(수동 Runner)는 가드 밖이다. 거기서는 pre-receive 와 원격의 신원 확인이 지킨다.
+
+## 14. R3 를 구조로 (CMD-GA5)
+
+- **GA4 의 잘못:** 문자열 가드를 "닫는 쪽" 이라고 보고했지만 스크립트 실행 길이 열려 있었다. baseline 이 그 밖에도 따옴표로 나누기와 옵션 줄임을 찾았다.
+  - 로컬 원격에서는 받는 쪽 명령도 push 하는 쪽이 고른다(`--receive-pack`). 그래서 pre-receive 도 보장이 되지 못한다.
+- **pull, 독립 clone (`isolation: "clone"`, 기본):** 세션은 push 하지 않는다. 허브가 `git fetch <세션 clone> +refs/heads/<자기 브랜치>:refs/ga/sessions/<세션>/<브랜치>` 로 가져온다.
+  - R1b(지시 아래의 주장)와 R2 · R4 · R6 은 그대로 통합 전에 본다.
+- **쓰기 샌드박스(`ga/adapters/sandbox.py`):** 바깥 user/mount namespace 에서 보호할 경로를 읽기 전용으로 bind 하고, 자기 자리만 읽기·쓰기로 다시 bind 한다. 명령은 한 겹 안쪽 user namespace 에서 돈다. 그 안에서는 마운트가 잠겨 있어(kernel MNT_LOCK_*) 다시 마운트하거나 떼어 낼 수 없다.
+  - 허브가 턴마다 무엇을 보호하고 어디에 쓸 수 있는지 정한다(`Hub.sandbox_paths`). 헤드리스 Runner 는 `sandbox: auto | require | off` 로 감싼다.
+  - Claude 홈은 세션마다 따로 둔다. 턴 기록에는 `sandboxed` 가 남는다.
+- **문자열 가드:** 첫 겹으로 남긴다. 따옴표를 뺀 꼴도 보고, 옵션 줄임과 스크립트 실행도 더했다. **보장으로 세지 않는다.**
+- 모드별로 무엇이 지켜지고 무엇이 안 지켜지는지는 README 의 표에 있다.

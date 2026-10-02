@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from . import sandbox
 from .base import TurnRequest, TurnResult
 
 KEEP_ENV = (
@@ -54,6 +55,7 @@ class HeadlessRunner:
         extra_env: dict[str, str] | None = None,
         extra_args: Iterable[str] = (),
         guard: bool = True,
+        sandbox: str = "auto",
     ):
         self.home = Path(home)
         self.executable = executable
@@ -66,32 +68,39 @@ class HeadlessRunner:
         self.extra_env = dict(extra_env or {})
         self.extra_args = list(extra_args)
         self.guard = guard
+        if sandbox not in ("auto", "require", "off"):
+            raise ValueError("sandbox must be auto, require or off")
+        self.sandbox = sandbox
 
-    @property
-    def guard_log(self) -> Path:
-        return self.home / "ga-guard.jsonl"
+    def session_home(self, session: str) -> Path:
+        """HOME / CLAUDE_CONFIG_DIR of one session: per session, so a turn cannot touch another session's state."""
+        return self.home / session
 
-    def settings_file(self) -> Path:
+    def guard_log(self, session: str) -> Path:
+        return self.session_home(session) / "ga-guard.jsonl"
+
+    def settings_file(self, session: str) -> Path:
         """Turn settings with the PreToolUse guard (bash_guard.py) — only in the runner's own directory."""
         import shlex
         import sys
 
         from . import bash_guard
 
-        self.home.mkdir(parents=True, exist_ok=True)
-        cmd = " ".join(shlex.quote(x) for x in (sys.executable, bash_guard.__file__, "--log", str(self.guard_log)))
+        home = self.session_home(session)
+        home.mkdir(parents=True, exist_ok=True)
+        cmd = " ".join(shlex.quote(x) for x in (sys.executable, bash_guard.__file__, "--log", str(self.guard_log(session))))
         settings = {"hooks": {"PreToolUse": [{"matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
                                               "hooks": [{"type": "command", "command": cmd}]}]}}
-        path = self.home / "ga-settings.json"
+        path = home / "ga-settings.json"
         path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
         return path
 
-    def env(self) -> dict[str, str]:
-        self.home.mkdir(parents=True, exist_ok=True)
-        cfg = self.home / ".claude"
-        cfg.mkdir(exist_ok=True)
+    def env(self, session: str) -> dict[str, str]:
+        home = self.session_home(session)
+        cfg = home / ".claude"
+        cfg.mkdir(parents=True, exist_ok=True)
         env = {k: os.environ[k] for k in KEEP_ENV if k in os.environ}
-        env.update(HOME=str(self.home), CLAUDE_CONFIG_DIR=str(cfg))
+        env.update(HOME=str(home), CLAUDE_CONFIG_DIR=str(cfg))
         env.update(self.extra_env)
         return env
 
@@ -109,14 +118,25 @@ class HeadlessRunner:
         if req.resume_id:
             argv += ["--resume", req.resume_id]
         if self.guard:
-            argv += ["--settings", str(self.settings_file())]
+            argv += ["--settings", str(self.settings_file(req.session))]
         return argv + self.extra_args
 
     def run_turn(self, req: TurnRequest) -> TurnResult:
-        call = run_claude(self.argv(req), req.prompt, Path(req.workdir), self.env(), self.timeout)
+        env = self.env(req.session)
+        argv = self.argv(req)
+        protect = list(req.permissions.get("protect", []))
+        sandboxed = False
+        if self.sandbox != "off" and protect:
+            if sandbox.available():
+                writable = list(req.permissions.get("writable", [])) + [self.session_home(req.session)]
+                argv = sandbox.wrap(argv, protect, writable)
+                sandboxed = True
+            elif self.sandbox == "require":
+                return TurnResult(ended=True, error="sandbox_unavailable", seconds=0.0, sandboxed=False)
+        call = run_claude(argv, req.prompt, Path(req.workdir), env, self.timeout)
         data = call.data or {}
         return TurnResult(ended=True, session_id=call.session_id, cost=call.cost, error=call.error, seconds=call.seconds,
-                          note=f"num_turns {data.get('num_turns')}" if "num_turns" in data else call.note)
+                          note=f"num_turns {data.get('num_turns')}" if "num_turns" in data else call.note, sandboxed=sandboxed)
 
 
 @dataclass

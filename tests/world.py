@@ -75,7 +75,8 @@ class World:
 
     def __init__(self, judge_fn: Callable[[JudgeContext], dict[str, Any]] | None = None, remote: bool = False,
                  modes: tuple[str, ...] = ("path",), runner=None, budget: dict | None = None, shared_alpha: bool = False,
-                 beta_deps: list[str] | None = None, server_hooks: bool = True):
+                 beta_deps: list[str] | None = None, server_hooks: bool = True,
+                 isolation: str = "clone"):
         self.tmp_obj = tempfile.TemporaryDirectory(prefix="ga-world-")
         self.tmp = Path(self.tmp_obj.name)
         isolate_git(self.tmp)
@@ -107,6 +108,7 @@ class World:
             ],
             "budget": budget or {"runs": 50},
             "bundle": {"pip_args": ["--no-index", *find_links()], "timeout": 600},
+            "isolation": isolation,
         }
         (self.tmp / "G.md").write_text("허브 안내\n", encoding="utf-8")
         (self.tmp / "SG.md").write_text("세션 안내\n", encoding="utf-8")
@@ -184,7 +186,7 @@ class World:
             p.write_text(text, encoding="utf-8")
         git(wt, "add", "-A")
         git(wt, "commit", "--quiet", "-m", msg)
-        if self.remote:
+        if self.remote and self.cfg.isolation == "worktree":
             git(wt, "push", "--quiet", "origin", self.cfg.sessions[session].branch_for(repo))
         return git(wt, "rev-parse", "HEAD")
 

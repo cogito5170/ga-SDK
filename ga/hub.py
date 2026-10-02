@@ -130,13 +130,14 @@ class Hub:
         st["seen"].setdefault(to, None)
         workdir = self._prepare_worktrees(to)
         resume = st["resume"].get(to)
-        result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text), workdir, resume, budget=dict(directive.get("budget", {}))))
+        result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text), workdir, resume,
+                                                  permissions=self.sandbox_paths(to), budget=dict(directive.get("budget", {}))))
         self._writes += 1
         # numbers only: no prompt, transcript or answer text is kept
         st.setdefault("turns", []).append({
             "session": to, "directive": directive["id"], "rev": directive["rev"], "runner": getattr(self.runner, "kind", "?"),
             "ended": result.ended, "error": result.error, "cost": result.cost, "seconds": result.seconds,
-            "resumed": resume, "session_id": result.session_id,
+            "resumed": resume, "session_id": result.session_id, "sandboxed": result.sandboxed,
         })
         if result.error:
             findings.append(Problem(f"turn {to} {directive['id']}", f"runner {getattr(self.runner, 'kind', '?')}: {result.error}", "soft", None))
@@ -152,6 +153,27 @@ class Hub:
         if own:
             self.save_state(st)
         return post, findings, []
+
+    def sandbox_paths(self, session: str) -> dict[str, list[str]]:
+        """What a session's turn may not write (protect) and the only places inside them it may (writable).
+
+        Empty in worktree isolation: a worktree keeps its git data inside the hub's repository, so it cannot work
+        with that repository read-only — that mode has no structural R3 (see README)."""
+        if self.cfg.isolation != "clone":
+            return {}
+        protect = [self.cfg.base_dir, self.ga]
+        for r in self.cfg.repos:
+            protect.append(self.vcs.repo_dir(r))
+            remote = self.vcs.local_remote_dir(r)
+            if remote is not None:
+                protect.append(remote)
+        writable = [self.ga / "worktrees" / session]
+        root = getattr(self.channel, "root", None)
+        if root is not None:
+            (Path(root) / session).mkdir(parents=True, exist_ok=True)
+            writable.append(Path(root) / session)
+        (self.ga / "worktrees" / session).mkdir(parents=True, exist_ok=True)
+        return {"protect": [str(p) for p in protect], "writable": [str(p) for p in writable]}
 
     def _prepare_worktrees(self, session: str) -> Path:
         s = self.cfg.sessions[session]

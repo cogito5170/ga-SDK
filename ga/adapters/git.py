@@ -132,9 +132,26 @@ class GitVcs:
     def remote_url(self, repo: str) -> str:
         return git(self.repo_dir(repo), "remote", "get-url", self._remote(repo))
 
+    @property
+    def cloned(self) -> bool:
+        return self.cfg.isolation == "clone"
+
+    def session_ref(self, repo: str, session: str) -> str:
+        """Where the hub keeps what it fetched from a session's own clone (clone isolation)."""
+        return f"refs/ga/sessions/{session}/{self.cfg.sessions[session].branch_for(repo)}"
+
     def fetch(self, repo: str) -> None:
         if self._remote(repo):
             git(self.repo_dir(repo), "fetch", "--quiet", "--prune", self._remote(repo))
+        if self.cloned:
+            # pull, never push: the hub reads each session's own branch from that session's own clone, so who
+            # wrote a branch is where the hub fetched it from — nothing the session can claim or forge
+            for s in self.cfg.sessions_of_repo(repo):
+                ws = self.session_worktree(s.name, repo)
+                if (ws / ".git").is_dir():
+                    branch = s.branch_for(repo)
+                    git(self.repo_dir(repo), "-c", "protocol.file.allow=always", "fetch", "--quiet", "--no-tags",
+                        "--no-write-fetch-head", str(ws), f"+refs/heads/{branch}:{self.session_ref(repo, s.name)}", check=False)
 
     def ref(self, repo: str, branch: str) -> str | None:
         """Head of a branch as the hub sees it (remote-tracking when there is a remote)."""
@@ -150,6 +167,8 @@ class GitVcs:
         return self.ref(repo, self.cfg.integration_branch)
 
     def session_head(self, repo: str, session: str) -> str | None:
+        if self.cloned:
+            return git(self.repo_dir(repo), "rev-parse", "--verify", "--quiet", self.session_ref(repo, session) + "^{commit}", check=False) or None
         return self.ref(repo, self.cfg.sessions[session].branch_for(repo))
 
     def is_ancestor(self, repo: str, a: str, b: str) -> bool:
@@ -227,6 +246,8 @@ class GitVcs:
         branch = s.branch_for(repo)
         rd = self.repo_dir(repo)
         wt = self.session_worktree(session, repo)
+        if self.cloned:
+            return self._ensure_session_clone(session, repo, branch, wt)
         if not wt.exists():
             wt.parent.mkdir(parents=True, exist_ok=True)
             has_local = git(rd, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False)
@@ -242,6 +263,25 @@ class GitVcs:
             # every push from this worktree names its session to the remote's pre-receive hook
             git(wt, "config", "--worktree", f"remote.{self._remote(repo)}.receivepack", _receivepack(session))
         return wt
+
+    def _ensure_session_clone(self, session: str, repo: str, branch: str, ws: Path) -> Path:
+        """An independent clone (no shared refs, no hardlinked objects) on the session's branch. Its origin is the
+        hub's repository, for reading the integration branch; the session never needs to push."""
+        if (ws / ".git").is_dir():
+            return ws
+        ws.parent.mkdir(parents=True, exist_ok=True)
+        rd = self.repo_dir(repo)
+        git(ws.parent, "clone", "--quiet", "--no-hardlinks", "--no-checkout", str(rd), str(ws))
+        start = self.session_head(repo, session)
+        if start:  # a clone made again for a session the hub already knows: continue its branch
+            git(ws, "fetch", "--quiet", "origin", f"+{self.session_ref(repo, session)}:refs/heads/{branch}")
+            git(ws, "checkout", "--quiet", branch)
+        else:
+            ih = self.integration_head(repo)
+            if ih is None:
+                raise GitError(f"{repo}: {self.cfg.integration_branch} does not exist")
+            git(ws, "checkout", "--quiet", "-b", branch, ih)
+        return ws
 
     def local_remote_dir(self, repo: str) -> Path | None:
         """The remote's directory when the remote is a local (bare) repository, else None."""

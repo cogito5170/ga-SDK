@@ -79,6 +79,9 @@ class Config:
     raised_rules: tuple[str, ...] = ()
     secret_patterns: list[str] = field(default_factory=list)
     bundle: dict[str, Any] = field(default_factory=dict)  # {"pip_args": [...], "timeout": seconds}
+    # "clone" (default): each session works in its own full clone and never pushes; the hub fetches its branch.
+    # "worktree" (0.1): sessions share the repository's refs through git worktrees and push their branches.
+    isolation: str = "clone"
     judge: dict[str, Any] = field(default_factory=dict)  # {"kind": "file" | "llm", "model", "max_runs", ...}
     runner: dict[str, Any] = field(default_factory=dict)  # {"kind": "manual" | "headless", "model", "timeout", "max_budget_usd", ...}
     base_dir: Path = Path(".")
@@ -188,10 +191,12 @@ def problems_of(raw: Any) -> list[Problem]:
     for rid in rules.get("raise", []):
         if rid not in RULE_IDS:
             bad("$.rules.raise", f"unknown rule {rid}")
-    known = {"schema", "hub", "integration_branch", "repos", "sessions", "ownership", "budget", "rules", "secret_patterns", "bundle", "runner", "judge"}
+    known = {"schema", "hub", "integration_branch", "repos", "sessions", "ownership", "budget", "rules", "secret_patterns", "bundle", "runner", "judge", "isolation"}
     for k in raw:
         if k not in known:
             bad(f"$.{k}", "unknown key")
+    if raw.get("isolation", "clone") not in ("clone", "worktree"):
+        bad("$.isolation", "must be clone or worktree")
     budget = raw.get("budget", {})
     if not isinstance(budget, dict) or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in budget.values()):
         bad("$.budget", "must map names to non-negative numbers")
@@ -226,6 +231,7 @@ def from_dict(raw: dict[str, Any], base_dir: str | Path = ".") -> Config:
         bundle=dict(raw.get("bundle", {})),
         runner=dict(raw.get("runner", {})),
         judge=dict(raw.get("judge", {})),
+        isolation=raw.get("isolation", "clone"),
         base_dir=Path(base_dir),
     )
 

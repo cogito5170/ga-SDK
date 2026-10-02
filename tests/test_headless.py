@@ -97,8 +97,8 @@ class RunnerPathsTest(unittest.TestCase):
         call = stub.calls()[0]
         self.assertFalse([k for k in call["env"] if k.startswith("CLAUDE_CODE_") or k == "CLAUDECODE"])
         self.assertNotIn("ANTHROPIC_API_KEY_GA_TEST", call["env"])
-        self.assertEqual(Path(call["HOME"]), stub.dir / "home")
-        self.assertEqual(Path(call["CLAUDE_CONFIG_DIR"]), stub.dir / "home" / ".claude")
+        self.assertEqual(Path(call["HOME"]), stub.dir / "home" / "A")  # per session
+        self.assertEqual(Path(call["CLAUDE_CONFIG_DIR"]), stub.dir / "home" / "A" / ".claude")
         self.assertNotEqual(call["HOME"], os.path.expanduser("~"))
 
     def test_narrowed_permissions_and_cap(self):
@@ -179,7 +179,7 @@ class HubWithHeadlessTest(unittest.TestCase):
     def test_no_verify_push_in_a_turn_is_refused_by_pre_receive(self):
         stub = Stub([])
         self.addCleanup(stub.close)
-        w = World(remote=True, runner=stub.runner())
+        w = World(remote=True, runner=stub.runner(), isolation="worktree")
         self.addCleanup(w.close)
         (stub.dir / "plan.json").write_text(json.dumps([
             {"do": "cmd", "argv": ["git", "-C", "beta", "push", "--no-verify", "origin", "HEAD:refs/heads/sess-a"]},

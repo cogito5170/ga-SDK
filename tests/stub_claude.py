@@ -59,7 +59,7 @@ elif do == "reply":
     print(json.dumps(out, ensure_ascii=False))
 elif do == "cmd":
     p = subprocess.run(step["argv"], cwd=os.getcwd(), capture_output=True, text=True)
-    (d / f"cmd-{n}.json").write_text(json.dumps({"code": p.returncode, "stderr": p.stderr[-2000:]}), encoding="utf-8")
+    (d / f"cmd-{n}.json").write_text(json.dumps({"code": p.returncode, "stdout": p.stdout[-6000:], "stderr": p.stderr[-4000:]}), encoding="utf-8")
     result(step.get("cost", 0.01))
 elif do == "work":
     sys.path.insert(0, step["ga_root"])

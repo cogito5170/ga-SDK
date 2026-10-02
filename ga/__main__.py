@@ -1,6 +1,7 @@
 """``python -m ga`` (or ``ga``) — the local, no-infrastructure front of the hub loop.
 
     ga setup                                    install the receiving-side R3 hook on local bare remotes
+    ga sandbox SESSION [CMD…]                    manual mode: a shell for SESSION that can write only its own clone
     ga tick    [--dry-run]                      one pass of the loop (cron it for a safety net)
     ga post    --channel S --from S FILE         a session hands in a report (FILE: report/1 text, - = stdin)
     ga send    FILE                              the hub sends a directive (directive/1 text)
@@ -80,6 +81,26 @@ def cmd_tick(args) -> int:
     }
     print(json.dumps(out, ensure_ascii=False, indent=2))
     return 0
+
+
+def cmd_sandbox(args) -> int:
+    """Manual mode: run a person's shell (or a command) for one session inside the same write sandbox."""
+    import os
+
+    from .adapters import sandbox
+
+    hub = _hub(args)
+    if not sandbox.available():
+        print("ga sandbox: unprivileged user namespaces are not available here; R3 then rests on the hub's pull "
+              "and its checks only (see README)", file=sys.stderr)
+        return 3
+    paths = hub.sandbox_paths(args.session)
+    for r in hub.cfg.sessions[args.session].repos:
+        hub.vcs.ensure_session_worktree(args.session, r)
+    cmd = args.cmd or [os.environ.get("SHELL", "/bin/sh")]
+    argv = sandbox.wrap(cmd, paths["protect"], paths["writable"])
+    os.chdir(hub.ga / "worktrees" / args.session)
+    os.execvp(argv[0], argv)
 
 
 def cmd_setup(args) -> int:
@@ -165,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("tick"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_tick)
     p = sub.add_parser("setup"); p.set_defaults(fn=cmd_setup)
+    p = sub.add_parser("sandbox"); p.add_argument("session"); p.add_argument("cmd", nargs=argparse.REMAINDER); p.set_defaults(fn=cmd_sandbox)
     p = sub.add_parser("post"); p.add_argument("--channel", required=True); p.add_argument("--from", dest="author", required=True)
     p.add_argument("file"); p.set_defaults(fn=cmd_post)
     p = sub.add_parser("send"); p.add_argument("file"); p.set_defaults(fn=cmd_send)

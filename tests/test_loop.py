@@ -71,7 +71,7 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(st["spent"]["cost_unknown_runs"], 3)  # manual runner cannot know the cost
 
     def test_pre_push_hook_blocks_other_branches(self):
-        w = World(remote=True)
+        w = World(remote=True, isolation="worktree")
         try:
             w.hub.send(directive("CMD-A1", "A"))
             wt = w.vcs.session_worktree("A", "alpha")
@@ -94,7 +94,7 @@ class LoopTest(unittest.TestCase):
             w.close()
 
     def test_pre_receive_holds_even_with_no_verify(self):
-        w = World(remote=True)
+        w = World(remote=True, isolation="worktree")
         try:
             self.assertEqual(len(w.hooks), 2)
             w.hub.send(directive("CMD-A1", "A"))

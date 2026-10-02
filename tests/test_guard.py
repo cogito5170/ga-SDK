@@ -35,6 +35,15 @@ DENY = [
     ("sh -c 'git push origin x'", "shell_indirection"),
     ("python3 -c 'import os'", "shell_indirection"),
     (". ./evil.sh", "shell_indirection"),
+    # baseline's probes (BD-139): quote splitting, abbreviated long options, scripts
+    ('g""it -c remote.origin.receivepack="GA_SESSION=hub git-receive-pack" push', "receive_pack"),
+    ("'git' -c x=y push", "git_c"),
+    ("git push --no-verif origin HEAD:refs/heads/sess-a", "no_verify"),
+    ("git push --receive-pac=x origin HEAD:integ", "receive_pack"),
+    ("bash x.sh", "script_exec"),
+    ("./x.sh", "script_exec"),
+    ("make push", "script_exec"),
+    ("python3 tool.py", "script_exec"),
 ]
 ALLOW = [
     "git -C beta add -A",
@@ -44,6 +53,7 @@ ALLOW = [
     "git -C beta status",
     "git -C beta rev-parse HEAD",
     "python3 -m unittest discover -s tests",
+    "/usr/local/bin/python3 -m ga --config /w/ga.json post --channel B --from B report.md",
 ]
 
 
