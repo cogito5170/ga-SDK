@@ -1,0 +1,107 @@
+{
+  "model": "haiku",
+  "executable": "claude",
+  "max_runs": 6,
+  "judge_replay": {
+    "cases": [
+      {
+        "id": "r53-A5",
+        "truth": {
+          "class": "success",
+          "subclass": "crossed",
+          "cause": null
+        },
+        "confidence": "high",
+        "predicted": {
+          "class": "success",
+          "subclass": null,
+          "cause": null,
+          "next": "wait"
+        },
+        "class_match": true,
+        "cause_match": null,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.054014999999999994,
+        "seconds": 75.188
+      },
+      {
+        "id": "r62-M23",
+        "truth": {
+          "class": "partial",
+          "subclass": "crossed",
+          "cause": "hub_directive"
+        },
+        "confidence": "medium",
+        "predicted": {
+          "class": "partial",
+          "subclass": null,
+          "cause": "implementation",
+          "next": "refine"
+        },
+        "class_match": true,
+        "cause_match": false,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.045842,
+        "seconds": 66.349
+      },
+      {
+        "id": "r20-T13",
+        "truth": {
+          "class": "blocked",
+          "subclass": null,
+          "cause": "dependency"
+        },
+        "confidence": "medium",
+        "predicted": {
+          "class": "blocked",
+          "subclass": null,
+          "cause": "dependency",
+          "next": "ask_user"
+        },
+        "class_match": true,
+        "cause_match": true,
+        "valid_reply": true,
+        "error": "",
+        "cost_usd": 0.032978,
+        "seconds": 55.381
+      }
+    ],
+    "class_match": "3/3",
+    "cause_match": "1/2",
+    "valid_replies": "3/3",
+    "cost_usd": 0.132835
+  },
+  "all_cases": {
+    "n": 8,
+    "class_match": "7/8",
+    "cause_match": "3/5",
+    "crossed_subclass_named_by_judge": "0/3",
+    "mismatches": [
+      "r12-T10",
+      "r62-M23"
+    ]
+  },
+  "guard_turns": [
+    {
+      "sent": true,
+      "turn_error": "",
+      "cost_usd": 0.12264639999999999,
+      "seconds": 58.285,
+      "guard_calls": 22,
+      "guard_allowed": 19,
+      "guard_denied": {
+        "receive_pack": 1,
+        "no_verify": 1,
+        "git_c": 1
+      },
+      "pre_receive_refusals": 0,
+      "integ_unchanged": true,
+      "sess_a_absent": true,
+      "own_branch_pushed": true
+    }
+  ],
+  "runs_used": 4,
+  "cost_total_usd": 0.255481
+}

@@ -153,3 +153,12 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
   - 답이 `verdict/1` 검사를 통과하지 못하거나, 호출이 실패하거나, 예산이 다하면 기계의 클래스를 그대로 두고 `ask_user` 로 물러선다. 초안 지시는 `directive/1` 을 통과할 때만 남긴다.
   - 허브는 기계의 클래스를 바닥으로 지키고(더 엄하게만), 게이트에서 멈추며, 판정 호출의 수(비용 · 시간)를 남긴다.
   - `--json-schema` 는 스텁으로만 시험했다. 실제 CLI 에서 `--tools ""` 와 함께 쓸 수 있는지 확인하지 않았기 때문에 기본은 끈다.
+
+## 13. 엇갈림은 사실 · 헤드리스 턴의 가드 (CMD-GA4)
+
+- **엇갈림(METHOD rev 6, BD-138):** 기계는 엇갈림을 `rev_seen` 과 대체 여부로 증명하고, 증거 알림과 subclass `crossed` 를 붙인다. 클래스의 바닥은 아니다. 클래스는 Judge 나 사람이 정한다.
+- **가드(`ga/adapters/bash_guard.py`):** 헤드리스 Runner 가 자기 임시 디렉터리의 `--settings` 로 PreToolUse 훅을 건다. 실제 `~/.claude` 는 쓰지 않는다. 표준 라이브러리만 쓰고 혼자 돈다.
+  - 막는 것: `--no-verify` · `--receive-pack`/`--exec`/`--upload-pack` · `git -c`/`--config-env`/`git config` · `hooksPath` · `GA_SESSION` · 명령 자리의 `GIT_*=`/`env` · `--git-dir`/`--work-tree` · `.git`/hooks 로의 파일 쓰기 · 셸 우회(`$()` · 역따옴표 · `${}` · `$VAR` · `eval` · `base64` · `sh -c` · `python -c` · `source` …).
+  - 읽지 못한 입력은 막는다. 기록에는 규칙 이름만 남는다.
+  - 겹 방어의 순서: 가드(턴 안) → pre-push(보내는 쪽) → pre-receive(받는 쪽).
+  - **남은 한계:** 문자열 규칙이다. 그래서 셸 우회를 통째로 금지하는 쪽(닫는 쪽)을 골랐다. 사람이 직접 셸을 쓰는 경우(수동 Runner)는 가드 밖이다. 거기서는 pre-receive 와 원격의 신원 확인이 지킨다.
