@@ -7,13 +7,14 @@ Shape (``schema: ga-config/1``)::
       "hub": {"name", "repo", "session_id", "guidance", "session_guidance",
               "worker_head", "worker_tail", "wake"},
       "integration_branch": "...",
-      "repos": {"<name>": {"url", "slug", "test": [...], "path", "env", "package", "extras"}},
+      "repos": {"<name>": {"path", "remote", "src", "test": [...], "env", "package", "extras", "url", "slug"}},
       "sessions": {"<name>": {"prefix", "tag", "branch", "branches", "repos", "channel",
                               "session_id", "first_directive"}},
       "ownership": [{"repo", "path", "session"}],        # first match wins
       "budget": {"llm_runs": 6, ...},
       "rules": {"raise": ["R7", ...]},
-      "secret_patterns": ["..."]                          # added to the built-in ones
+      "secret_patterns": ["..."],                         # added to the built-in ones
+      "bundle": {"pip_args": ["--no-index"], "timeout": 1800}
     }
 """
 from __future__ import annotations
@@ -40,11 +41,13 @@ HARD_RULES = ("R2", "R3", "R4", "R5", "R6", "R9", "R12")
 @dataclass
 class Repo:
     name: str
+    path: str = ""  # local git repository, relative to the config file (METHOD §4.3)
+    remote: str = ""  # e.g. "origin"; empty = no remote, worktrees share the repository's refs
+    src: str = "."  # what goes on PYTHONPATH, relative to a checkout
+    test: list[str] = field(default_factory=list)  # argv; "{python}" is replaced by the bundle's interpreter
+    env: dict[str, str] = field(default_factory=dict)
     url: str = ""
     slug: str = ""  # owner/name, for user-facing commands
-    test: list[str] = field(default_factory=list)
-    path: str = "."  # what goes on PYTHONPATH, relative to the checkout
-    env: dict[str, str] = field(default_factory=dict)
     package: str = ""  # distribution name for Bundle (b); empty = not installable
     extras: str = ""
 
@@ -75,6 +78,7 @@ class Config:
     budget: dict[str, float] = field(default_factory=dict)
     raised_rules: tuple[str, ...] = ()
     secret_patterns: list[str] = field(default_factory=list)
+    bundle: dict[str, Any] = field(default_factory=dict)  # {"pip_args": [...], "timeout": seconds}
     base_dir: Path = Path(".")
 
     # ------------------------------------------------------------------ lookups
@@ -99,11 +103,15 @@ class Config:
     def session_by_prefix(self, prefix: str) -> Session | None:
         return next((s for s in self.sessions.values() if s.prefix == prefix), None)
 
-    def read_text(self, rel: str) -> str:
+    def resolve(self, rel: str) -> Path:
         p = Path(rel)
-        if not p.is_absolute():
-            p = self.base_dir / p
-        return p.read_text(encoding="utf-8")
+        return p if p.is_absolute() else (self.base_dir / p).resolve()
+
+    def read_text(self, rel: str) -> str:
+        return self.resolve(rel).read_text(encoding="utf-8")
+
+    def sessions_of_repo(self, repo: str) -> list[Session]:
+        return [s for s in self.sessions.values() if repo in s.repos]
 
 
 def problems_of(raw: Any) -> list[Problem]:
@@ -178,6 +186,10 @@ def problems_of(raw: Any) -> list[Problem]:
     for rid in rules.get("raise", []):
         if rid not in RULE_IDS:
             bad("$.rules.raise", f"unknown rule {rid}")
+    known = {"schema", "hub", "integration_branch", "repos", "sessions", "ownership", "budget", "rules", "secret_patterns", "bundle"}
+    for k in raw:
+        if k not in known:
+            bad(f"$.{k}", "unknown key")
     budget = raw.get("budget", {})
     if not isinstance(budget, dict) or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in budget.values()):
         bad("$.budget", "must map names to non-negative numbers")
@@ -209,6 +221,7 @@ def from_dict(raw: dict[str, Any], base_dir: str | Path = ".") -> Config:
         budget=dict(raw.get("budget", {})),
         raised_rules=tuple(raw.get("rules", {}).get("raise", [])),
         secret_patterns=list(raw.get("secret_patterns", [])),
+        bundle=dict(raw.get("bundle", {})),
         base_dir=Path(base_dir),
     )
 

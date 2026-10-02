@@ -1,14 +1,15 @@
-# DESIGN — ga-SDK 0.1 설계 초안 (CMD-GA1 rev 2, 2026-10-02)
+# DESIGN — ga-SDK 0.1 설계 (CMD-GA1 rev 3, 2026-10-02)
 
-> 명세는 [`METHOD.md`](METHOD.md)(method-1, `2867c25`, baseline 소유)다. 이 문서는 **어떻게 짓는가**만 적는다.
-> 상태: **초안 — 아직 코드 없음.** 아래는 계획이지 결과가 아니다.
+> 명세는 [`METHOD.md`](METHOD.md)(method-1 rev 3, `f6a4c36`, baseline 소유)다. 이 문서는 **어떻게 짓는가**만 적는다.
+> 상태: 짓는 중. G1 · G8 · G2 는 코드와 시험이 있다. 나머지는 계획이다.
 > rev 1(`60c9a95`, METHOD `78019c2` 기준) → rev 2: §0 정신(hard/soft) · §3.2 보고 꼴 · §4b(G8) · §5 강도를 반영했다.
+> rev 2 → rev 3: §4c Runner(Waker 대신) · 로컬 배치(세션마다 worktree · pre-push 훅) · G9 를 반영했다.
 
 ## 0. 제약과 정신
 
 - Python ≥ 3.10, 핵심은 표준 라이브러리만. (git · pip 는 하위 프로세스로 부른다 — import 하지 않는다.)
 - 저장소 · 세션 id · 브랜치 이름은 코드에 없고 모두 설정에서 온다.
-- 1판: LLM 호출 없음, GitHub · 원격 세션 어댑터 없음(인터페이스만 그것을 담을 수 있게).
+- 1판: **로컬만.** LLM 호출 없음, GitHub · 원격 · 헤드리스 Runner 없음(인터페이스만 그것을 담을 수 있게). 원격 · 네트워크 없이 고리가 돈다.
 - **SDK 는 안전만 막고 나머지는 알린다**(METHOD §0). 그래서 검사 결과는 늘 `hard`(막음) · `soft`(알림)를 가진다.
   기계 머리가 틀린 것은 거부하지만, 사람이 읽는 본문 칸이 비어 있는 것은 거부하지 않는다(G1).
 
@@ -25,14 +26,15 @@ ga/
   gates.py      §6  게이트 일곱 -> question/1 을 내고 멈춤 (G7)
   prompts.py    §4b 허브 · 작업 세션의 첫 프롬프트 만들기 (G8)
   hub.py        §2  고리 1–6 (받기 → 통합 → 재현 → 판정 → 기록 → 다음) + tick (G3 · G5)
-  config.py         허브 설정(JSON): 저장소 · 브랜치 · 세션(이름 · 머리글자 · 통로) · 소유표 · 시험 명령 · 환경 변수 · 예산 · 규칙 강도 올림
+  config.py         허브 설정(JSON): 저장소(로컬 경로) · 브랜치 · 세션(이름 · 머리글자 · 통로) · 소유표 · 시험 명령 · 환경 변수 · 예산 · 규칙 강도 올림
   adapters/
-    base.py     §4  Channel · Waker · Vcs · Bundle · Ticker · Judge  (typing.Protocol)
-    mailbox.py      파일 우편함 Channel + 없는 Waker
-    git.py          Vcs (subprocess git)
+    base.py     §4  Channel · Runner · Vcs · Bundle · Judge  (typing.Protocol) — Ticker 는 `ga tick` 한 번
+    mailbox.py      파일 우편함 Channel: `<작업 디렉터리>/.ga/mailbox/<세션>/`, 임시 파일 + os.replace 로 여러 프로세스가 함께 써도 안전
+    runner.py   §4c Runner 인터페이스(TurnRequest → TurnResult{ended, session_id, cost}) + 수동 Runner(붙여 넣을 프롬프트를 `.ga/outbox/` 에 쓰고 출력)
+    git.py          Vcs (subprocess git): 세션마다 worktree, 원격이 있으면 fetch · push, 없으면 같은 저장소의 브랜치가 곧 통로
+    hooks.py        R3: 세션 worktree 마다 pre-push 훅(`extensions.worktreeConfig` + worktree 별 `core.hooksPath`) — 자기 브랜치 밖 · force · 지우기를 막는다
     venv.py         Bundle (a) 경로 방식 · (b) 깨끗한 venv 에 sha 고정 설치
     human.py        Judge 사람 입력 구현(답을 파일에서 읽는다)
-    ticker.py       Ticker: tick() 한 번 = 고리 [1] 한 번. 주기는 바깥(cron 등)이 정한다
   __main__.py       python -m ga  check | tick [--dry-run] | render | bundle | prompt
 tests/              unittest (표준 라이브러리)
 ```
@@ -82,7 +84,14 @@ tests/              unittest (표준 라이브러리)
 
 ## 7. 짓는 순서
 
-G1 → G8 → G2 → G4 → G6(우편함 · git) → G3 → G5 → G7. §9 검증 2(엇갈림)는 G6 와 함께 시험으로 만든다.
+G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · pre-push) → G3 → G5 → G7. §9 검증 2(엇갈림)는 G6 와 함께 시험으로 만든다.
+
+## 7b. 로컬 배치 (G9)
+
+- 설정의 저장소는 로컬 경로다. `.ga/worktrees/<세션>/<저장소>` 에 세션 브랜치 worktree, `.ga/worktrees/_hub/<저장소>` 에 통합 브랜치 worktree 를 둔다.
+- 원격이 없으면 worktree 들이 ref 를 함께 쓰므로 세션의 커밋이 곧 보고된 브랜치다. 허브는 자기가 기록한 통합 머리와 실제 머리가 다르면 R3 위반(허브 아닌 쪽이 통합 브랜치를 움직임)으로 멈춘다.
+- 수동 Runner 는 턴의 끝을 모른다(`ended=None`). 보고가 우편함에 오면 다음 tick 이 연다. 시험에서는 사람 몫을 함수로 흉내 낸다.
+- 비용을 아는 Runner 는 턴마다 비용을, 모르는 Runner 는 "알 수 없음" 과 실행 횟수를 상태에 남긴다. R12 는 그 값으로 센다.
 
 ## 8. 검증 계획 (§9)
 

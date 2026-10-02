@@ -45,6 +45,17 @@ def worker_prompt(cfg: Config, session: str) -> str:
     return "\n".join([head, "", guidance, "", *channel, "", tail]) + "\n"
 
 
+def turn_prompt(cfg: Config, session: str, directive_text: str) -> str:
+    """What a Runner hands to a session for one turn: the directive and how to report back."""
+    s = cfg.sessions[session]
+    return (
+        f"[{cfg.hub_name} → {s.tag}] 새 지시가 통로 {s.channel or session} 에 왔다. 아래가 그 글이다.\n\n"
+        f"{directive_text.rstrip()}\n\n"
+        f"작업은 자기 브랜치({', '.join(f'{r}@{s.branch_for(r)}' for r in s.repos) or '-'})에서 하고, "
+        f"끝나면 report/1 꼴로 보고한다: `ga post --channel {session} --from {session} <보고 파일>`.\n"
+    )
+
+
 def hub_prompt(cfg: Config) -> str:
     guidance = cfg.read_text(cfg.hub["guidance"]).rstrip("\n")
     head = (
