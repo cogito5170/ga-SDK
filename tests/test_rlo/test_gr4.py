@@ -15,7 +15,8 @@ from .world import run_cli
 
 class SubstitutesTest(unittest.TestCase):
     def test_the_map_serves_plumbing_only(self):
-        self.assertEqual(remote.SUBSTITUTES, {"ReadNotifications": ["mcp__github__issue_read"]})
+        self.assertEqual(remote.SUBSTITUTES, {"ReadNotifications": ["ga.mail.read", "mcp__github__issue_read"],
+                                              "mcp__claude-code-remote__send_message": ["ga.mail.send"]})  # GR7 S1
         for t in ("WebFetch", "Agent", "mcp__claude-code-remote__create_session"):
             self.assertNotIn(t, remote.SUBSTITUTES)
         self.assertEqual(remote.substitute_problems(remote.model("W", substitutes=True)), [])

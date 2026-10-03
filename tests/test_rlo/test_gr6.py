@@ -34,19 +34,19 @@ class OnePinSourceTest(unittest.TestCase):
         dist, extras, url, _ = _pins.PINS["rlo"]
         other = "f" * 40
         with mock.patch.dict(_pins.PINS, {"rlo": (dist, extras, url, other)}):
-            GoldenTest("test_same_bytes_as_ga_rlo_c2fcbc3").test_same_bytes_as_ga_rlo_c2fcbc3()
+            GoldenTest("test_same_bytes_as_golden").test_same_bytes_as_golden()
             with tempfile.TemporaryDirectory() as d:
                 remote.write(d, "W1")
                 self.assertEqual(remote.pin_of(Path(d) / "ops/rlo/install.sh"), other)
                 self.assertEqual(remote.problems(d), [])
 
     def test_a_golden_byte_change_outside_the_pin_is_caught(self):
-        golden = HERE / "golden_remote_W1" / "ops/rlo/guard.sh"
+        golden = HERE / "golden_remote_W1" / "ops/rlo/guard.py"
         good = golden.read_bytes()
         self.addCleanup(golden.write_bytes, good)
-        golden.write_bytes(good.replace(b"--mode enforce", b"--mode  enforce"))
+        golden.write_bytes(good.replace(b'"--mode", "enforce"', b'"--mode",  "enforce"'))
         with self.assertRaises(AssertionError):
-            GoldenTest("test_same_bytes_as_ga_rlo_c2fcbc3").test_same_bytes_as_ga_rlo_c2fcbc3()
+            GoldenTest("test_same_bytes_as_golden").test_same_bytes_as_golden()
 
     def test_upgrade_remote_prints_the_move_to_ga_pins(self):
         """S3: amp's guard keeps its own pin until a person runs what upgrade-remote prints: old -> ga/_pins.py's."""

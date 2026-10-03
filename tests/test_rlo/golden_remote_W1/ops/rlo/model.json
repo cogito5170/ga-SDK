@@ -299,11 +299,51 @@
    "postcondition": [],
    "window_ms": null,
    "description": "Send a notify/1 line to the hub session. External: granted."
+  },
+  {
+   "schema": "action-spec/1",
+   "name": "ga.mail.read",
+   "version": "1",
+   "target_model": null,
+   "params": {},
+   "preconditions": [],
+   "risk": "read",
+   "postcondition": [],
+   "window_ms": null,
+   "description": "Channel command, not a tool: Bash `ga mail read --repo <channel repo> ...` as declared in ops/rlo/GUARD.md."
+  },
+  {
+   "schema": "action-spec/1",
+   "name": "ga.mail.scan",
+   "version": "1",
+   "target_model": null,
+   "params": {},
+   "preconditions": [],
+   "risk": "read",
+   "postcondition": [],
+   "window_ms": null,
+   "description": "Channel command, not a tool: Bash `ga mail scan --repo <channel repo> ...` as declared in ops/rlo/GUARD.md."
+  },
+  {
+   "schema": "action-spec/1",
+   "name": "ga.mail.send",
+   "version": "1",
+   "target_model": null,
+   "params": {},
+   "preconditions": [],
+   "risk": "external",
+   "postcondition": [],
+   "window_ms": null,
+   "description": "Channel command, not a tool: Bash `ga mail send --repo <channel repo> ...` as declared in ops/rlo/GUARD.md."
   }
  ],
  "substitutes": {
   "ReadNotifications": [
+   "ga.mail.read",
    "mcp__github__issue_read"
+  ],
+  "mcp__claude-code-remote__send_message": [
+   "ga.mail.send"
   ]
  }
 }

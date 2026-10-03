@@ -1,11 +1,12 @@
 """`ga rlo ...` -- rlo's commands inside ga (moved from ga_rlo 0.4.0 `ga-rlo`, CMD-GR5, GA_UNIFIED U2).
 
     ga rlo init     --hub H --repo N=PATH … --session N:P:BRANCH:REPOS …   G3: ga.json + rlo model (prints the permit only)
-    ga rlo init     --profile remote --work-repo PATH [--name W]           GR2: the guard as a remote worker's project settings
+    ga rlo init     --profile remote --work-repo PATH [--name W] [--hub H] [--channel-repo P] [--guard-ref R/B]
+                                                                          GR2/GR7: the guard as a remote worker's settings
     ga rlo doctor   [--install-only] [--profile remote --work-repo PATH] [--json]   G4: checks before running (exit 1 if off)
     ga rlo evidence [--json]                                               G2: per turn, ga's guard evidence
     ga rlo preset   [--model PATH]                                         G1: one runner.guards entry (JSON)
-    ga rlo upgrade-remote [--work-repo PATH]                               prints how to move a remote guard to the pinned rlo
+    ga rlo upgrade-remote [--work-repo PATH]                               prints how to move a remote guard (pin, GR7)
     ga rlo hooks …                                                         python -m rlo.hooks … as is; install-hook and
                                                                            uninstall-hook need --settings and refuse the
                                                                            person's settings (P4)
@@ -91,6 +92,10 @@ def _parser() -> argparse.ArgumentParser:
                    help="local profile (one or more)")
     p.add_argument("--work-repo", default=None, help="remote profile: the worker's repository checkout")
     p.add_argument("--name", default="worker", help="remote profile: the worker session's name (record file name)")
+    p.add_argument("--channel-repo", default=".", help="remote profile: the ga mail repo, relative to the work repo")
+    p.add_argument("--guard-ref", default=None, metavar="REMOTE/BRANCH",
+                   help="remote profile: take the model and PIN from this ref, not the working tree (CMD-GR7 S5)")
+    p.add_argument("--fetch-every", type=float, default=5, metavar="MINUTES", help="remote profile: guard ref fetch bound")
     p.add_argument("--integration-branch", default="integration")
     p.add_argument("--runner", default="headless", choices=("headless", "agent_sdk"))
     p.add_argument("--model", default=None)
@@ -110,9 +115,13 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p = sub.add_parser("preset", help="G1: runner.guards 항목 하나")
     p.add_argument("--model", default=None, help="모형 경로(기본: <설정 디렉터리>/.ga-rlo/cc_tools_model.json)")
-    p = sub.add_parser("upgrade-remote", help="print the commands that move a remote guard's install.sh to the pinned rlo")
+    p = sub.add_parser("upgrade-remote", help="print the commands that move a remote guard to the pinned rlo and the GR7 guard")
     p.add_argument("--work-repo", default=".")
     p.add_argument("--install-sh", default="ops/rlo/install.sh", help="path inside the work repo")
+    p.add_argument("--name", default=None, help="the worker's name (default: the guard's record file name)")
+    p.add_argument("--hub", default="hub", help="the ga mail recipient the worker reports to")
+    p.add_argument("--channel-repo", default=".")
+    p.add_argument("--guard-ref", default=None, metavar="REMOTE/BRANCH")
     sub.add_parser("hooks", help="python -m rlo.hooks … 그대로", add_help=False)
     return ap
 
@@ -122,7 +131,8 @@ def cmd_init(a) -> int:
 
     if a.profile == "remote":
         try:
-            out = init.run(directory=".", profile="remote", force=a.force, work_repo=a.work_repo, name=a.name)
+            out = init.run(directory=".", profile="remote", force=a.force, work_repo=a.work_repo, name=a.name,
+                           hub=a.hub, channel_repo=a.channel_repo, guard_ref=a.guard_ref, fetch_every_min=a.fetch_every)
         except init.InitError as e:
             print(f"ga rlo init: {e}", file=sys.stderr)
             return 2
@@ -135,6 +145,9 @@ def cmd_init(a) -> int:
         print("Give the hub ownership of these paths in its ga.json:")
         for row in out["ownership"]:
             print(f"  {json.dumps(row)}")
+        if a.guard_ref:
+            print(f"The guard reads model.json and install.sh from {a.guard_ref}: they must be on that branch too, or it"
+                  " fails closed (the channel stays open).")
         print("Then: ga rlo doctor --profile remote --work-repo <checkout>")
         return 0
     if not a.repo or not a.session:
@@ -207,17 +220,28 @@ def cmd_upgrade_remote(a) -> int:
 
     try:
         old, cmds = remote.upgrade_commands(a.work_repo, a.install_sh)
+        why, move = remote.mailbox_move(a.work_repo, name=a.name, hub=a.hub, channel_repo=a.channel_repo,
+                                        guard_ref=a.guard_ref)
     except (OSError, ValueError) as e:
         print(f"ga rlo upgrade-remote: {e}", file=sys.stderr)
         return 2
-    if not cmds:
-        print(f"already at the pinned rlo-sdk ({old[:7]}): nothing to do")
+    if not cmds and not move:
+        print(f"already at the pinned rlo-sdk ({old[:7]}) and the CMD-GR7 guard: nothing to do")
         return 0
-    print(f"{a.install_sh} pins rlo-sdk {old[:7]}; ga pins {remote._pins.PINS['rlo'][3][:7]}.")
-    print("ga rlo does not edit, commit or push a guard (BD-196). A human runs:")
-    for c in cmds:
-        print(f"  {c}")
-    print("The venv marker carries the PIN, so the worker's next session start reinstalls rlo.")
+    if cmds:
+        print(f"{a.install_sh} pins rlo-sdk {old[:7]}; ga pins {remote._pins.PINS['rlo'][3][:7]}.")
+        print("ga rlo does not edit, commit or push a guard (BD-196). A human runs:")
+        for c in cmds:
+            print(f"  {c}")
+        print("The venv marker carries the PIN: the guard (or the next session start) installs rlo at the new PIN.")
+    else:
+        print(f"already at the pinned rlo-sdk ({old[:7]}).")
+    if move:
+        print(f"\nMove to the CMD-GR7 guard ({why}). For HUMAN_QUEUE: a person reviews and runs, in order")
+        print("(ga rlo runs none of them and pushes nothing to a guarded repo, BD-196):")
+        for c in move:
+            print(f"  {c}")
+        print("Settings stay the same hooks, so a running session takes the new guard at its next tool call.")
     return 0
 
 

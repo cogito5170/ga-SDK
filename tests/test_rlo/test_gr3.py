@@ -159,7 +159,8 @@ class UpgradeRemoteTest(unittest.TestCase):
         self.assertEqual(after, before.replace(OLD, NEW))
         self.assertIn("AMP_RLO_VENV", after)  # only the PIN line moved
         rc, out, _ = run_cli("upgrade-remote", "--work-repo", str(self.amp))
-        self.assertIn("nothing to do", out)
+        self.assertIn("already at the pinned rlo-sdk", out)
+        self.assertIn("Move to the CMD-GR7 guard", out)  # the PIN moved; the mailbox move is still owed (GR7 S3)
 
     def test_no_pin_line(self):
         (self.amp / "ops/rlo/install.sh").write_text("#!/bin/sh\n")
