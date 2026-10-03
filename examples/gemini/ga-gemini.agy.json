@@ -1,0 +1,22 @@
+{
+  "schema": "ga-gemini/1",
+  "host": "agy",
+  "agy": {
+    "model": "gemini-3.8-flash-high",
+    "cli": ["agy"],
+    "usage_floor_pct": 5,
+    "window": "weekly",
+    "reset_fallback_s": 3600,
+    "usage_every_s": 300
+  },
+  "budget": {"rpm": 5},
+  "tools": {
+    "issue_read": {"mcp": "github", "tool": "issue_read", "about": "read one GitHub issue or its comments"}
+  },
+  "mcp_servers": {
+    "github": {"command": ["node", "path/to/your-extension/mcp-server.js"]}
+  },
+  "state_dir": ".ga-gemini",
+  "turn_status_s": 20,
+  "max_parallel": 4
+}

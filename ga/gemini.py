@@ -45,6 +45,11 @@ DAILY_DEFAULT = {"requests": 20, "reset_tz": "America/Los_Angeles", "reset_at": 
 # meets a 429 it would retry inside the turn (BD-232). The free tier's exact minute limit for gemini-3-flash-preview is
 # not known here — an assumption; set budget.rpm in ga-gemini.json to your key's limit minus a margin.
 DEFAULT_BUDGET = {"rpm": 5}
+HOSTS = ("gemini_cli", "agy")
+# agy (CMD-GA23): the slug the user pinned (BD-255); a model step waits when the family's weekly share is under the
+# floor; window and reset_fallback_s cover a /usage text that does not say them (its format is U)
+AGY_DEFAULT = {"model": "gemini-3.8-flash-high", "cli": ["agy"], "usage_floor_pct": 5, "window": "weekly",
+               "reset_fallback_s": 3600, "usage_every_s": 300}
 
 
 # ---- config ---------------------------------------------------------------------------------------------------------
@@ -65,6 +70,13 @@ class GeminiConfig:
     daily: dict[str, Any] = field(default_factory=lambda: dict(DAILY_DEFAULT))
     turn_status_s: float = 20.0          # a turn running longer gets one status line per this many seconds (S7)
     max_parallel: int | None = None      # tool steps at once; handed to the Scheduler when it takes it (K12 rev 3, S8)
+    host: str = "gemini_cli"             # gemini_cli | agy (CMD-GA23); `ga gemini --host` overrides it
+    agy: dict[str, Any] = field(default_factory=lambda: dict(AGY_DEFAULT))
+
+    @property
+    def active_model(self) -> str:
+        """The one model this host runs: fixed by the config, never switched (the same rule on both hosts)."""
+        return self.agy["model"] if self.host == "agy" else self.model
 
     @property
     def state_path(self) -> Path:
@@ -79,7 +91,7 @@ def config_problems(raw: Any) -> list[Problem]:
     if not isinstance(raw, dict):
         return [Problem("$", "must be an object")]
     known = {"schema", "model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps", "result_cap",
-             "turn_timeout_s", "est_tokens", "daily", "turn_status_s", "max_parallel"}
+             "turn_timeout_s", "est_tokens", "daily", "turn_status_s", "max_parallel", "host", "agy"}
     for k in sorted(set(raw) - known):
         bad(f"$.{k}", "unknown field")
     if raw.get("schema") != CONFIG_SCHEMA:
@@ -127,6 +139,24 @@ def config_problems(raw: Any) -> list[Problem]:
         bad("$.max_parallel", "must be an integer >= 1")
     if "state_dir" in raw and not (isinstance(raw["state_dir"], str) and raw["state_dir"]):
         bad("$.state_dir", "must be a path")
+    if "host" in raw and raw["host"] not in HOSTS:
+        bad("$.host", f"must be one of {', '.join(HOSTS)}")
+    a = raw.get("agy", {})
+    if not isinstance(a, dict) or set(a) - set(AGY_DEFAULT):
+        bad("$.agy", "must be {model?, cli?, usage_floor_pct?, window?, reset_fallback_s?, usage_every_s?}")
+    else:
+        a = {**AGY_DEFAULT, **a}
+        if not (isinstance(a["model"], str) and a["model"]):
+            bad("$.agy.model", "must be an agy model slug")
+        if not (isinstance(a["cli"], list) and a["cli"] and all(isinstance(x, str) and x for x in a["cli"])):
+            bad("$.agy.cli", "must be a non-empty list of strings")
+        if not (isinstance(a["usage_floor_pct"], (int, float)) and 0 <= a["usage_floor_pct"] < 100):
+            bad("$.agy.usage_floor_pct", "must be a number in [0, 100)")
+        if a["window"] not in ("weekly", "5-hour"):
+            bad("$.agy.window", "must be weekly or 5-hour")
+        for k in ("reset_fallback_s", "usage_every_s"):
+            if not (isinstance(a[k], (int, float)) and not isinstance(a[k], bool) and a[k] > 0):
+                bad(f"$.agy.{k}", "must be a positive number")
     d = raw.get("daily", DAILY_DEFAULT)
     if not isinstance(d, dict) or set(d) - set(DAILY_DEFAULT):
         bad("$.daily", "must be {requests?, reset_tz?, reset_at?}")
@@ -154,8 +184,10 @@ def load_config(path: str | Path) -> GeminiConfig:
     if probs:
         raise FormError(probs)
     kw = {k: raw[k] for k in ("model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps",
-                              "result_cap", "turn_timeout_s", "est_tokens", "turn_status_s", "max_parallel") if k in raw}
-    return GeminiConfig(root=path.resolve().parent, daily={**DAILY_DEFAULT, **raw.get("daily", {})}, **kw)
+                              "result_cap", "turn_timeout_s", "est_tokens", "turn_status_s", "max_parallel", "host")
+          if k in raw}
+    return GeminiConfig(root=path.resolve().parent, daily={**DAILY_DEFAULT, **raw.get("daily", {})},
+                        agy={**AGY_DEFAULT, **raw.get("agy", {})}, **kw)
 
 
 # ---- the daily quota (S6, BD-222) -----------------------------------------------------------------------------------
@@ -208,7 +240,7 @@ class DayCount:
         self._save()
 
 
-def daily_governor(cfg: GeminiConfig, clock: Callable[[], float], day: DayCount) -> Any:
+def daily_governor(cfg: GeminiConfig, clock: Callable[[], float], day: DayCount, model: str | None = None) -> Any:
     """rlo's Governor (per-minute window, 429 waits) with the daily count on top: no request goes out when today's is
     spent — the step waits for the reset instead of spending a call on a known 429."""
     from rlo.governor import Governor
@@ -225,7 +257,86 @@ def daily_governor(cfg: GeminiConfig, clock: Callable[[], float], day: DayCount)
                 day.add(self.clock())
             return g
 
-    return DailyGovernor({cfg.model: dict(cfg.budget)}, clock=clock, provider="gemini")
+    return DailyGovernor({model or cfg.model: dict(cfg.budget)}, clock=clock, provider="gemini")
+
+
+class AgyQuota:
+    """agy's share for the pinned model's family (S2, BD-255): read from ``agy -p /usage`` (V: spends nothing), at most
+    every ``usage_every_s`` and again once the held reset has come. Under the floor, or after a quota / credits error,
+    model steps wait for the reset agy reports (or ``reset_fallback_s`` when it reports none)."""
+
+    def __init__(self, cli: Any, model: str, agy: dict[str, Any], clock: Callable[[], float],
+                 log: Callable[..., None] = lambda *a, **k: None):
+        from .adapters.agy_cli import family_of
+        self.cli, self.clock, self.log = cli, clock, log
+        self.family = family_of(model)
+        self.floor, self.window = float(agy["usage_floor_pct"]), agy["window"]
+        self.fallback_s, self.every_s = float(agy["reset_fallback_s"]), float(agy["usage_every_s"])
+        self.info: dict[str, Any] | None = None
+        self.probed_at: float | None = None
+        self.blocked_until: float | None = None
+        self.probes = 0
+
+    def probe(self) -> dict[str, Any] | None:
+        now = self.clock()
+        self.probes += 1
+        self.probed_at = now
+        try:
+            self.info = self.cli.usage().get(self.family)
+        except GeminiError:
+            self.info = None
+        pct = self.info["remaining_pct"] if self.info else None
+        self.log("usage", family=self.family, remaining_pct=pct, known=self.info is not None)
+        return self.info
+
+    def _reset(self, now: float) -> float:
+        at = self.info.get("reset_at") if self.info else None
+        return at if isinstance(at, (int, float)) and at > now else now + self.fallback_s
+
+    def wait(self, now: float) -> float:
+        """Seconds a model step must still wait (no probe)."""
+        return max(0.0, self.blocked_until - now) if self.blocked_until and now < self.blocked_until else 0.0
+
+    def check(self, now: float) -> float:
+        """Before a model step: the wait (0 when it may go). Probes when the last reading is stale or a held reset came."""
+        if self.blocked_until and now < self.blocked_until:
+            return self.blocked_until - now
+        if self.blocked_until or self.probed_at is None or now - self.probed_at >= self.every_s:
+            self.blocked_until = None
+            self.probe()
+        if self.info and self.info["remaining_pct"] < self.floor:
+            self.blocked_until = self._reset(now)
+            return self.blocked_until - now
+        return 0.0
+
+    def spent(self, now: float) -> float:
+        """agy said the quota is spent (or offered credits): hold until the reset; return the wait."""
+        self.probe()
+        self.blocked_until = self._reset(now)
+        return self.blocked_until - now
+
+    @property
+    def window_kind(self) -> str:
+        return (self.info or {}).get("window") or self.window
+
+
+def agy_governor(cfg: GeminiConfig, clock: Callable[[], float], quota: AgyQuota, model: str) -> Any:
+    """rlo's Governor (per-minute window) with agy's share on top: no model step goes out while the share is under the
+    floor or a quota stop is held."""
+    from rlo.governor import Governor
+
+    class AgyGovernor(Governor):
+        def wait_s(self, est_tokens: int = 0, model_: str | None = None, calls: int = 1) -> float:
+            return max(super().wait_s(est_tokens, model_, calls), quota.wait(self.clock()))
+
+        def try_acquire(self, est_tokens: int = 0, model_: str | None = None) -> Any:
+            from rlo.governor import Grant
+            w = quota.check(self.clock())
+            if w > 0:
+                return Grant(False, w)
+            return super().try_acquire(est_tokens, model_)
+
+    return AgyGovernor({model: dict(cfg.budget)}, clock=clock, provider="gemini")
 
 
 # ---- the closed step list -------------------------------------------------------------------------------------------
@@ -316,8 +427,14 @@ class Supervisor:
         self.cfg, self.clock, self._sleep, self.out = cfg, clock, sleep, out or sys.stdout
         self.dir = cfg.state_path
         (self.dir / "results").mkdir(parents=True, exist_ok=True)
-        self.cli = cli or GeminiCLI(cfg.cli, cfg.model, cwd=str(cfg.root), timeout_s=cfg.turn_timeout_s,
-                                    settings_dir=self.dir)
+        self.host, self.model = cfg.host, cfg.active_model
+        if self.host == "agy":  # CMD-GA23: Antigravity CLI, the user's Google account
+            from .adapters.agy_cli import AgyCLI
+            self.cli = cli or AgyCLI(cfg.agy["cli"], self.model, cwd=str(cfg.root), timeout_s=cfg.turn_timeout_s)
+        else:
+            self.cli = cli or GeminiCLI(cfg.cli, self.model, cwd=str(cfg.root), timeout_s=cfg.turn_timeout_s,
+                                        settings_dir=self.dir)
+        self.agy_quota = AgyQuota(self.cli, self.model, cfg.agy, clock, self.log) if self.host == "agy" else None
         self.day = DayCount(self.dir / "day.json", cfg.daily)
         self._quota: dict[str, str] = {}  # step id -> where its wait comes from: hint · window · daily reset
         self._lock = threading.RLock()  # tool steps may run on the Scheduler's threads (K12 rev 3): one writer at a time
@@ -334,7 +451,7 @@ class Supervisor:
         st = json.loads(self.state_file.read_text(encoding="utf-8"))
         if st.get("schema") != STATE_SCHEMA:
             raise FormError([Problem("$.schema", f"{self.state_file} is not {STATE_SCHEMA}")])
-        if st.get("model") != self.cfg.model:  # the model is the config's; a saved task does not switch it
+        if st.get("model") != self.model:  # the model is the config's; a saved task does not switch it
             raise FormError([Problem("$.model", "the saved task was run with another model than the config's")])
         self.st = st
         return True
@@ -368,7 +485,11 @@ class Supervisor:
     def _prompt(self, rec: dict[str, Any]) -> str:
         if rec.get("first"):
             return protocol(self.cfg) + "\nTask:\n" + rec["prompt"]
-        lines = [f"Reply with one {PLAN_SCHEMA} JSON object, as before.", "Results:"]
+        if getattr(self.cli, "resumes", True):
+            lines = [f"Reply with one {PLAN_SCHEMA} JSON object, as before.", "Results:"]
+        else:  # a host without --resume (agy, U): every turn carries the protocol and the task again
+            first = next(s for s in self.st["steps"] if s.get("first"))
+            lines = [protocol(self.cfg), "Task:", first["prompt"], "", "Results:"]
         for a in rec.get("needs", []):
             t = self._rec(a)
             lines.append(f"- {t['plan_id']} ({t['tool']}): {self._result_text(a)}")
@@ -416,8 +537,9 @@ class Supervisor:
         if sid in self.st["parked"]:
             _at, since, *src = self.st["parked"].pop(sid)
             waited = round(self.clock() - since, 1)
-            if src and src[0] == "daily reset":  # the one probe at the reset (S6): one call, whatever it shows
-                self.say(f"[ga gemini] daily quota reset: one probe ({sid}) after {waited:g} s")
+            if src and src[0] in ("daily reset", "quota reset"):  # the one probe at the reset: one call, whatever it shows
+                what = "daily quota" if src[0] == "daily reset" else "agy quota"
+                self.say(f"[ga gemini] {what} reset: one probe ({sid}) after {waited:g} s")
                 self.log("probe", step=sid, waited_s=waited)
             else:
                 self.say(f"[ga gemini] resumed {sid} after {waited:g} s")
@@ -432,17 +554,27 @@ class Supervisor:
                 self.day.exhaust(now)
                 e.body = quota_body("day", self.day.reset_at(now) - now)
                 src = "daily reset"
+            elif e.kind in ("quota", "credits") and self.agy_quota is not None:  # agy: the share is spent
+                if e.kind == "credits":
+                    self.say("[ga gemini] agy offered or mentioned paid AI credits; ga never accepts them — "
+                             "the plan quota is spent, waiting for its reset")
+                e.body = quota_body("day", self.agy_quota.spent(now))
+                src = "quota reset"
             else:
                 src = "hint" if e.hint_s is not None else "window"
             self._quota[sid] = src
-            self.log("turn", step=sid, ok=False, reason=e.reason, source=src, via=e.via, model=self.cfg.model)
+            self.log("turn", step=sid, ok=False, reason=e.reason, source=src, via=e.via, model=self.model)
             raise
         except GeminiError as e:
-            self.log("turn", step=sid, ok=False, reason=e.reason, model=self.cfg.model)
+            self.log("turn", step=sid, ok=False, reason=e.reason, model=self.model)
             raise
         self.st["session_id"] = turn.session_id or self.st.get("session_id")
-        self.log("turn", step=sid, ok=True, served=turn.served, model=self.cfg.model, seconds=turn.seconds,
+        self.log("turn", step=sid, ok=True, served=turn.served, model=self.model, seconds=turn.seconds,
                  tokens=turn.usage.get("total_tokens"))
+        denied = list(getattr(turn, "denied", []) or [])
+        if denied:  # agy refused tool calls inside the turn (V: denied_actions); reported, labels only
+            self.say(f"[ga gemini] agy refused {len(denied)} action(s) in {sid}: {', '.join(denied[:8])}")
+            self.log("denied", step=sid, count=len(denied), labels=sorted(set(denied))[:8])
         try:
             plan = extract_plan(turn.text)
             probs = check_plan(plan, self.cfg.tools)
@@ -491,7 +623,7 @@ class Supervisor:
         after = tuple(rec["after"])
         if rec["kind"] == "model":
             return Step(rec["id"], MODEL_STEP, payload=rec["id"], after=after, est_tokens=self.cfg.est_tokens,
-                        model=self.cfg.model)
+                        model=self.model)
         return Step(rec["id"], rec["tool"], fn=self._tool_fn(rec["id"]), after=after)
 
     # -- status: K12 rev 2's status object, plus where the wait comes from --
@@ -509,6 +641,11 @@ class Supervisor:
         now = self.clock()
         src = next((self._quota[k] for k in parked if k in self._quota), None) or next(
             (self.st["parked"][k][2] for k in parked if len(self.st.get("parked", {}).get(k, [])) > 2), None)
+        if self.agy_quota is not None:
+            st["left_today"] = None
+            st["share_pct"] = (self.agy_quota.info or {}).get("remaining_pct")
+            st["eta_source"] = ("quota reset" if parked and self.agy_quota.wait(now) > 0 else (src or "window"))
+            return st
         st["left_today"] = self.day.left(now)
         st["eta_source"] = "daily reset" if st["left_today"] == 0 and parked else (src or "window")
         return st
@@ -525,12 +662,20 @@ class Supervisor:
                 since = self.st["parked"].get(sid, [None, round(now, 3)])[1]
                 self.st["parked"][sid] = [None if not math.isfinite(eta) else round(now + eta, 3), since, st["eta_source"]]
             self.save()
-            left, limit = st["left_today"], self.day.limit
+            left, limit = st.get("left_today"), self.day.limit
             self.log("park", steps=list(parked), resumes_in_s=None if not math.isfinite(eta) else round(eta, 1),
                      source=st["eta_source"], left_today=left, done=len(st["done"]), running=len(st["running"] or []))
             ids = ", ".join(parked)
             if not math.isfinite(eta):
                 head = f"[ga gemini] quota: {ids} parked — no window opens"
+            elif st["eta_source"] == "quota reset":  # agy: the weekly (or 5-hour) share of the model's family
+                q = self.agy_quota
+                h, m = divmod(math.ceil(eta / 60), 60)
+                days, h = divmod(h, 24)  # not `d`: that is the sleep the scheduler asked for
+                share = "unknown" if st.get("share_pct") is None else f"{st['share_pct']:g}%"
+                head = (f"[ga gemini] agy quota ({q.family}, {q.window_kind}): {ids} parked — {share} left "
+                        f"(floor {q.floor:g}%); resets at {time.strftime('%Y-%m-%d %H:%M %Z', time.localtime(now + eta))}, "
+                        f"in {days} d {h} h {m} min; one probe then")
             elif st["eta_source"] == "daily reset":
                 h, m = divmod(math.ceil(eta / 60), 60)
                 head = (f"[ga gemini] daily quota: {ids} parked — the quota resets at {self.day.at} {self.day.tz}, in "
@@ -542,7 +687,8 @@ class Supervisor:
             self.say("\n".join([
                 head,
                 f"  now:  done {len(st['done'])} · running {len(st['running'] or [])} · parked {len(parked)} · "
-                f"requests left today {left}/{limit}",
+                + (f"requests left today {left}/{limit}" if left is not None else
+                   f"agy share left {'unknown' if st.get('share_pct') is None else format(st['share_pct'], 'g') + '%'}"),
                 f"  next: {nxt}",
                 f"  saved: {self.state_file} — after a crash or a closed terminal: ga gemini --resume",
             ]))
@@ -556,12 +702,12 @@ class Supervisor:
             self.say(f"[ga gemini] {prev['task']} is not finished — ga gemini --resume continues it first")
             return False
         task = f"T{int(prev.get('tasks', 0)) + 1}"
-        self.st = {"schema": STATE_SCHEMA, "model": self.cfg.model, "session_id": prev.get("session_id"),
+        self.st = {"schema": STATE_SCHEMA, "model": self.model, "session_id": prev.get("session_id"),
                    "tasks": int(prev.get("tasks", 0)) + 1, "task": task, "status": "running", "model_steps": 1,
                    "steps": [{"id": f"{task}.m1", "kind": "model", "first": True, "prompt": prompt, "after": []}],
                    "done": [], "failed": {}, "parked": {}, "say": ""}
         self.save()
-        self.log("task", task=task, model=self.cfg.model)
+        self.log("task", task=task, model=self.model, host=self.host)
         return self._execute()
 
     def resume(self) -> bool:
@@ -576,7 +722,8 @@ class Supervisor:
 
     def _execute(self) -> bool:
         from rlo.scheduler import Scheduler, Step
-        gov = daily_governor(self.cfg, self.clock, self.day)
+        gov = (agy_governor(self.cfg, self.clock, self.agy_quota, self.model) if self.agy_quota is not None
+               else daily_governor(self.cfg, self.clock, self.day, self.model))
         kinds = {MODEL_STEP: "model", **{t: "tool" for t in self.cfg.tools}}
         # K12 rev 2 (S6): the scheduler saves its queue, results and Governor windows to this file on every row and,
         # when it exists, loads it — given the same steps again, so all of them are added, done ones too
@@ -621,6 +768,8 @@ def main(args: Any) -> int:
         for p in e.problems:
             print(f"config: {p}", file=sys.stderr)
         return 2
+    if getattr(args, "host", None):
+        cfg.host = args.host
     sup = Supervisor(cfg)
     try:
         if args.resume:

@@ -195,6 +195,34 @@ ga gemini --config ga-gemini.json --resume                             # after a
 - **On disk** (`state_dir`): `state.json` (session id, steps, done, parked), `results/<step>.json` (full tool results), `log.jsonl` (labels and numbers only) and `ledger.jsonl` (rlo's rows). In memory, each result is capped at `result_cap` characters. No Node process lives for the whole session.
 - Example config: `examples/gemini/ga-gemini.json`. Needs Gemini CLI and its credential in the environment (for example `GEMINI_API_KEY`); ga never stores it.
 
+## `ga gemini --host agy`: the same loop on Antigravity CLI (CMD-GA23, BD-234/255)
+
+`ga gemini --host agy` (or `"host": "agy"` in the config) runs each model step as one headless `agy` process with your Google account: `agy -p … --output-format stream-json --model gemini-3.8-flash-high`, in the config's directory (the workspace with the extension's `.agents`), stdin closed. The default host stays Gemini CLI; the model rule is the same: the slug in `agy.model` and nothing else, and a turn served by any other model fails.
+
+- **Quota:** agy's quota is a weekly share per model family, not requests per minute. Before a model step ga reads `agy -p /usage` (it spends nothing), at most every `usage_every_s`. When the family's remaining share is under `usage_floor_pct`, the step waits for the reset agy reports:
+  ```
+  [ga gemini] agy quota (gemini, weekly): T1.m2 parked — 3% left (floor 5%); resets at 2026-10-11 00:56 KST, in 6 d 7 h 56 min; one probe then
+  ```
+  A quota stop (`AGY_ERROR`, exit 3) waits the same way, with one probe at the reset. Tool steps keep running.
+- **AI credits are never accepted.** When agy offers paid credits ("Use AI Credits") or says the credits balance is too low, ga treats the plan quota as spent and waits for the reset. Spending money is your decision; ga passes nothing that could enable credits and closes stdin, so no prompt can be answered.
+- `denied_actions` (tool calls agy refused) are printed and logged, as labels and counts.
+- Every turn carries the protocol and the task again, because agy has no known `--resume`.
+- ga passes nothing for auth and never reads the token store (keyring, `~/.gemini/antigravity-cli/…`).
+- Example: `examples/gemini/ga-gemini.agy.json`.
+
+### What the Mac run must settle (HUMAN_QUEUE Q5)
+
+The output shapes are assumptions until a real agy shows them. Run these on the Mac, in the workspace, and paste the output back. Never paste a token; `ga mail` and R6 refuse one anyway.
+
+1. `agy --version`, and `agy --help`: does it list `--resume` or `--input-format`?
+2. `agy models --output-format json`: the field names, and that `gemini-3.8-flash-high` is there.
+3. `agy -p "/usage"` and `agy -p "/quota"`: the exact lines (percent, family, reset time and zone, the words "weekly" or "5-hour").
+4. `agy -p "Reply with the word OK" --output-format stream-json --model gemini-3.8-flash-high; echo "exit $?"`: the raw lines. Where is the model, the text, a session id?
+5. The same with `--output-format json`.
+6. A turn where a tool is refused (for example a fetch the workspace's `.agents` rules deny): the `denied_actions` entry.
+7. If a quota stop happens on its own (do not force one): the exact `AGY_ERROR` line and the exit code. Never answer yes to "Use AI Credits".
+8. End to end: `ga gemini --host agy --config ga-gemini.agy.json "list the tools you can use"`, plus `.ga-gemini/log.jsonl` (labels and numbers only).
+
 ## 시험
 
 ```sh
