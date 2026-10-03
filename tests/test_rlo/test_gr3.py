@@ -18,8 +18,8 @@ from ga.rlo import hook, preset, remote
 
 from .world import run_cli
 
-OLD = "a152e14bc84dc282f66bb3426a12a70934fc530d"
-NEW = "3323f88741c198f453370936c481c00fbd26d398"
+NEW = _pins.PINS["rlo"][3]  # one source: ga/_pins.py (BD-228)
+OLD = "1" * 40 if NEW != "1" * 40 else "2" * 40  # an older pin, as amp's W1 guard has; any sha other than NEW
 # the shape of amp's W1 install.sh (amp 344a604): its own venv variable and marker, the PIN line ga-rlo moves
 AMP_INSTALL = f"""#!/usr/bin/env bash
 # Install rlo-sdk (stage-8, pinned) into a private venv for the W1 guard. Idempotent.
@@ -32,16 +32,16 @@ MARK="$VENV/.pinned-$PIN"
 
 
 class PinTest(unittest.TestCase):
-    def test_everything_pins_rlo_051(self):
+    def test_everything_pins_the_rlo_in_ga_pins(self):
         self.assertEqual(_pins.PINS["rlo"][3], NEW)
         with tempfile.TemporaryDirectory() as d:
             remote.write(d, "W")
             self.assertEqual(remote.pin_of(Path(d) / "ops/rlo/install.sh"), NEW)
 
-    def test_installed_rlo_is_051(self):
+    def test_installed_rlo_is_the_pinned_version(self):
         import rlo
 
-        self.assertEqual(rlo.versions()["sdk"], "rlo-sdk/0.6.0")  # GR4 moved the pin on (K11)
+        self.assertEqual(rlo.versions()["sdk"], f"rlo-sdk/{_pins.VERSIONS['rlo-sdk']}")
 
     def test_old_pin_left_in_install_sh_is_caught(self):
         with tempfile.TemporaryDirectory() as d:

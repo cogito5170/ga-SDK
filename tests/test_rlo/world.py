@@ -76,7 +76,12 @@ class World:
         fake.write_text(f"#!/bin/sh\nexec {sys.executable} {HERE / 'fake_claude.py'} \"$@\"\n", encoding="utf-8")
         fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
         self.plan_path = self.tmp / "plan.json"
-        self.edit(lambda raw: (raw["runner"].update(executable=str(fake), extra_env={"GA_RLO_FAKE": str(self.plan_path)}),
+        # CMD-GR6 S4: the turn imports the same ga as this test process (a source checkout need not be installed:
+        # without this, the fake claude and `python -m ga.rlo.hook` cannot import ga in the turn's clean environment)
+        import ga
+
+        extra_env = {"GA_RLO_FAKE": str(self.plan_path), "PYTHONPATH": str(Path(ga.__file__).resolve().parent.parent)}
+        self.edit(lambda raw: (raw["runner"].update(executable=str(fake), extra_env=extra_env),
                                raw["repos"]["work"].update(test=["{python}", "-m", "unittest", "discover", "-s", "tests"]),
                                raw.update(bundle={"pip_args": ["--no-index"], "timeout": 300})))
 

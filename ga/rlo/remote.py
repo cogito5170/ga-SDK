@@ -452,7 +452,7 @@ def replay(repo: str | Path, venv: str | Path, *, guard_rel: str = f"{GUARD_DIR}
                         "--record", str(home / "rec.jsonl")]
             try:
                 p = subprocess.run(argv, input=json.dumps(data) if c.stdin is None else c.stdin,
-                                   capture_output=True, text=True, env=env, timeout=300)
+                                   capture_output=True, text=True, env=env, cwd=str(project), timeout=300)
             except (OSError, subprocess.TimeoutExpired) as e:
                 res.append((c.name, False, type(e).__name__))
                 continue

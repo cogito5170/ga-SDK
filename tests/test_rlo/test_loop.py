@@ -41,7 +41,9 @@ class OneRoundTest(unittest.TestCase):
         rc, out, err = run_cli("--config", str(w.config), "send", str(w.directive_file()))
         self.assertEqual(rc, 0, err)
         turn = w.state()["turns"][-1]
-        self.assertEqual((turn["runner"], turn["error"], turn["sandboxed"]), ("headless", "", True))
+        crash = w.ga / "headless" / "home" / "W" / "fake-error.txt"  # CMD-GR6 S4: the fake's own error, if any
+        self.assertEqual((turn["runner"], turn["error"], turn["sandboxed"]), ("headless", "", True),
+                         crash.read_text() if crash.exists() else "no fake-error.txt")
         g = turn["guards"][0]
         self.assertEqual({k: g[k] for k in ("guard", "allow", "deny", "errors", "labels")},
                          {"guard": "rlo", "allow": 2, "deny": 1, "errors": 0, "labels": ["A1"]})

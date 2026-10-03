@@ -29,11 +29,12 @@ class PinsTest(unittest.TestCase):
     """Inside ga the pins come from ga/_pins.py (one place, GA20); its pyproject and metadata checks are GA's
     (tests/test_unified.py). Here: ga.rlo uses that pin for the rlo it installs and checks."""
 
-    def test_the_rlo_pin_is_the_one_in_the_directive(self):
-        self.assertEqual(_pins.PINS["rlo"][3], "3323f88741c198f453370936c481c00fbd26d398")
-        self.assertEqual(_pins.PINS["rlo"][1], ("sensor",))
-        self.assertEqual(_pins.requirement(_pins.PINS["rlo"]),
-                         "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@3323f88741c198f453370936c481c00fbd26d398")
+    def test_the_rlo_pin_has_the_shape_ga_rlo_needs(self):
+        """The value is ga/_pins.py's (one source, BD-228); ga.rlo needs rlo-sdk with [sensor], at a full commit sha."""
+        dist, extras, url, sha = _pins.PINS["rlo"]
+        self.assertEqual((dist, extras, url), ("rlo-sdk", ("sensor",), "https://github.com/cogito5170/rlo-SDK"))
+        self.assertRegex(sha, r"^[0-9a-f]{40}$")
+        self.assertEqual(_pins.requirement(_pins.PINS["rlo"]), f"rlo-sdk[sensor] @ git+{url}@{sha}")
 
     def test_ga_rlo_keeps_no_pin_list_of_its_own(self):
         import ga.rlo.remote as remote

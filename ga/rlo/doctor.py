@@ -84,13 +84,18 @@ def _clean_env(home: str) -> dict[str, str]:
     return env
 
 
-def _call(argv: list[str], data: dict, env: dict[str, str]) -> tuple[int, str]:
-    p = subprocess.run(argv, input=json.dumps(data), capture_output=True, text=True, env=env, timeout=TIMEOUT)
+def _call(argv: list[str], data: dict, env: dict[str, str], cwd: str) -> tuple[int, str]:
+    p = subprocess.run(argv, input=json.dumps(data), capture_output=True, text=True, env=env, cwd=cwd, timeout=TIMEOUT)
     return p.returncode, p.stdout.strip()
 
 
-def replay(guard: dict[str, Any], *, session: str = "doctor", where: str = "replay") -> list[Check]:
-    """설정된 가드 명령을 Claude Code 명령 훅처럼 부른다: 표준입력에 훅 입력 JSON, 표준출력의 JSON 하나."""
+def replay(guard: dict[str, Any], *, session: str = "doctor", where: str = "replay",
+           extra_env: dict[str, str] | None = None) -> list[Check]:
+    """설정된 가드 명령을 Claude Code 명령 훅처럼 부른다: 표준입력에 훅 입력 JSON, 표준출력의 JSON 하나.
+
+    As a turn runs it (CMD-GR6 S4): a clean environment plus the Runner's ``extra_env``, and a working directory that
+    is not the caller's -- from a source checkout, ``python -m ga.rlo.hook`` would otherwise import ga from the
+    current directory and pass here while the real turn (in its worktree) cannot import it."""
     from rlo.example_hooks import hook_input, now_after
 
     out: list[Check] = []
@@ -100,14 +105,14 @@ def replay(guard: dict[str, Any], *, session: str = "doctor", where: str = "repl
             base = shlex.split(cmd)
         except ValueError:
             return [Check(where, False, "guard command cannot be read")]
-        env = _clean_env(home)
+        env = dict(_clean_env(home), **(extra_env or {}))
         cases = [(n, hook_input(n), now_after(n), None) for n in MUST_PASS]
         for tool, args, rule in MUST_DENY:
             d = dict(hook_input("normal"), tool_name=tool, tool_input=args, tool_use_id=f"probe-{tool}")
             cases.append((f"probe {tool}", d, now_after("normal"), rule))
         for name, data, now, rule in cases:
             try:
-                code, text = _call(base + ["--now-ms", repr(now)], data, env)
+                code, text = _call(base + ["--now-ms", repr(now)], data, env, cwd=home)
             except (OSError, subprocess.TimeoutExpired) as e:
                 out.append(Check(f"{where}.{name}", False, type(e).__name__))
                 continue
@@ -198,7 +203,7 @@ def config_checks(config: Path, ga_dir: str | None) -> list[Check]:
         gap = hub._guard_gap(s)
         out.append(Check(f"guard.program.{s}", not gap, gap or "guard programs are there"))
     for i, g, p in found:
-        out += replay(g, where=f"replay[{i}]")
+        out += replay(g, where=f"replay[{i}]", extra_env=cfg.runner.get("extra_env"))
     gap = hub._permission_gap(hub.load_state())
     out.append(Check("permission", not gap, gap or f"{cfg.runner.get('permission')} covers this Runner"))
     from ga.adapters import sandbox

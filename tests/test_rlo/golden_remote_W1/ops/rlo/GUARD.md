@@ -5,7 +5,7 @@ The middle verification line (METHOD §4c 7) for the `W1` remote worker session,
 
 - `.claude/settings.json`: SessionStart runs `ops/rlo/install.sh`; every tool call (PreToolUse, matcher `*`) runs
   `ops/rlo/guard.sh`.
-- `install.sh`: installs pinned `rlo-sdk[sensor] @ 3323f88` into `$GA_RLO_VENV` (default `~/.cache/ga-rlo-venv`).
+- `install.sh`: installs pinned `rlo-sdk[sensor] @ @RLO_PIN7@` into `$GA_RLO_VENV` (default `~/.cache/ga-rlo-venv`).
 - `guard.sh`: runs `python -m rlo.hooks --mode enforce` with `model.json`. Records one line per verdict in
   `~/.rlo/W1.jsonl`.
   - Fail closed. It denies when:

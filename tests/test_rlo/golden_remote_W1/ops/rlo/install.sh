@@ -2,7 +2,7 @@
 # Install rlo-sdk[sensor] (pinned) into a private venv for this repo's rlo guard. Idempotent.
 # Written by ga-rlo init --profile remote. Owned by the hub: the worker session must not edit it.
 set -u
-PIN="3323f88741c198f453370936c481c00fbd26d398"
+PIN="@RLO_PIN@"
 VENV="${GA_RLO_VENV:-$HOME/.cache/ga-rlo-venv}"
 MARK="$VENV/.pinned-$PIN"
 [ -f "$MARK" ] && exit 0

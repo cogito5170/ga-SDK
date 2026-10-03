@@ -22,6 +22,13 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+import traceback  # noqa: E402
+
+# CMD-GR6 S4: any crash of this fake is written next to its hook log, so a failing turn ("exit 1") names its cause
+sys.excepthook = lambda t, v, tb: (Path(os.environ.get("HOME", ".")).joinpath("fake-error.txt").write_text(
+    "".join(traceback.format_exception(t, v, tb))[-4000:], encoding="utf-8"), sys.__excepthook__(t, v, tb))
+# git in the turn reads no system or global config of the machine running the tests
+GIT_ENV = dict(os.environ, GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
 plan = json.loads(Path(os.environ["GA_RLO_FAKE"]).read_text(encoding="utf-8"))
 argv = sys.argv[1:]
 sys.stdin.read()
@@ -81,9 +88,10 @@ for i, call in enumerate(plan["tools"], 1):
 repo = Path(os.getcwd()) / plan["repo"]
 (repo / plan["file"]).write_text(plan["text"], encoding="utf-8")
 git = ["git", "-c", "user.name=fake", "-c", "user.email=fake@test", "-c", "commit.gpgsign=false"]
-subprocess.run(git + ["add", "-A"], cwd=repo, check=True)
-subprocess.run(git + ["commit", "-q", "-m", "fake work"], cwd=repo, check=True)
-sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True).stdout.strip()
+subprocess.run(git + ["add", "-A"], cwd=repo, check=True, env=GIT_ENV)
+subprocess.run(git + ["commit", "-q", "-m", "fake work"], cwd=repo, check=True, env=GIT_ENV)
+sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True,
+                     env=GIT_ENV).stdout.strip()
 
 from ga.adapters.mailbox import FileMailbox  # noqa: E402
 from ga.forms import dump_text  # noqa: E402
