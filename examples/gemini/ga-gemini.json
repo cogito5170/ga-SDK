@@ -1,0 +1,16 @@
+{
+  "schema": "ga-gemini/1",
+  "model": "gemini-3-flash-preview",
+  "cli": ["gemini"],
+  "budget": {"rpm": 10},
+  "tools": {
+    "issue_read": {"mcp": "github", "tool": "issue_read", "about": "read one GitHub issue or its comments"},
+    "add_issue_comment": {"mcp": "github", "tool": "add_issue_comment", "about": "post one comment"}
+  },
+  "mcp_servers": {
+    "github": {"command": ["node", "path/to/your-extension/mcp-server.js"]}
+  },
+  "state_dir": ".ga-gemini",
+  "max_model_steps": 20,
+  "result_cap": 2000
+}

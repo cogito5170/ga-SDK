@@ -142,6 +142,30 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 
 - `ga prompt SESSION` reads `hub.session_guidance`; `ga prompt --hub` reads `hub.guidance`. A missing key, an empty one or an unreadable file is a config error: exit 2, and stderr names the key (`config: [hard] $.hub.session_guidance: …`). An unknown session is exit 2 too. The library (`worker_prompt` · `hub_prompt`) raises `FormError`.
 
+## `ga gemini`: a Gemini supervisor (CMD-GA21, BD-221)
+
+You talk to ga, not to Gemini CLI's interactive UI. Gemini only directs; ga and rlo do the work.
+
+```sh
+ga gemini --config ga-gemini.json "read issue 12 and post a summary"   # one task
+ga gemini --config ga-gemini.json                                      # a prompt loop (ga gemini> …)
+ga gemini --config ga-gemini.json --resume                             # after a crash or a closed terminal
+```
+
+- **A fixed model, no switch prompt.** The model comes from the config (`model`, default `gemini-3-flash-preview`) and nowhere else. Every Gemini turn is one headless CLI process: `gemini -p … --output-format stream-json -m <model> [--resume <session>]`, with stdin closed, so the quota dialog never opens. If the stream says another model served the turn, or names none, the turn fails. It is never accepted and never retried on another model.
+- **Gemini only directs.** Each turn answers with one closed step list (`ga-gemini-plan/1`): tool steps from the config's `tools` table, with `args` and `after`, and at most one `next` model step that receives the results it lists. A tool outside the table, or any other shape, fails that model step and nothing of it runs. Tools are an extension's MCP tools, called directly over stdio (`mcp_servers`), or Python functions (`"python": "module:function"`).
+- **rlo runs the list** (K12 `Scheduler` and `Governor`, `budget` = `{rpm, tpm}` per minute). Tool steps run whenever they are ready; a parked model step never holds them up. A model step goes out only when the Governor allows. A 429 parks it until the server's `retryDelay` (or the minute window).
+- **When the quota is hit**, ga prints one block and saves the state:
+  ```
+  [ga gemini] quota: T1.m2 parked — resumes in 7 s, at 14:52:07 (retryDelay)
+    now:  done 5 · running 0 · parked 1
+    next: T1.m2 (model)
+    saved: …/.ga-gemini/state.json — after a crash or a closed terminal: ga gemini --resume
+  ```
+  It then sleeps until the window opens and resumes by itself. `--resume` keeps the rest of a saved wait.
+- **On disk** (`state_dir`): `state.json` (session id, steps, done, parked), `results/<step>.json` (full tool results), `log.jsonl` (labels and numbers only) and `ledger.jsonl` (rlo's rows). In memory, each result is capped at `result_cap` characters. No Node process lives for the whole session.
+- Example config: `examples/gemini/ga-gemini.json`. Needs Gemini CLI and its credential in the environment (for example `GEMINI_API_KEY`); ga never stores it.
+
 ## 시험
 
 ```sh
