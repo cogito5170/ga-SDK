@@ -29,6 +29,10 @@ def guard_sh(repo: Path) -> Path:
     return repo / "ops" / "rlo" / "guard.sh"
 
 
+def guard_py(repo: Path) -> Path:
+    return repo / "ops" / "rlo" / "guard.py"
+
+
 class RemoteBase(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="ga-rlo-remote-test-"))
@@ -62,7 +66,8 @@ class GenerateTest(RemoteBase):
     def test_writes_the_files_and_prints_commands_never_runs_them(self):
         rc, out, err = self.init()
         self.assertEqual(rc, 0, err)
-        for rel in (".claude/settings.json", "ops/rlo/install.sh", "ops/rlo/guard.sh", "ops/rlo/model.json", "ops/rlo/GUARD.md"):
+        for rel in (".claude/settings.json", "ops/rlo/install.sh", "ops/rlo/guard.sh", "ops/rlo/guard.py",
+                    "ops/rlo/model.json", "ops/rlo/GUARD.md"):
             self.assertTrue((self.repo / rel).is_file(), rel)
         self.assertTrue(os.access(guard_sh(self.repo), os.X_OK))
         self.assertIn("git -C", out)
@@ -73,9 +78,10 @@ class GenerateTest(RemoteBase):
         self.assertEqual(s["hooks"]["PreToolUse"], [{"matcher": "*", "hooks": [
             {"type": "command", "command": 'bash "$CLAUDE_PROJECT_DIR/ops/rlo/guard.sh"', "timeout": 600}]}])
         self.assertEqual(s["hooks"]["SessionStart"][0]["hooks"][0]["command"], 'bash "$CLAUDE_PROJECT_DIR/ops/rlo/install.sh"')
-        g = guard_sh(self.repo).read_text()
-        self.assertIn('REC="$HOME/.rlo/W1.jsonl"', g)
-        self.assertNotIn("amp", g.lower())  # generalised: no amp-specific names
+        g = guard_sh(self.repo).read_text() + guard_py(self.repo).read_text()
+        self.assertEqual(remote.conf_of(g)["name"], "W1")  # the record is ~/.rlo/W1.jsonl
+        self.assertIn('REC = os.path.join(STATE, CONF["name"] + ".jsonl")', g)
+        self.assertNotRegex(g.lower(), r"\bamp\b|amp_rlo|amp-rlo|w1_guard")  # generalised: no amp-specific names
         self.assertIn(f'PIN="{_pins.PINS["rlo"][3]}"', (self.repo / "ops/rlo/install.sh").read_text())
 
     def test_the_model_always_has_the_plumbing(self):
@@ -159,24 +165,28 @@ class ReplayTest(RemoteBase):
         self.assertIn("remote.replay.plumbing ReadNotifications", bad)
 
     def test_shadow(self):
-        self.edit("ops/rlo/guard.sh", "--mode enforce", "--mode shadow")
+        self.edit("ops/rlo/guard.py", '"--mode", "enforce"', '"--mode", "shadow"')
         bad = self.doctor_failed()
         self.assertTrue({"remote.preset", "remote.replay.A1 WebFetch", "remote.replay.Bash after 2h idle"} <= bad)
 
     def test_widened_grant(self):
-        self.edit("ops/rlo/guard.sh", "--grant Bash", "--grant Bash --grant mcp__claude-code-remote__create_session")
+        self.edit("ops/rlo/guard.py", '"grants":["Bash",', '"grants":["Bash","mcp__claude-code-remote__create_session",')
         self.assertIn("remote.preset", self.doctor_failed())
 
     def test_clock_override(self):
-        self.edit("ops/rlo/guard.sh", '--record "$REC"', '--now-ms 1 --record "$REC"')
+        self.edit("ops/rlo/guard.py", 'argv += ["--record", REC]', 'argv += ["--now-ms", "1", "--record", REC]')
         self.assertIn("remote.preset", self.doctor_failed())
 
     def test_push_code_in_the_guard_files(self):
-        for f in ("install.sh", "guard.sh"):
+        push = {"install.sh": ("set -u\n", "set -u\ngit push origin HEAD >/dev/null 2>&1\n"),
+                "guard.sh": ("set -u\n", "set -u\ngit push origin HEAD >/dev/null 2>&1\n"),
+                "guard.py": ("def main():\n", "def main():\n    git(\"push\", \"origin\", \"HEAD\")\n")}
+        for f, (old_s, new_s) in push.items():
             with self.subTest(f=f):
                 p = self.repo / "ops/rlo" / f
                 old = p.read_text()
-                p.write_text(old.replace("set -u\n", "set -u\ngit push origin HEAD >/dev/null 2>&1\n", 1))
+                self.assertIn(old_s, old)
+                p.write_text(old.replace(old_s, new_s, 1))
                 self.assertIn("remote.preset", self.doctor_failed())
                 p.write_text(old)
 
@@ -196,21 +206,38 @@ class ReplayTest(RemoteBase):
         self.assertIn("remote.preset", self.doctor_failed())
 
     def test_each_deny_path_turned_into_allow_is_caught(self):
-        g = guard_sh(self.repo)
-        good = g.read_text()
-        paths = {'deny "empty hook input"': "remote.replay.empty stdin",
-                 'deny "rlo not installed and install failed"': "remote.replay.no venv, install fails",
-                 'deny "model file missing"': "remote.replay.model missing",
-                 'deny "rlo recorded no verdict"': "remote.replay.model broken"}
-        for call, case in paths.items():
+        """Each deny path of guard.py (and guard.sh) made to allow -- exit 0, nothing printed -- fails its replay case."""
+        allow = "sys.exit(0) or "
+        paths = {(guard_py, 'return fail_closed({}, "bad_input"'): ("return 0 and fail_closed({}, \"bad_input\"",
+                                                                     "remote.replay.empty stdin"),
+                 (guard_py, 'raise Closed("install_failed"'): (allow + 'Closed("install_failed"',
+                                                              "remote.replay.no venv, install fails"),
+                 (guard_py, 'raise Closed("no_model"'): (allow + 'Closed("no_model"', "remote.replay.model missing"),
+                 (guard_py, 'raise Closed("no_verdict"'): (allow + 'Closed("no_verdict"', "remote.replay.model broken"),
+                 (guard_py, 'return closed(data, "mail_pin"'): ('return 0 and closed(data, "mail_pin"',
+                                                               "remote.replay.ga mail read, another repo"),
+                 (guard_py, "return fail_closed(data, cause, detail)"): ("return 0",
+                                                                         "remote.replay.install fails: WebFetch"),
+                 (guard_sh, 'deny "no python3 to run ops/rlo/guard.py"'): ("exit 0", "remote.replay.no python3")}
+        for (where, call), (mutant, case) in paths.items():
             with self.subTest(path=call):
+                g = where(self.repo)
+                good = g.read_text()
                 self.assertIn(call, good)
-                g.write_text(good.replace(call, "exit 0"))
+                g.write_text(good.replace(call, mutant))
                 self.assertIn(case, self.doctor_failed())
-        g.write_text(good)
+                g.write_text(good)
+
+    def test_channel_cut_off_is_caught(self):
+        """GR7: the mutant that denies the channel too when the guard fails closed."""
+        self.edit("ops/rlo/guard.py", "        if chan:\n", "        if False:\n")
+        bad = self.doctor_failed()
+        self.assertTrue({"remote.replay.install fails: channel ReadNotifications",
+                         "remote.replay.install fails: ga mail read", "remote.replay.model broken: ga mail send event"}
+                        <= bad, bad)
 
     def stand_in(self, body: str) -> Path:
-        """A venv whose `python -m rlo.hooks` misbehaves as real rlo 0.5.1 cannot (other calls go to this python)."""
+        """A venv whose `python -m rlo.hooks` misbehaves as real rlo cannot (other calls go to this python)."""
         fake = self.tmp / f"fakevenv{len(list(self.tmp.glob('fakevenv*')))}" / "bin"
         fake.mkdir(parents=True)
         py = fake / "python"
@@ -229,19 +256,19 @@ os.execv({sys.executable!r}, [{sys.executable!r}] + a)
         return dict((n, d) for n, ok, d in remote.replay(self.repo, venv, only=["Bash after Bash"]))["Bash after Bash"]
 
     def test_wrapper_only_paths_and_their_allow_mutations(self):
-        """Two deny paths real rlo 0.5.1 no longer reaches (it exits 0 and prints JSON on every input): a stand-in
-        rlo reaches them, the good guard denies, and the mutant (deny -> exit 0) lets the call through."""
-        paths = {'deny "rlo output is not JSON"':
+        """Two deny paths real rlo no longer reaches (it exits 0 and prints JSON on every input): a stand-in rlo
+        reaches them, the good guard denies, and the mutant (deny -> exit 0) lets the call through."""
+        paths = {'raise Closed("not_json"':
                  ('    open(a[a.index("--record") + 1], "a").write("{}\\n")\n    print("garbage")\n    sys.exit(0)',
                   "rlo output is not JSON"),
-                 'deny "rlo exited $RC"': ("    sys.exit(3)", "rlo exited 3")}
-        g = guard_sh(self.repo)
+                 'raise Closed("rlo_exit"': ("    sys.exit(3)", "rlo exited 3")}
+        g = guard_py(self.repo)
         good = g.read_text()
         for call, (body, reason) in paths.items():
             with self.subTest(path=call):
                 venv = self.stand_in(body)
-                self.assertEqual(self.guard_detail(venv), f"blocked: rlo guard (fail closed): {reason}")
-                g.write_text(good.replace(call, "exit 0"))
+                self.assertTrue(self.guard_detail(venv).startswith(f"blocked: rlo guard (fail closed): {reason}."))
+                g.write_text(good.replace(call, "sys.exit(0) or " + call[len("raise "):]))
                 self.assertEqual(self.guard_detail(venv), "not blocked")  # the mutant: the assertion above kills it
                 g.write_text(good)
 
@@ -271,9 +298,10 @@ if __name__ == "__main__":
 
 
 class GoldenTest(unittest.TestCase):
-    """CMD-GR5 D2 / CMD-GR6 S2: `ga rlo init --profile remote` writes byte for byte what ga_rlo c2fcbc3 (`ga-rlo`) wrote
-    for the same input (golden_remote_W1/), except the rlo pin: the golden files carry @RLO_PIN@ / @RLO_PIN7@, filled
-    from ga/_pins.py before the comparison, so a pin bump changes no golden byte. Every other byte stays pinned."""
+    """CMD-GR5 D2 / CMD-GR6 S2: `ga rlo init --profile remote` writes byte for byte golden_remote_W1/ for the same
+    input -- what ga_rlo c2fcbc3 (`ga-rlo`) wrote, moved once on purpose by CMD-GR7 (guard.py, the mailbox and outbox
+    rules, the ga.mail labels) -- except the rlo pin: the golden files carry @RLO_PIN@ / @RLO_PIN7@, filled from
+    ga/_pins.py before the comparison, so a pin bump changes no golden byte. Every other byte stays pinned."""
 
     PLACEHOLDERS = ("@RLO_PIN@", "@RLO_PIN7@")
 
@@ -282,7 +310,7 @@ class GoldenTest(unittest.TestCase):
         sha = _pins.PINS["rlo"][3]
         return text.replace(b"@RLO_PIN@", sha.encode()).replace(b"@RLO_PIN7@", sha[:7].encode())
 
-    def test_same_bytes_as_ga_rlo_c2fcbc3(self):
+    def test_same_bytes_as_golden(self):
         golden = Path(__file__).resolve().parent / "golden_remote_W1"
         with tempfile.TemporaryDirectory() as d:
             remote.write(d, "W1")
