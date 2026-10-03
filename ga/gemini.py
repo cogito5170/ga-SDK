@@ -5,8 +5,9 @@
 - A Gemini turn answers with a closed step list (``ga-gemini-plan/1``): tool steps from the configured tool table (an
   extension's MCP tools over stdio, or Python functions) and at most one next model step.
 - rlo's Scheduler (CMD-K12) runs the list: tool steps whenever ready, model steps only when the Governor allows. When a
-  model step is parked (the minute quota, or a 429 with ``retryDelay``) ga prints one status block (when it resumes,
-  what is done / running / parked, what comes next), saves the state file and sleeps until the window opens. After a
+  model step is parked (the minute window, a quota error's "retry in N s" hint, or the daily quota) ga prints one
+  status block (when it resumes, what is done / running / parked, what comes next, requests left today), saves the
+  state file and sleeps until the window opens; at a daily reset it probes once. After a
   crash or a closed terminal, ``ga gemini --resume`` continues from the state file.
 - ga's state stays on disk (state file, tool results, log); in memory only capped previews. The log holds labels and
   numbers only — no prompt, answer or result text.
@@ -35,6 +36,9 @@ MODEL_STEP = "gemini"  # the one model step name in the step table
 STEP_ID = re.compile(r"^[A-Za-z0-9_-]{1,12}$")
 TOOL_NAME = re.compile(r"^[A-Za-z0-9_.:+-]{1,40}$")  # a step-table name is a label (rlo LABEL)
 MAX_PLAN_STEPS = 16
+# the free tier of gemini-3-flash-preview: 20 requests a day, shared by every session on the key (GMG6); Google documents
+# per-day limits as resetting at midnight Pacific
+DAILY_DEFAULT = {"requests": 20, "reset_tz": "America/Los_Angeles", "reset_at": "00:00"}
 
 
 # ---- config ---------------------------------------------------------------------------------------------------------
@@ -52,6 +56,7 @@ class GeminiConfig:
     result_cap: int = 2000
     turn_timeout_s: float = 600.0
     est_tokens: int = 2000
+    daily: dict[str, Any] = field(default_factory=lambda: dict(DAILY_DEFAULT))
 
     @property
     def state_path(self) -> Path:
@@ -66,7 +71,7 @@ def config_problems(raw: Any) -> list[Problem]:
     if not isinstance(raw, dict):
         return [Problem("$", "must be an object")]
     known = {"schema", "model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps", "result_cap",
-             "turn_timeout_s", "est_tokens"}
+             "turn_timeout_s", "est_tokens", "daily"}
     for k in sorted(set(raw) - known):
         bad(f"$.{k}", "unknown field")
     if raw.get("schema") != CONFIG_SCHEMA:
@@ -110,6 +115,20 @@ def config_problems(raw: Any) -> list[Problem]:
         bad("$.turn_timeout_s", "must be a positive number")
     if "state_dir" in raw and not (isinstance(raw["state_dir"], str) and raw["state_dir"]):
         bad("$.state_dir", "must be a path")
+    d = raw.get("daily", DAILY_DEFAULT)
+    if not isinstance(d, dict) or set(d) - set(DAILY_DEFAULT):
+        bad("$.daily", "must be {requests?, reset_tz?, reset_at?}")
+    else:
+        d = {**DAILY_DEFAULT, **d}
+        if not (isinstance(d["requests"], int) and not isinstance(d["requests"], bool) and d["requests"] >= 1):
+            bad("$.daily.requests", "must be an integer >= 1")
+        if not (isinstance(d["reset_at"], str) and re.match(r"^([01]\d|2[0-3]):[0-5]\d$", d["reset_at"])):
+            bad("$.daily.reset_at", "must be HH:MM")
+        try:
+            from zoneinfo import ZoneInfo
+            ZoneInfo(d["reset_tz"])
+        except Exception:
+            bad("$.daily.reset_tz", "must be an IANA time zone this system knows")
     return p
 
 
@@ -124,7 +143,77 @@ def load_config(path: str | Path) -> GeminiConfig:
         raise FormError(probs)
     kw = {k: raw[k] for k in ("model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps",
                               "result_cap", "turn_timeout_s", "est_tokens") if k in raw}
-    return GeminiConfig(root=path.resolve().parent, **kw)
+    return GeminiConfig(root=path.resolve().parent, daily={**DAILY_DEFAULT, **raw.get("daily", {})}, **kw)
+
+
+# ---- the daily quota (S6, BD-222) -----------------------------------------------------------------------------------
+
+def next_reset(now: float, tz: str, at: str) -> float:
+    """The first time after ``now`` (epoch s) when the clock in ``tz`` reads ``at`` (HH:MM)."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    zone, (h, m) = ZoneInfo(tz), map(int, at.split(":"))
+    local = datetime.fromtimestamp(now, zone)
+    cand = local.replace(hour=h, minute=m, second=0, microsecond=0)
+    if cand <= local:
+        cand = (local + timedelta(days=1)).replace(hour=h, minute=m, second=0, microsecond=0)
+    return cand.timestamp()
+
+
+class DayCount:
+    """Requests sent today (this ga's count, on disk), against the daily limit; a new day starts at the reset."""
+
+    def __init__(self, path: Path, daily: dict[str, Any]):
+        self.path, self.limit, self.tz, self.at = path, int(daily["requests"]), daily["reset_tz"], daily["reset_at"]
+        d = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        self.used, self.reset = int(d.get("used", 0)), float(d.get("reset_at", 0.0))
+
+    def _roll(self, now: float) -> None:
+        if now >= self.reset:
+            self.used, self.reset = 0, next_reset(now, self.tz, self.at)
+            self._save()
+
+    def _save(self) -> None:
+        _atomic_write(self.path, {"used": self.used, "reset_at": self.reset, "limit": self.limit})
+
+    def left(self, now: float) -> int:
+        self._roll(now)
+        return max(0, self.limit - self.used)
+
+    def reset_at(self, now: float) -> float:
+        self._roll(now)
+        return self.reset
+
+    def add(self, now: float) -> None:
+        self._roll(now)
+        self.used += 1
+        self._save()
+
+    def exhaust(self, now: float) -> None:
+        """The server says the day is spent (TerminalQuotaError): nothing is left until the reset, whatever ga counted."""
+        self._roll(now)
+        self.used = max(self.used, self.limit)
+        self._save()
+
+
+def daily_governor(cfg: GeminiConfig, clock: Callable[[], float], day: DayCount) -> Any:
+    """rlo's Governor (per-minute window, 429 waits) with the daily count on top: no request goes out when today's is
+    spent — the step waits for the reset instead of spending a call on a known 429."""
+    from rlo.governor import Governor
+
+    class DailyGovernor(Governor):
+        def wait_s(self, est_tokens: int = 0, model: str | None = None, calls: int = 1) -> float:
+            w = super().wait_s(est_tokens, model, calls)
+            now = self.clock()
+            return max(w, day.reset_at(now) - now) if day.left(now) < calls else w
+
+        def try_acquire(self, est_tokens: int = 0, model: str | None = None) -> Any:
+            g = super().try_acquire(est_tokens, model)
+            if g.ok:
+                day.add(self.clock())
+            return g
+
+    return DailyGovernor({cfg.model: dict(cfg.budget)}, clock=clock, provider="gemini")
 
 
 # ---- the closed step list -------------------------------------------------------------------------------------------
@@ -213,9 +302,12 @@ class Supervisor:
     def __init__(self, cfg: GeminiConfig, *, cli: GeminiCLI | None = None, clock: Callable[[], float] = time.time,
                  sleep: Callable[[float], None] = time.sleep, out: TextIO | None = None):
         self.cfg, self.clock, self._sleep, self.out = cfg, clock, sleep, out or sys.stdout
-        self.cli = cli or GeminiCLI(cfg.cli, cfg.model, cwd=str(cfg.root), timeout_s=cfg.turn_timeout_s)
         self.dir = cfg.state_path
         (self.dir / "results").mkdir(parents=True, exist_ok=True)
+        self.cli = cli or GeminiCLI(cfg.cli, cfg.model, cwd=str(cfg.root), timeout_s=cfg.turn_timeout_s,
+                                    settings_dir=self.dir)
+        self.day = DayCount(self.dir / "day.json", cfg.daily)
+        self._quota: dict[str, str] = {}  # step id -> where its wait comes from: hint · window · daily reset
         self.state_file, self.log_file = self.dir / "state.json", self.dir / "log.jsonl"
         self.st: dict[str, Any] = {}
         self.sched = None
@@ -302,15 +394,30 @@ class Supervisor:
 
     def _model_turn(self, sid: str) -> dict[str, Any]:
         rec = self._rec(sid)
+        self._quota.pop(sid, None)
+        self._shown = ()  # a park after this dispatch is a new park, shown again
         if sid in self.st["parked"]:
-            waited = round(self.clock() - self.st["parked"].pop(sid)[1], 1)
-            self.say(f"[ga gemini] resumed {sid} after {waited:g} s")
-            self.log("resume", step=sid, waited_s=waited)
-        from .adapters.gemini_cli import GeminiRateLimited
+            _at, since, *src = self.st["parked"].pop(sid)
+            waited = round(self.clock() - since, 1)
+            if src and src[0] == "daily reset":  # the one probe at the reset (S6): one call, whatever it shows
+                self.say(f"[ga gemini] daily quota reset: one probe ({sid}) after {waited:g} s")
+                self.log("probe", step=sid, waited_s=waited)
+            else:
+                self.say(f"[ga gemini] resumed {sid} after {waited:g} s")
+                self.log("resume", step=sid, waited_s=waited)
+        from .adapters.gemini_cli import GeminiRateLimited, quota_body
         try:
             turn = self.cli.run_turn(self._prompt(rec), self.st.get("session_id"))
-        except GeminiRateLimited:
-            self.log("turn", step=sid, ok=False, reason="rate_limited", model=self.cfg.model)
+        except GeminiRateLimited as e:
+            now = self.clock()
+            if e.kind == "day":  # not a minute window: wait for the reset, then probe once
+                self.day.exhaust(now)
+                e.body = quota_body("day", self.day.reset_at(now) - now)
+                src = "daily reset"
+            else:
+                src = "hint" if e.hint_s is not None else "window"
+            self._quota[sid] = src
+            self.log("turn", step=sid, ok=False, reason=e.reason, source=src, via=e.via, model=self.cfg.model)
             raise
         except GeminiError as e:
             self.log("turn", step=sid, ok=False, reason=e.reason, model=self.cfg.model)
@@ -362,7 +469,8 @@ class Supervisor:
     # -- status: K12 rev 2's status object, plus where the wait comes from --
     def status(self) -> dict[str, Any]:
         """The scheduler's status() {resumes_in_s, done, running, parked, next}, with ``running`` as a list,
-        ``resumes_in_s`` inf for a wait that does not end today, and ``eta_source``: retryDelay or window."""
+        ``resumes_in_s`` inf for a wait that never opens, ``eta_source`` (hint: a "retry in N s" in the error;
+        window: the Governor's minute window; daily reset: today's requests are spent) and ``left_today``."""
         s = self.sched
         st = dict(s.status())
         st["running"] = [st["running"]] if isinstance(st.get("running"), str) else list(st.get("running") or [])
@@ -370,30 +478,43 @@ class Supervisor:
         if parked and st.get("resumes_in_s") is None:
             st["resumes_in_s"] = math.inf  # parked with no window that opens (the daily quota)
         st["resumes_in_s"] = st.get("resumes_in_s") or 0.0
-        hit = any(r.get("kind") == "rate_limit" and r.get("step") in parked for r in (s.rows if s is not None else []))
-        saved = any(len(self.st.get("parked", {}).get(k, [])) > 2 and self.st["parked"][k][2] == "retryDelay" for k in parked)
-        st["eta_source"] = "retryDelay" if hit or saved else "window"  # the server's wait, or the governor's window
+        now = self.clock()
+        src = next((self._quota[k] for k in parked if k in self._quota), None) or next(
+            (self.st["parked"][k][2] for k in parked if len(self.st.get("parked", {}).get(k, [])) > 2), None)
+        st["left_today"] = self.day.left(now)
+        st["eta_source"] = "daily reset" if st["left_today"] == 0 and parked else (src or "window")
         return st
 
     def _sleep_hook(self, d: float) -> None:
         """The scheduler sleeps only when nothing can run: a model step is parked. Show it once, save, then sleep."""
         st = self.status()
-        key = tuple(st["parked"] or ())
-        if key and key != self._shown:
+        parked = tuple(st["parked"] or ())
+        key = parked + (st["eta_source"],)
+        if parked and key != self._shown:
             now = self.clock()
             eta = st["resumes_in_s"]
-            for sid in key:
+            for sid in parked:
                 since = self.st["parked"].get(sid, [None, round(now, 3)])[1]
                 self.st["parked"][sid] = [None if not math.isfinite(eta) else round(now + eta, 3), since, st["eta_source"]]
             self.save()
-            self.log("park", steps=list(key), resumes_in_s=None if not math.isfinite(eta) else round(eta, 1),
-                     source=st["eta_source"], done=len(st["done"]), running=len(st["running"] or []))
-            when = "does not resume today (daily quota)" if not math.isfinite(eta) else \
-                f"resumes in {math.ceil(eta)} s, at {_hhmmss(now + eta)}"
+            left, limit = st["left_today"], self.day.limit
+            self.log("park", steps=list(parked), resumes_in_s=None if not math.isfinite(eta) else round(eta, 1),
+                     source=st["eta_source"], left_today=left, done=len(st["done"]), running=len(st["running"] or []))
+            ids = ", ".join(parked)
+            if not math.isfinite(eta):
+                head = f"[ga gemini] quota: {ids} parked — no window opens"
+            elif st["eta_source"] == "daily reset":
+                h, m = divmod(math.ceil(eta / 60), 60)
+                head = (f"[ga gemini] daily quota: {ids} parked — the quota resets at {self.day.at} {self.day.tz}, in "
+                        f"{h} h {m} min (at {_hhmmss(now + eta)} here); one probe then")
+            else:
+                head = (f"[ga gemini] quota: {ids} parked — resumes in {math.ceil(eta)} s, at {_hhmmss(now + eta)} "
+                        f"({st['eta_source']})")
             nxt = ", ".join(f"{x['id']} ({x['kind']})" for x in (st["next"] or [])[:6]) or "-"
             self.say("\n".join([
-                f"[ga gemini] quota: {', '.join(key)} parked — {when} ({st['eta_source']})",
-                f"  now:  done {len(st['done'])} · running {len(st['running'] or [])} · parked {len(key)}",
+                head,
+                f"  now:  done {len(st['done'])} · running {len(st['running'] or [])} · parked {len(parked)} · "
+                f"requests left today {left}/{limit}",
                 f"  next: {nxt}",
                 f"  saved: {self.state_file} — after a crash or a closed terminal: ga gemini --resume",
             ]))
@@ -426,9 +547,8 @@ class Supervisor:
         return self._execute()
 
     def _execute(self) -> bool:
-        from rlo.governor import Governor
         from rlo.scheduler import Scheduler, Step
-        gov = Governor({self.cfg.model: dict(self.cfg.budget)}, clock=self.clock, provider="gemini")
+        gov = daily_governor(self.cfg, self.clock, self.day)
         kinds = {MODEL_STEP: "model", **{t: "tool" for t in self.cfg.tools}}
         # K12 rev 2 (S6): the scheduler saves its queue, results and Governor windows to this file on every row and,
         # when it exists, loads it — given the same steps again, so all of them are added, done ones too

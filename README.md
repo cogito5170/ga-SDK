@@ -152,17 +152,23 @@ ga gemini --config ga-gemini.json                                      # a promp
 ga gemini --config ga-gemini.json --resume                             # after a crash or a closed terminal
 ```
 
-- **A fixed model, no switch prompt.** The model comes from the config (`model`, default `gemini-3-flash-preview`) and nowhere else. Every Gemini turn is one headless CLI process: `gemini -p … --output-format stream-json -m <model> [--resume <session>]`, with stdin closed, so the quota dialog never opens. If the stream says another model served the turn, or names none, the turn fails. It is never accepted and never retried on another model.
+- **A fixed model, no switch prompt.** The model comes from the config (`model`, default `gemini-3-flash-preview`) and nowhere else. Every Gemini turn is one headless CLI process: `gemini -p … --output-format stream-json -m <model> [--resume <session>]`, with stdin closed, so the quota dialog never opens. The served model is every key of the result's `stats.models` (`init.model` is only the model asked for). If it names another model, or none, the turn fails. It is never accepted and never retried on another model. ga runs every turn of a task in the config's directory, because the CLI keeps sessions per project directory, and hands the CLI private settings with `general.maxAttempts: 1`, so the CLI does not retry and sleep inside the process. Those settings are the system settings in force plus that one key, passed through `GEMINI_CLI_SYSTEM_SETTINGS_PATH`; your own settings files are not touched.
 - **Gemini only directs.** Each turn answers with one closed step list (`ga-gemini-plan/1`): tool steps from the config's `tools` table, with `args` and `after`, and at most one `next` model step that receives the results it lists. A tool outside the table, or any other shape, fails that model step and nothing of it runs. Tools are an extension's MCP tools, called directly over stdio (`mcp_servers`), or Python functions (`"python": "module:function"`).
-- **rlo runs the list** (K12 `Scheduler` and `Governor`, `budget` = `{rpm, tpm}` per minute). Tool steps run whenever they are ready; a parked model step never holds them up. A model step goes out only when the Governor allows. A 429 parks it until the server's `retryDelay` (or the minute window).
+- **rlo runs the list** (K12 `Scheduler` and `Governor`, `budget` = `{rpm, tpm}` per minute). Tool steps run whenever they are ready; a parked model step never holds them up. A model step goes out only when the Governor allows. A quota error is read from the result's `error.type`: `RetryableQuotaError` parks the step for a "retry in N s" hint in its message, or else the Governor's minute window. `TerminalQuotaError`, or a per-day quota in the message, is the daily quota (below). A quota sentence in the text of another error class is a second path only. The exit code is never read; a turn with no `result` event is a crashed turn.
 - **When the quota is hit**, ga prints one block and saves the state:
   ```
-  [ga gemini] quota: T1.m2 parked — resumes in 7 s, at 14:52:07 (retryDelay)
-    now:  done 5 · running 0 · parked 1
+  [ga gemini] quota: T1.m2 parked — resumes in 7 s, at 14:52:07 (hint)
+    now:  done 5 · running 0 · parked 1 · requests left today 18/20
     next: T1.m2 (model)
     saved: …/.ga-gemini/state.json — after a crash or a closed terminal: ga gemini --resume
   ```
   It then sleeps until the window opens and resumes by itself. `--resume` keeps the rest of a saved wait.
+- **The daily quota** (`daily`: `requests`, default 20 for the free tier, shared by every session on the key; `reset_tz`, default `America/Los_Angeles`; `reset_at`, default `00:00`). ga counts the requests it sends today (`day.json`). When none are left, or the server says `TerminalQuotaError`, the step waits for the reset instead of spending a call on a known 429:
+  ```
+  [ga gemini] daily quota: T1.m3 parked — the quota resets at 00:00 America/Los_Angeles, in 15 h 0 min (at 08:00:00 here); one probe then
+    now:  done 4 · running 0 · parked 1 · requests left today 0/20
+  ```
+  At the reset ga sends that one step once (the probe). If it hits the quota again, it waits for the next reset; it never retries in a loop. Tool steps keep running meanwhile. ga counts only its own requests; other sessions on the key are why the server's word wins.
 - **On disk** (`state_dir`): `state.json` (session id, steps, done, parked), `results/<step>.json` (full tool results), `log.jsonl` (labels and numbers only) and `ledger.jsonl` (rlo's rows). In memory, each result is capped at `result_cap` characters. No Node process lives for the whole session.
 - Example config: `examples/gemini/ga-gemini.json`. Needs Gemini CLI and its credential in the environment (for example `GEMINI_API_KEY`); ga never stores it.
 

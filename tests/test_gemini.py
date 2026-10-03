@@ -1,8 +1,10 @@
-"""CMD-GA21 (BD-221): `ga gemini` — a fixed model, a closed step list, rlo's scheduler, wait-and-resume.
+"""CMD-GA21 rev 2 (BD-221, BD-222): `ga gemini` — a fixed model, a closed step list, rlo's scheduler, wait-and-resume.
 
-D1 the fake Gemini CLI: a 429 with retryDelay mid-plan -> one status block (ETA, state, next), the state file, tool
-steps not blocked, the model step resumed after the window with --resume, zero failed steps; a served-model mismatch
-is a failed turn. D2 kill the supervisor while parked; `ga gemini --resume` completes from the state file.
+The fake Gemini CLI (tests/fake_gemini.py) speaks the 0.62.0 stream-json shapes baseline read from the source; quota,
+mismatch, crash and max-turns turns replay recorded fixtures (tests/fixtures/gemini/*.jsonl).
+D1 a per-minute quota error mid-plan -> one status block, the state file, tool steps not held, the model step resumed
+with --resume, zero failed steps; a served-model mismatch is a failed turn. D2 kill while parked, then --resume.
+D3 the fixture run. D5 the daily quota: reset time, requests left today, one probe at reset, no loop, maxAttempts 1.
 """
 import io
 import json
@@ -16,15 +18,19 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from ga.adapters.gemini_cli import (GeminiCLI, GeminiError, GeminiRateLimited, ModelMismatch, parse_stream,
-                                    rate_limit_body)
+from ga.adapters.gemini_cli import (SETTINGS_ENV, GeminiCLI, GeminiError, GeminiRateLimited, ModelMismatch,
+                                    parse_stream, quota_of)
 from ga.forms import FormError
 from ga import gemini as G
 
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parent
 FAKE = [sys.executable, str(TESTS / "fake_gemini.py")]
+FIXTURES = TESTS / "fixtures" / "gemini"
 MODEL = "gemini-3-flash-preview"
+QUOTA_MIN_HINT = {"fixture": "quota_minute_hint", "exit": 173}   # "retry in 7s"
+QUOTA_MIN = {"fixture": "quota_minute", "exit": 173}             # no hint: the Governor's window
+QUOTA_DAY = {"fixture": "quota_day", "exit": 173}                # TerminalQuotaError
 
 try:
     import rlo.scheduler  # noqa: F401  (K12)
@@ -79,8 +85,10 @@ class Box:
 
 
 class FakeClock:
+    START = 1_800_032_400.0  # 2027-01-15 09:00 in America/Los_Angeles: the daily reset is 15 h away
+
     def __init__(self):
-        self.t, self.sleeps = 1_800_000_000.0, []
+        self.t, self.sleeps = self.START, []
 
     def __call__(self):
         return self.t
@@ -98,27 +106,41 @@ class StreamTest(unittest.TestCase):
                           json.dumps({"type": "message", "role": "assistant", "content": "ab", "delta": True}),
                           json.dumps({"type": "message", "role": "user", "content": "zz"}),
                           json.dumps({"type": "message", "role": "assistant", "content": "c", "delta": True}),
+                          json.dumps({"type": "error", "severity": "warning", "message": "loop"}),
                           json.dumps({"type": "result", "status": "success", "stats": {
                               "input_tokens": 5, "output_tokens": 2, "total_tokens": 7, "models": {"other-model": {}}}})])
-        self.assertEqual((s.session_id, s.text, s.usage, s.served, s.status),
-                         ("s9", "abc", {"input_tokens": 5, "output_tokens": 2, "total_tokens": 7}, [MODEL, "other-model"],
-                          "success"))
+        # init.model is the asked model; only stats.models says who served
+        self.assertEqual((s.session_id, s.asked, s.text, s.usage, s.served, s.status, s.warnings, s.has_result),
+                         ("s9", MODEL, "abc", {"input_tokens": 5, "output_tokens": 2, "total_tokens": 7}, ["other-model"],
+                          "success", 1, True))
 
-    def test_rate_limit_body(self):
-        api = {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "details": [
-            {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "41s"}]}}
-        ev = json.dumps({"type": "error", "message": "[API Error: " + json.dumps(api) + "]"})
-        self.assertEqual(rate_limit_body([ev]), api)
-        hint = rate_limit_body(["", "Error 429: quota exceeded. Please retry in 12.5s."])
-        self.assertEqual(hint["error"]["details"][0]["retryDelay"], "12.5s")
-        self.assertEqual(rate_limit_body(["429 RESOURCE_EXHAUSTED"])["error"]["details"], [])
-        self.assertIsNone(rate_limit_body(["boom", json.dumps({"error": {"code": 500}})]))
+    def test_quota_from_the_result_error_type(self):
+        def q(name):
+            return quota_of(parse_stream((FIXTURES / f"{name}.jsonl").read_text().splitlines()))
+        self.assertEqual(q("quota_minute_hint"), ("minute", 7.0, "type"))
+        self.assertEqual(q("quota_minute"), ("minute", None, "type"))
+        self.assertEqual(q("quota_day"), ("day", None, "type"))
+        # baseline's source-shaped messages: no "429" and no RESOURCE_EXHAUSTED in the text — the type decides
+        self.assertEqual(q("quota_minute_source"), ("minute", 7.5, "type"))
+        self.assertEqual(q("quota_day_source"), ("day", None, "type"))
+        self.assertEqual(q("quota_text_only"), ("minute", 3.0, "text"))  # the second path: an unnamed class, a 429 text
+        for none in ("mismatch", "crash", "api_500", "max_turns"):
+            self.assertIsNone(q(none), none)
+        s = parse_stream([json.dumps({"type": "result", "status": "error", "error": {
+            "type": "RetryableQuotaError", "message": "Quota exceeded for requests per day. Please retry in 30s."}})])
+        self.assertEqual(quota_of(s), ("day", None, "type"))  # a per-day quota in the message is the daily quota
+
+    def test_init_model_is_never_counted_as_served(self):
+        for name in ("quota_minute_source", "quota_day_source", "crash"):
+            s = parse_stream((FIXTURES / f"{name}.jsonl").read_text().splitlines())
+            self.assertEqual((s.asked, s.served), (MODEL, []), name)  # an error turn: served unknown
 
 
 class AdapterTest(unittest.TestCase):
-    def cli(self, script, model=MODEL):
+    def cli(self, script, model=MODEL, extra_env=None):
         self.box = Box(self, script)
-        return GeminiCLI(FAKE, model, cwd=str(self.box.dir))
+        env = dict(os.environ, **extra_env) if extra_env else None
+        return GeminiCLI(FAKE, model, cwd=str(self.box.dir), settings_dir=self.box.dir / "st", env=env)
 
     def test_headless_fixed_model_resume_and_no_tty(self):
         cli = self.cli([{"plan": plan(say="hi")}, {"plan": plan()}])
@@ -132,27 +154,54 @@ class AdapterTest(unittest.TestCase):
                              (True, "stream-json", MODEL, False, True))
         self.assertEqual((c1["resume"], c2["resume"]), (None, "s-1"))
         self.assertNotEqual(c1["pid"], c2["pid"])  # S4: one short-lived process per turn
+        own = self.box.dir / "st" / "gemini-cli-settings.json"
+        self.assertEqual({(c["settings"], c["max_attempts"]) for c in (c1, c2)}, {(str(own), 1)})  # the CLI fails fast
+
+    def test_private_settings_keep_the_system_settings_in_force(self):
+        sysf = Path(tempfile.mkdtemp()) / "system.json"
+        self.addCleanup(__import__("shutil").rmtree, sysf.parent)
+        sysf.write_text(json.dumps({"general": {"maxAttempts": 10, "vimMode": True}, "ui": {"theme": "x"}}))
+        cli = self.cli([{"plan": plan()}, {"plan": plan()}], extra_env={SETTINGS_ENV: str(sysf)})
+        cli.run_turn("a")
+        cli.run_turn("b", "s-1")  # the second turn still merges the system file, not ga's own
+        got = json.loads((self.box.dir / "st" / "gemini-cli-settings.json").read_text())
+        self.assertEqual(got, {"general": {"maxAttempts": 1, "vimMode": True}, "ui": {"theme": "x"}})
+        self.assertEqual(json.loads(sysf.read_text())["general"]["maxAttempts"], 10)  # not touched
+        sysf.write_text("{ not json")
+        with self.assertRaises(GeminiError) as e:
+            GeminiCLI(FAKE, MODEL, settings_dir=self.box.dir / "st2", env={SETTINGS_ENV: str(sysf)}).run_turn("x")
+        self.assertEqual(e.exception.reason, "system_settings_unreadable")
 
     def test_served_model_mismatch_is_a_failed_turn(self):
-        cli = self.cli([{"plan": plan(), "served": "gemini-2.5-flash"}, {"plan": plan(), "no_model": True}])
-        with self.assertRaises(ModelMismatch) as e:
-            cli.run_turn("x")
-        self.assertEqual(e.exception.reason, "served_model_mismatch")
-        with self.assertRaises(ModelMismatch) as e:
-            cli.run_turn("x")
-        self.assertEqual(e.exception.reason, "served_model_unknown")
+        cli = self.cli([{"plan": plan(), "served": ["gemini-2.5-flash"]}, {"fixture": "mismatch"},
+                        {"plan": plan(), "served": [MODEL, "gemini-2.5-flash"]}, {"plan": plan(), "served": []}])
+        for want in ("served_model_mismatch", "served_model_mismatch", "served_model_mismatch", "served_model_unknown"):
+            with self.assertRaises(ModelMismatch) as e:
+                cli.run_turn("x")
+            self.assertEqual(e.exception.reason, want)
 
-    def test_429_carries_the_retry_delay(self):
-        cli = self.cli([{"rate_limit": "7s"}, {"rate_limit_text": "3"}, {"fail": True}])
+    def test_quota_crash_and_max_turns(self):
+        cli = self.cli([QUOTA_MIN_HINT, QUOTA_MIN, QUOTA_DAY, {"fixture": "crash", "exit": 1},
+                        {"fixture": "max_turns", "exit": 0}, {"fixture": "quota_minute_hint", "exit": 0}])
         with self.assertRaises(GeminiRateLimited) as e:
             cli.run_turn("x")
-        self.assertEqual((e.exception.status, e.exception.body["error"]["details"][1]["retryDelay"]), (429, "7s"))
+        self.assertEqual((e.exception.kind, e.exception.hint_s, e.exception.status, e.exception.via),
+                         ("minute", 7.0, 429, "type"))
+        self.assertEqual(e.exception.body["error"]["details"][1]["retryDelay"], "7.000s")  # a hint, as a RetryInfo
         with self.assertRaises(GeminiRateLimited) as e:
             cli.run_turn("x")
-        self.assertEqual(e.exception.body["error"]["details"][0]["retryDelay"], "3s")
-        with self.assertRaises(GeminiError) as e:
+        self.assertEqual((e.exception.kind, e.exception.hint_s, len(e.exception.body["error"]["details"])),
+                         ("minute", None, 1))  # no wait known: the Governor's window
+        with self.assertRaises(GeminiRateLimited) as e:
             cli.run_turn("x")
-        self.assertNotIsInstance(e.exception, GeminiRateLimited)
+        self.assertEqual(e.exception.kind, "day")
+        for want in ("no_result", "cli_error"):
+            with self.assertRaises(GeminiError) as e:
+                cli.run_turn("x")
+            self.assertNotIsInstance(e.exception, GeminiRateLimited)
+            self.assertEqual(e.exception.reason, want)
+        with self.assertRaises(GeminiRateLimited):  # the exit code is never read: exit 0 with a quota result
+            cli.run_turn("x")
 
     def test_env_drops_claude_code_variables(self):
         from ga.adapters.gemini_cli import clean_env
@@ -197,7 +246,8 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(G.config_problems(ok), [])
         for bad in ({"schema": "x"}, dict(ok, model=""), dict(ok, budget={"rpm": 0}), dict(ok, budget={}),
                     dict(ok, tools={"gemini": {"python": "m:f"}}), dict(ok, tools={"t": {"mcp": "nope", "tool": "x"}}),
-                    dict(ok, fallback_model="gemini-2.5-flash"), dict(ok, cli=[])):
+                    dict(ok, fallback_model="gemini-2.5-flash"), dict(ok, cli=[]), dict(ok, daily={"requests": 0}),
+                    dict(ok, daily={"reset_tz": "Mars/Base"}), dict(ok, daily={"reset_at": "24:00"})):
             with self.subTest(bad=bad):
                 self.assertTrue(G.config_problems(bad))
 
@@ -209,13 +259,12 @@ D1_SCRIPT = [
                    {"id": "c", "tool": "add", "args": {"a": 1, "b": 1}, "after": ["b"]},
                    {"id": "e", "tool": "echo", "args": {"q": "labels"}}],  # not needed by the next model step
                   {"prompt": "summarise a and c", "after": ["a", "c"]}, "looking")},
-    {"rate_limit": "7s"},
+    QUOTA_MIN_HINT,
     {"plan": plan([{"id": "d", "tool": "echo", "args": {"q": "post"}}], None, "all done")},
 ]
 
 
-@needs_k12
-class SupervisorTest(unittest.TestCase):
+class RunTask:
     def run_task(self, script, prompt="list the issues", **cfg):
         box = Box(self, script, **cfg)
         clock, out = FakeClock(), io.StringIO()
@@ -228,25 +277,29 @@ class SupervisorTest(unittest.TestCase):
         ok = sup.start(prompt)
         return box, sup, ok, clock, out.getvalue(), snaps
 
+
+@needs_k12
+class SupervisorTest(RunTask, unittest.TestCase):
     def test_d1_429_mid_plan_waits_shows_saves_and_resumes(self):
         box, sup, ok, clock, out, snaps = self.run_task(D1_SCRIPT)
         self.assertTrue(ok, out)
         # one status block: ETA from retryDelay, the state, the next step
         self.assertEqual(out.count("[ga gemini] quota:"), 1)
         self.assertIn("[ga gemini] quota: T1.m2 parked — resumes in 7 s", out)
-        self.assertIn("(retryDelay)", out)
-        self.assertIn("  now:  done 5 · running 0 · parked 1", out)  # m1, a, b, c, e
+        self.assertIn("(hint)", out)
+        self.assertIn("  now:  done 5 · running 0 · parked 1 · requests left today 18/20", out)  # m1, a, b, c, e
         self.assertIn("  next: T1.m2 (model)", out)
         self.assertIn("ga gemini --resume", out)
         # the state file at the park: parked m2 until park + 7 s, the tool steps done
         st, shown = snaps[0]
         self.assertEqual(sorted(st["done"]), ["T1.m1", "T1.r1.a", "T1.r1.b", "T1.r1.c", "T1.r1.e"])
         at, since, source = st["parked"]["T1.m2"]
-        self.assertEqual((round(at - since, 3), source, st["status"]), (7.0, "retryDelay", "running"))
-        # no busy retry: three turns, one sleep of exactly the server's 7 s
+        self.assertEqual((round(at - since, 3), source, st["status"]), (7.0, "hint", "running"))
+        # no busy retry: three turns, one sleep of exactly the 7 s the error named
         self.assertEqual((len(box.calls()), clock.sleeps), (3, [7.0]))
         c = box.calls()
         self.assertEqual([x["resume"] for x in c], [None, "s-1", "s-1"])
+        self.assertEqual({x["cwd"] for x in c}, {str(box.dir.resolve())})  # sessions live per project dir
         self.assertEqual({x["model"] for x in c}, {MODEL})
         self.assertTrue(c[2]["prompt_has_results"])
         # the tool steps ran once each, before the park, and were not blocked by it
@@ -256,7 +309,7 @@ class SupervisorTest(unittest.TestCase):
         park = next(r for r in log if r["event"] == "park")
         tools_before = [r for r in log if r["event"] == "tool" and r["at"] <= park["at"]]
         self.assertEqual(len(tools_before), 4)  # e too: a tool step is never held behind a parked model step
-        self.assertEqual((park["resumes_in_s"], park["source"]), (7.0, "retryDelay"))
+        self.assertEqual((park["resumes_in_s"], park["source"], park["left_today"]), (7.0, "hint", 18))
         self.assertEqual(next(r for r in log if r["event"] == "resume")["waited_s"], 7.0)
         self.assertTrue(all(r["served"] == [MODEL] for r in log if r["event"] == "turn" and r["ok"]))
         end = log[-1]
@@ -280,7 +333,7 @@ class SupervisorTest(unittest.TestCase):
         self.assertTrue(sup2.resume(), out.getvalue())
         self.assertEqual(clock.sleeps, [4.0])  # 7 s from the server, 3 s already gone
         self.assertIn("resumes in 4 s", out.getvalue())
-        self.assertIn("(retryDelay)", out.getvalue())
+        self.assertIn("(hint)", out.getvalue())
         self.assertIn("resumed T1.m2 after 7 s", out.getvalue())
         self.assertEqual(len(box.calls()), 3)
 
@@ -289,6 +342,14 @@ class SupervisorTest(unittest.TestCase):
         text = "\n".join(box.lines(".ga-gemini/log.jsonl") + box.lines(".ga-gemini/ledger.jsonl"))
         for raw in ("SECRET-PROMPT-TEXT", "summarise", "issues", "all done", "looking"):
             self.assertNotIn(raw, text)
+
+    def test_a_quota_error_without_a_hint_waits_the_window(self):
+        script = [{"plan": plan(next_={"prompt": "next"})}, QUOTA_MIN, {"plan": plan()}]
+        box, sup, ok, clock, out, snaps = self.run_task(script)
+        self.assertTrue(ok, out)
+        self.assertEqual(clock.sleeps, [60.0])
+        self.assertIn("resumes in 60 s", out)
+        self.assertIn("(window)", out)
 
     def test_window_park_without_a_429(self):
         script = [{"plan": plan([{"id": "a", "tool": "add", "args": {"a": 1, "b": 2}}], {"prompt": "next", "after": ["a"]})},
@@ -301,7 +362,7 @@ class SupervisorTest(unittest.TestCase):
         self.assertIn("resumes in 60 s", out)
 
     def test_served_model_mismatch_is_never_accepted(self):
-        script = [{"plan": plan([{"id": "a", "tool": "add", "args": {"a": 1, "b": 2}}]), "served": "gemini-2.5-flash"}]
+        script = [{"plan": plan([{"id": "a", "tool": "add", "args": {"a": 1, "b": 2}}]), "served": ["gemini-2.5-flash"]}]
         box, sup, ok, clock, out, snaps = self.run_task(script)
         self.assertFalse(ok)
         st = box.state()
@@ -352,13 +413,103 @@ class SupervisorTest(unittest.TestCase):
 
 
 @needs_k12
+class FixtureRunTest(RunTask, unittest.TestCase):
+    """D3: a `ga gemini` task over recorded fixtures in the 0.62 shapes: a per-minute quota error with a hint, then the
+    daily TerminalQuotaError, then the one probe at the reset; and the turns that must fail."""
+
+    def test_minute_then_day_then_probe(self):
+        script = [{"plan": plan([{"id": "a", "tool": "add", "args": {"a": 1, "b": 2}}], {"prompt": "on", "after": ["a"]})},
+                  QUOTA_MIN_HINT,
+                  {"plan": plan([{"id": "b", "tool": "echo", "args": {"k": 2}}], {"prompt": "last", "after": ["b"]})},
+                  QUOTA_DAY,
+                  {"plan": plan(say="all done")}]
+        box, sup, ok, clock, out, snaps = self.run_task(script)
+        self.assertTrue(ok, out)
+        self.assertEqual(clock.sleeps, [7.0, 54_000.0 - 7.0])  # the hint, then up to 00:00 America/Los_Angeles
+        self.assertIn("quota: T1.m2 parked — resumes in 7 s", out)
+        self.assertIn("[ga gemini] daily quota: T1.m3 parked — the quota resets at 00:00 America/Los_Angeles, in 15 h 0 min",
+                      out)
+        self.assertIn("one probe then", out)
+        self.assertIn("requests left today 0/20", out)
+        self.assertEqual(out.count("[ga gemini] daily quota reset: one probe (T1.m3)"), 1)
+        log = box.log()
+        self.assertEqual([r["source"] for r in log if r["event"] == "park"], ["hint", "daily reset"])
+        self.assertEqual([r["step"] for r in log if r["event"] == "probe"], ["T1.m3"])
+        calls = box.calls()
+        self.assertEqual(len(calls), 5)
+        self.assertEqual({c["max_attempts"] for c in calls}, {1})
+        self.assertEqual(box.state()["failed"], {})
+        self.assertEqual(json.loads((box.dir / ".ga-gemini" / "day.json").read_text())["used"], 1)  # a new day: the probe
+
+    def test_source_shaped_quota_results_wait_and_resume(self):
+        script = [{"plan": plan(next_={"prompt": "on"})}, {"fixture": "quota_minute_source", "exit": 173},
+                  {"plan": plan(next_={"prompt": "last"})}, {"fixture": "quota_day_source", "exit": 173},
+                  {"plan": plan()}]
+        box, sup, ok, clock, out, snaps = self.run_task(script)
+        self.assertTrue(ok, out)
+        self.assertEqual(clock.sleeps, [7.5, 54_000.0 - 7.5])
+        turns = [r for r in box.log() if r["event"] == "turn" and not r["ok"]]
+        self.assertEqual([(r["reason"], r["source"], r["via"]) for r in turns],
+                         [("rate_limited_minute", "hint", "type"), ("rate_limited_day", "daily reset", "type")])
+
+    def test_a_quota_known_only_from_the_text(self):
+        box, sup, ok, clock, out, snaps = self.run_task([{"plan": plan(next_={"prompt": "on"})},
+                                                         {"fixture": "quota_text_only", "exit": 173}, {"plan": plan()}])
+        self.assertTrue(ok, out)
+        self.assertEqual(clock.sleeps, [3.0])
+        self.assertIn("text", [r.get("via") for r in box.log()])
+
+    def test_the_turns_that_fail(self):
+        for fixture, reason in (("crash", "no_result"), ("max_turns", "cli_error"), ("mismatch", "served_model_mismatch"),
+                                ("api_500", "result_ApiError")):
+            with self.subTest(fixture=fixture):
+                box, sup, ok, clock, out, snaps = self.run_task([{"fixture": fixture, "exit": 1}])
+                self.assertFalse(ok)
+                self.assertEqual(len(box.calls()), 1)  # failed, not retried
+                self.assertEqual(clock.sleeps, [])
+                self.assertIn(reason, [r.get("reason") for r in box.log()])
+                self.assertEqual(box.lines("tools.log"), [])  # nothing of a failed turn ran
+
+
+@needs_k12
+class DailyQuotaTest(RunTask, unittest.TestCase):
+    """D5 (S6): the daily quota is not a minute window."""
+
+    def test_a_probe_that_hits_the_quota_again_waits_for_the_next_reset(self):
+        script = [{"plan": plan(next_={"prompt": "on"})}, QUOTA_DAY, QUOTA_DAY, {"plan": plan()}]
+        box, sup, ok, clock, out, snaps = self.run_task(script)
+        self.assertTrue(ok, out)
+        self.assertEqual(clock.sleeps, [54_000.0, 86_400.0])  # one probe per reset, nothing in between: no loop
+        self.assertEqual(len(box.calls()), 4)
+        self.assertEqual(out.count("[ga gemini] daily quota: T1.m2 parked"), 2)
+        self.assertEqual(len([r for r in box.log() if r["event"] == "probe"]), 2)
+
+    def test_requests_left_today_count_down_and_the_last_one_is_not_spent_on_a_known_429(self):
+        script = [{"plan": plan(next_={"prompt": "2"})}, {"plan": plan(next_={"prompt": "3"})}, {"plan": plan()}]
+        box, sup, ok, clock, out, snaps = self.run_task(script, daily={"requests": 2})
+        self.assertTrue(ok, out)
+        self.assertEqual(clock.sleeps, [54_000.0])
+        st, shown = snaps[0]
+        self.assertEqual(len(box.calls()), 3)
+        self.assertIn("daily quota: T1.m3 parked", shown)
+        self.assertIn("requests left today 0/2", shown)
+        self.assertEqual(sorted(st["done"]), ["T1.m1", "T1.m2"])  # m3 waited for the reset without a call
+
+    def test_next_reset(self):
+        start = FakeClock.START
+        self.assertEqual(G.next_reset(start, "America/Los_Angeles", "00:00"), start + 54_000)
+        self.assertEqual(G.next_reset(start + 54_000, "America/Los_Angeles", "00:00"), start + 54_000 + 86_400)
+        self.assertEqual(G.next_reset(start, "UTC", "00:00") % 86_400, 0)
+
+
+@needs_k12
 class CrashResumeTest(unittest.TestCase):
     """D2: the real `ga gemini` process is killed while parked; `ga gemini --resume` completes the plan."""
 
     def test_kill_while_parked_then_resume(self):
         script = [{"plan": plan([{"id": "a", "tool": "add", "args": {"a": 2, "b": 2}},
                                  {"id": "b", "tool": "echo", "args": {"k": 1}}], {"prompt": "finish", "after": ["a", "b"]})},
-                  {"rate_limit": "2s"},
+                  {"fixture": "quota_minute_hint2", "exit": 173},
                   {"plan": plan([{"id": "c", "tool": "add", "args": {"a": 9, "b": 1}}], None, "finished")}]
         box = Box(self, script)
         env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(ROOT), str(TESTS)]), PYTHONDONTWRITEBYTECODE="1")
@@ -382,7 +533,7 @@ class CrashResumeTest(unittest.TestCase):
         st = json.loads(state.read_text())
         self.assertEqual((st["status"], sorted(st["parked"])), ("running", ["T1.m2"]))
         self.assertEqual(len(box.calls()), 2)
-        r = subprocess.run(cmd + ["--resume"], cwd=box.dir, env=env, capture_output=True, text=True, timeout=120)
+        r = subprocess.run(cmd + ["--resume"], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("T1 done", r.stdout)
         self.assertIn("finished", r.stdout)
@@ -391,6 +542,8 @@ class CrashResumeTest(unittest.TestCase):
         self.assertEqual(sorted(st["done"]), ["T1.m1", "T1.m2", "T1.r1.a", "T1.r1.b", "T1.r2.c"])
         calls = box.calls()
         self.assertEqual((len(calls), calls[2]["resume"]), (3, "s-1"))
+        # resumed from another directory, the CLI still runs where the task's session lives
+        self.assertEqual({c["cwd"] for c in calls}, {str(box.dir.resolve())})
         self.assertEqual(box.lines("tools.log"), ["add", "add"])  # a before the kill, c after: none run twice
         self.assertEqual(box.lines("mcp.log"), ["echo"])
         resume = next(r for r in (json.loads(x) for x in box.lines(".ga-gemini/log.jsonl")) if r["event"] == "resume")
@@ -419,7 +572,7 @@ class StatusBlockTest(unittest.TestCase):
         sup._sleep_hook(5.0)
         self.assertEqual(out.getvalue().count("[ga gemini] quota:"), 2)  # a new park is shown
 
-    def test_a_daily_quota_says_not_today(self):
+    def test_a_wait_that_never_opens(self):
         box = Box(self, [])
         clock, out = FakeClock(), io.StringIO()
         sup = G.Supervisor(G.load_config(box.cfg_path), clock=clock, sleep=clock.sleep, out=out)
@@ -427,7 +580,7 @@ class StatusBlockTest(unittest.TestCase):
         sup.sched = mock.Mock(rows=[], status=lambda: {"resumes_in_s": None, "done": [], "running": "T1.r1.a",
                                                         "parked": ["T1.m2"], "next": []})
         sup._sleep_hook(1.0)
-        self.assertIn("T1.m2 parked — does not resume today (daily quota)", out.getvalue())
+        self.assertIn("T1.m2 parked — no window opens", out.getvalue())
         self.assertIn("running 1", out.getvalue())
         self.assertEqual(sup.st["parked"]["T1.m2"][0], None)
 

@@ -1,0 +1,2 @@
+{"type":"init","timestamp":"2026-10-03T14:00:00.000Z","session_id":"s-1","model":"gemini-3-flash-preview"}
+{"type":"result","timestamp":"2026-10-03T14:00:01.000Z","status":"error","error":{"type":"ApiError","message":"[API Error: got status: 500 Internal error.]"},"stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":1000,"tool_calls":0,"models":{}}}
