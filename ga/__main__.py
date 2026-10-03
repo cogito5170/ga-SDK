@@ -61,6 +61,7 @@ def make_runner(cfg, ga_dir: Path):
     "executable", "permission_mode", "allowed_tools", "disallowed_tools"}."""
     r = dict(cfg.runner)
     kind = r.pop("kind", "manual")
+    r.pop("permission", None)  # read by the hub (§4c), not a Runner argument
     if kind == "manual":
         return ManualRunner(ga_dir / "outbox")
     if kind == "headless":
@@ -155,6 +156,16 @@ def cmd_review(args) -> int:
     return 0
 
 
+def cmd_permit(args) -> int:
+    """METHOD rev 13 §4c: the person permits a Runner that opens model turns, with its scope (decision/1 by user)."""
+    budget = {k: float(v) if "." in v else int(v) for k, v in (x.split("=", 1) for x in args.budget or [])}
+    d = _hub(args).permit(args.runner, model=args.model, sandbox=args.sandbox, budget=budget or None,
+                          measurement_calls=args.measurement_calls, note=args.note or "")
+    print(d["id"])
+    print(f'설정에 넣는다: "runner": {{..., "permission": "{d["id"]}"}}', file=sys.stderr)
+    return 0
+
+
 def cmd_answer(args) -> int:
     d = _hub(args).answer(args.question, args.label, args.note or "")
     print(d["id"])
@@ -210,6 +221,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--by", required=True); p.add_argument("--repo", required=True); p.add_argument("--sha", required=True)
     p.add_argument("--class", dest="cls", required=True); p.add_argument("--cause"); p.add_argument("--why", required=True)
     p.set_defaults(fn=cmd_review)
+    p = sub.add_parser("permit", help="the person permits a model-turn Runner, with its scope (decision/1)")
+    p.add_argument("--runner", required=True, choices=["headless", "agent_sdk", "remote"]); p.add_argument("--model")
+    p.add_argument("--sandbox", choices=["auto", "require", "off"]); p.add_argument("--budget", action="append", help="name=number")
+    p.add_argument("--measurement-calls", dest="measurement_calls", action="store_true"); p.add_argument("--note")
+    p.set_defaults(fn=cmd_permit)
     p = sub.add_parser("answer"); p.add_argument("question"); p.add_argument("label"); p.add_argument("--note"); p.set_defaults(fn=cmd_answer)
     p = sub.add_parser("prompt"); p.add_argument("session", nargs="?"); p.add_argument("--hub", action="store_true"); p.set_defaults(fn=cmd_prompt)
     p = sub.add_parser("check"); p.add_argument("files", nargs="+"); p.set_defaults(fn=cmd_check)

@@ -21,7 +21,22 @@ from .adapters.human import NeedJudgement
 from .adapters.venv import VenvBundle
 from .config import Config
 from .forms import FormError, Problem, canonical_json, dump_text, hard, load, parse_post, parse_sections
+from .adapters.runner import ManualRunner
+from .forms.kinds import RUNNER_KINDS
 from .gates import Gate, detect, question_for
+
+# §4c (METHOD rev 13): the choices of a not-sent directive's question. The closing one is last (the default
+# recommendation); the hub itself never picks the manual Runner.
+DOWNGRADE = "수동으로 강등한다"
+PERMIT_OPTIONS = [
+    ("허락한다", "`ga permit` 로 범위를 적은 결정을 남기고, 설정 runner.permission 에 그 id 를 넣은 뒤 다시 보낸다"),
+    (DOWNGRADE, "같은 지시를 수동 Runner 로 낸다(사람이 세션에 붙여 넣는다) · 기록에 runner: manual 과 까닭"),
+    ("멈춘다", "보내지 않은 채로 둔다"),
+]
+REFUSED_OPTIONS = [
+    (DOWNGRADE, "같은 지시를 수동 Runner 로 낸다(사람이 세션에 붙여 넣는다) · 기록에 runner: manual 과 까닭"),
+    ("멈춘다", "보내지 않은 채로 둔다 — 권한을 고친 뒤 다시 보낼 수 있다"),
+]
 from .prompts import post_allow, turn_prompt
 from .records import RecordStore
 
@@ -102,7 +117,9 @@ class Hub:
     def send(self, directive: dict[str, Any], body: str = "", st: dict[str, Any] | None = None, round_n: int | None = None) -> tuple[Post | None, list[Problem], list[Gate]]:
         """Post a directive to its session's channel and run that session's turn. Returns (post, findings, gates).
 
-        Gated or hard-blocked directives are not sent."""
+        Gated or hard-blocked directives are not sent. METHOD rev 13 §4c: a Runner that opens model turns needs the
+        person's permission (config ``runner.permission`` → their decision/1 with a scope that covers it); without it,
+        or when the Runner is refused, the directive is recorded as not sent and gate 6 asks — nothing is retried."""
         own = st is None
         st = st or self.load_state()
         load(directive, "directive/1")
@@ -115,36 +132,66 @@ class Hub:
             return None, findings, gates
         to = directive["to"]
         prev = st["directives"].get(directive["id"])
-        if prev and prev["rev"] >= directive["rev"]:
+        if prev and prev["rev"] >= directive["rev"] and prev.get("status") != "not_sent":
             raise FormError([Problem("$.rev", f"{directive['id']} rev {directive['rev']} already sent (rev {prev['rev']})")])
         text = dump_text(directive, body)
         findings += rules.r6_secrets(self.cfg, text, f"directive {directive['id']}")
         if hard(findings):
             return None, findings, detect(self.cfg, findings=findings)
+        gap = self._permission_gap(st)
+        if gap:  # §4c: nothing is written to the channel; the directive is kept as not sent, for the person to decide
+            st["directives"][directive["id"]] = {"rev": directive["rev"], "to": to, "status": "not_sent", "round": round_n,
+                                                 "doc": directive, "body": body, "not_sent": gap, "post": None}
+            gate = Gate(6, f"{directive['id']} not sent: {gap}", [directive["id"]], to, PERMIT_OPTIONS, directive["id"])
+            return None, findings, self._gates_out(st, [gate], own)
         post = self.channel.post(to, self.cfg.hub_name, text)
         self._writes += 1
-        st["directives"][directive["id"]] = {"rev": directive["rev"], "to": to, "status": "open", "round": round_n, "doc": directive}
+        st["directives"][directive["id"]] = {"rev": directive["rev"], "to": to, "status": "open", "round": round_n, "doc": directive,
+                                             "body": body, "post": post.id}
+        try:
+            result = self._run_turn(st, directive, text, post, self.runner)
+        except Exception as e:  # never leave a posted directive without its state (GA10 intervention 1)
+            st["directives"][directive["id"]].update(status="not_sent", not_sent=f"error:{type(e).__name__}")
+            if own:
+                self.save_state(st)
+            raise
+        if result.error.startswith("refused"):
+            # §4c: refused — not sent, not counted, not retried any other way; the person decides (gate 6)
+            st["directives"][directive["id"]].update(status="not_sent", not_sent=result.error)
+            gate = Gate(6, f"{directive['id']}: the {getattr(self.runner, 'kind', '?')} Runner was refused ({result.error}); not sent",
+                        [directive["id"]], to, REFUSED_OPTIONS, directive["id"])
+            return None, findings, self._gates_out(st, [gate], own)
         sup = directive.get("supersedes")
         if sup and sup["id"] != directive["id"] and sup["id"] in st["directives"]:
             st["directives"][sup["id"]].update(status="superseded", by=directive["id"])
+        if result.error:
+            findings.append(Problem(f"turn {to} {directive['id']}", f"runner {getattr(self.runner, 'kind', '?')}: {result.error}", "soft", None))
+        if own:
+            self.save_state(st)
+        return post, findings, []
+
+    def _run_turn(self, st: dict[str, Any], directive: dict[str, Any], text: str, post: Post, runner: Any, **record: Any) -> Any:
+        """One turn of ``runner`` for an already posted directive; its numbers go into the state (never its text)."""
+        to = directive["to"]
         st["seen"].setdefault(to, None)
         workdir = self._prepare_worktrees(to)
         start = self._session_heads(to)
-        resume = st["resume"].get(to)
-        result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text, directive), workdir, resume,
-                                                  permissions=self.sandbox_paths(to), budget=dict(directive.get("budget", {}))))
+        resume = st["resume"].get(to) if runner is self.runner else None
+        result = runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text, directive), workdir, resume,
+                                             permissions=self.sandbox_paths(to), budget=dict(directive.get("budget", {}))))
         self._writes += 1
+        refused = result.error.startswith("refused")
         # numbers only: no prompt, transcript or answer text is kept
         st.setdefault("turns", []).append({
-            "session": to, "directive": directive["id"], "rev": directive["rev"], "runner": getattr(self.runner, "kind", "?"),
+            "session": to, "directive": directive["id"], "rev": directive["rev"], "runner": getattr(runner, "kind", "?"),
             "ended": result.ended, "error": result.error, "cost": result.cost, "seconds": result.seconds,
             "resumed": resume, "session_id": result.session_id, "sandboxed": result.sandboxed,
-            "start": start, "post": post.id, "labels": result.note[:200],
+            "start": start, "post": post.id, "labels": result.note[:200], "sent": not refused, **record,
         })
+        if refused:
+            return result
         if result.ended:  # the runner knows the turn is over: label it now (GA5 rev 2 lost a cause for want of this)
             st["turns"][-1]["diag"] = self._turn_diag(st["turns"][-1])
-        if result.error:
-            findings.append(Problem(f"turn {to} {directive['id']}", f"runner {getattr(self.runner, 'kind', '?')}: {result.error}", "soft", None))
         spent = st["spent"]
         spent["runs"] = spent.get("runs", 0) + 1
         spent[f"runs:{to}"] = spent.get(f"runs:{to}", 0) + 1
@@ -152,11 +199,94 @@ class Hub:
             spent["cost_unknown_runs"] = spent.get("cost_unknown_runs", 0) + 1
         else:
             spent["cost"] = round(spent.get("cost", 0) + result.cost, 6)
-        if result.session_id:
+        if result.session_id and runner is self.runner:
             st["resume"][to] = result.session_id
+        return result
+
+    # ================================================================== §4c permission (METHOD rev 13)
+
+    def _permission_gap(self, st: dict[str, Any]) -> str:
+        """Why this hub's Runner may not open a model turn, or "" when the person's permission covers it."""
+        kind = getattr(self.runner, "kind", "manual")
+        if kind not in RUNNER_KINDS:
+            return ""  # the manual Runner calls no model
+        bd = self.cfg.runner.get("permission")
+        if not bd:
+            return f"no permission for the {kind} Runner (config runner.permission names no decision/1)"
+        d = self.records.decision(bd)
+        if d is None or d["by"] != "user":
+            return f"{bd} is not a decision of the user"
+        sc = d.get("scope")
+        if not sc:
+            return f"{bd} has no scope"
+        if sc["runner"] != kind:
+            return f"{bd} permits the {sc['runner']} Runner, not {kind}"
+        if hasattr(self.runner, "model") and sc.get("model") != self.runner.model:
+            return f"{bd} permits model {sc.get('model')!r}, not {self.runner.model!r}"
+        if hasattr(self.runner, "sandbox") and sc.get("sandbox") != self.runner.sandbox:
+            return f"{bd} permits sandbox {sc.get('sandbox')!r}, not {self.runner.sandbox!r}"
+        for k, lim in (sc.get("budget") or {}).items():
+            if st["spent"].get(k, 0) >= lim:
+                return f"{bd} permits {k} up to {lim:g}; {st['spent'].get(k, 0):g} spent"
+        return ""
+
+    def permit(self, runner: str, *, model: str | None = None, sandbox: str | None = None, budget: dict[str, float] | None = None,
+               measurement_calls: bool = False, note: str = "") -> dict[str, Any]:
+        """The person's permission for a Runner that opens model turns (decision/1 by user, with its scope).
+        Put its id in the config as ``runner.permission``."""
+        scope: dict[str, Any] = {"runner": runner, "measurement_calls": bool(measurement_calls)}
+        if model is not None:
+            scope["model"] = model
+        if sandbox is not None:
+            scope["sandbox"] = sandbox
+        if budget:
+            scope["budget"] = dict(budget)
+        bd = self.records.next_decision()
+        what = " · ".join(f"{k} {v}" for k, v in scope.items())
+        doc = {"schema": "decision/1", "id": bd, "date": self.today(), "by": "user", "supersedes": [], "scope": scope,
+               "decision": f"[게이트 6 · 자격] 모형 턴을 여는 Runner 를 허락한다: {what}",
+               "basis": f"사용자 결정 {self.today()} (§4c 허락){' ' + note if note else ''}"}
+        self.records.put(doc)
+        self._writes += 1
+        return doc
+
+    def _gates_out(self, st: dict[str, Any], gates: list[Gate], own: bool) -> list[Gate]:
+        """Standalone sends write their §4c questions themselves (a tick writes the questions of its round)."""
         if own:
+            n = self.records.next_round()
+            for i, g in enumerate(gates, 1):
+                k = i
+                while f"Q-{n}-p{k}" in st["questions"]:
+                    k += 1
+                self._ask(st, g, f"Q-{n}-p{k}", n, why=f"보내기 전: {g.reason}", changed="지시는 보내지 않았다(상태에 not_sent 로 남음)",
+                          next_="사람이 고른 대로: 허락을 고쳐 다시 보내거나, 수동 Runner 로 내거나, 멈춘다")
             self.save_state(st)
-        return post, findings, []
+        return gates
+
+    def _ask(self, st: dict[str, Any], g: Gate, qid: str, n: int, *, why: str, changed: str, next_: str,
+             recommendation: str | None = None) -> dict[str, Any]:
+        q = question_for(g, why=why, changed=changed, next_=next_, recommendation=recommendation, options=g.options)
+        self._write(self.ga / "questions" / f"{qid}.md", dump_text(q, f"# {qid}\n\n{q['about']}\n"))
+        st["questions"][qid] = {"status": "open", "gate": g.number, "session": g.session, "round": n, "doc": q,
+                                **({"directive": g.directive} if g.directive else {})}
+        return dict(q, id=qid)
+
+    def _downgrade(self, st: dict[str, Any], did: str, bd: str) -> None:
+        """The person chose the manual Runner for a directive that was not sent (§4c 4). Same directive, same rules;
+        the record says runner: manual and why."""
+        d = st["directives"].get(did)
+        if d is None or d["status"] != "not_sent":
+            return
+        directive, body = d["doc"], d.get("body", "")
+        text = dump_text(directive, body)
+        post = self.channel.post(directive["to"], self.cfg.hub_name, text)
+        self._writes += 1
+        d.update(status="open", post=post.id, downgraded={"from": getattr(self.runner, "kind", "?"), "why": d.get("not_sent"), "decision": bd})
+        self._run_turn(st, directive, text, post, ManualRunner(self.ga / "outbox"),
+                       downgraded_from=getattr(self.runner, "kind", "?"), why=d.get("not_sent"), decision=bd)
+        sup = directive.get("supersedes")
+        if sup and sup["id"] != directive["id"] and sup["id"] in st["directives"]:
+            st["directives"][sup["id"]].update(status="superseded", by=directive["id"])
 
     # ================================================================== turn diagnostics (labels and counts only)
 
@@ -340,6 +470,10 @@ class Hub:
         self.records.put(decision)
         self._writes += 1
         q.update(status="answered", decision=bd, label=label, processed=False)
+        if q.get("directive"):  # §4c: the person's answer is acted on as given; the hub never downgrades by itself
+            if label == DOWNGRADE:
+                self._downgrade(st, q["directive"], bd)
+            q["processed"] = True
         self.save_state(st)
         return decision
 
@@ -630,17 +764,10 @@ class Hub:
         # ---------------------------------------------------------- questions
         qdocs = []
         for i, g in enumerate(gates, 1):
-            qid = f"Q-{n}-{i}"
-            q = question_for(
-                g,
-                why=f"{n} 회차: {g.reason}",
-                changed=proposal.get("summary", verdict["next"]["reason"]),
-                next_=f"답에 따라 {('지시 ' + directive['id']) if directive else '다음 단계'} 를 보내거나 멈춘다",
-                recommendation=proposal.get("recommendation"),
-            )
-            self._write(self.ga / "questions" / f"{qid}.md", dump_text(q, f"# {qid}\n\n{q['about']}\n"))
-            st["questions"][qid] = {"status": "open", "gate": g.number, "session": g.session, "round": n, "doc": q}
-            qdocs.append(dict(q, id=qid))
+            qdocs.append(self._ask(st, g, f"Q-{n}-{i}", n, why=f"{n} 회차: {g.reason}",
+                                   changed=proposal.get("summary", verdict["next"]["reason"]),
+                                   next_=f"답에 따라 {('지시 ' + directive['id']) if directive else '다음 단계'} 를 보내거나 멈춘다",
+                                   recommendation=None if g.options else proposal.get("recommendation")))
         for qid in answered:
             st["questions"][qid]["processed"] = True
         for rv in reviews:

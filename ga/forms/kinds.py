@@ -173,6 +173,8 @@ ROUND = [
     Field("decisions", list_of(decision_id), required=False),
 ]
 
+RUNNER_KINDS = ("headless", "agent_sdk", "remote")  # the Runners that open model turns (METHOD rev 13 §4c)
+
 DECISION = [
     Field("id", decision_id),
     Field("date", is_str),
@@ -180,6 +182,14 @@ DECISION = [
     Field("basis", is_str),
     Field("by", one_of("user", "hub")),
     Field("supersedes", list_of(decision_id), required=False),
+    # §4c: a person's permission for a Runner that opens model turns, and how far it goes
+    Field("scope", obj([
+        Field("runner", one_of(*RUNNER_KINDS)),
+        Field("model", is_str, required=False),
+        Field("sandbox", one_of("auto", "require", "off"), required=False),
+        Field("budget", _budget, required=False),
+        Field("measurement_calls", lambda v: None if isinstance(v, bool) else "must be true or false", required=False),
+    ]), required=False),
 ]
 
 STAGE = [

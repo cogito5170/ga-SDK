@@ -153,6 +153,8 @@ class AgentSDKRunner:
             result = asyncio.run(asyncio.wait_for(self._run(req, options), timeout=self.timeout))
         except asyncio.TimeoutError:
             return TurnResult(ended=True, error="timeout", seconds=round(time.monotonic() - start, 3), sandboxed=sandboxed)
+        except PermissionError as e:  # refused by the environment (§4c): reported, never worked around
+            return TurnResult(ended=True, error=f"refused:{type(e).__name__}", seconds=round(time.monotonic() - start, 3), sandboxed=sandboxed)
         except Exception as e:  # the SDK's CLINotFoundError, ProcessError, CLIJSONDecodeError, …: the kind only
             return TurnResult(ended=True, error=f"sdk_error:{type(e).__name__}", seconds=round(time.monotonic() - start, 3), sandboxed=sandboxed)
         secs = round(time.monotonic() - start, 3)

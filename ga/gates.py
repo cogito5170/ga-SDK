@@ -44,6 +44,8 @@ class Gate:
     reason: str
     refs: list[str] = field(default_factory=list)
     session: str | None = None
+    options: list[tuple[str, str]] | None = None  # the question's choices when the defaults do not fit
+    directive: str | None = None  # the directive a §4c question is about (not sent)
 
     @property
     def title(self) -> str:

@@ -325,7 +325,7 @@ class RemoteHubRoundTest(FakeGitHubCase):
             return {"session_id": "cse_remote_A"}
 
         sent = {}
-        w.hub.runner = RemoteSessionRunner(send)
+        w.permit_runner(RemoteSessionRunner(send))
         post, findings, gates = w.hub.send(directive("CMD-A1", "A"))
         self.assertIsNotNone(post)
         self.assertEqual(gates, [])
@@ -350,7 +350,7 @@ class RemoteHubRoundTest(FakeGitHubCase):
         self.addCleanup(w.close)
         w.cfg.repos["alpha"].push = False
         w.hub.channel = self.channel()
-        w.hub.runner = RemoteSessionRunner(lambda req: {})
+        w.permit_runner(RemoteSessionRunner(lambda req: {}))
         w.hub.send(directive("CMD-A1", "A"))
         bare = w.tmp / "remotes" / "alpha.git"
         cloud = w.tmp / "cloud"

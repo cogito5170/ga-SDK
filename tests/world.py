@@ -131,6 +131,18 @@ class World:
                        today=lambda: "2026-10-02")
         if remote and server_hooks:
             self.hooks = self.hub.setup()
+        self.permit_runner()
+
+    def permit_runner(self, runner=None) -> None:
+        """Use ``runner`` (default: the current one) and, when it opens model turns, give the person's permission for
+        exactly it (METHOD rev 13 §4c) — what a person does with `ga permit` before the first send."""
+        from ga.forms.kinds import RUNNER_KINDS
+        if runner is not None:
+            self.hub.runner = self.runner = runner
+        kind = getattr(self.hub.runner, "kind", "manual")
+        if kind in RUNNER_KINDS:
+            d = self.hub.permit(kind, model=getattr(self.hub.runner, "model", None), sandbox=getattr(self.hub.runner, "sandbox", None))
+            self.cfg.runner["permission"] = d["id"]
 
     # ------------------------------------------------------------------ setup
 

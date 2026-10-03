@@ -53,7 +53,7 @@ def main() -> int:
             extra_env={**GIT_ENV, "GIT_CONFIG_GLOBAL": os.environ["GIT_CONFIG_GLOBAL"], "PYTHONPATH": str(ROOT)},
             sandbox="require",
         )
-        w.hub.runner = w.runner = runner
+        w.permit_runner(runner)  # METHOD rev 13 §4c
         integ_before = {r: git(w.tmp / "remotes" / f"{r}.git", "rev-parse", "integ") for r in ("alpha", "beta")}
         for sid, repo, did, name in (("A", "alpha", "CMD-A1", "a1"), ("B", "beta", "CMD-B1", "b1")):
             w.hub.send(directive(did, sid, goal=f"{repo} 에 {name} 기록을 남긴다"), body(w, sid, repo, did, name))

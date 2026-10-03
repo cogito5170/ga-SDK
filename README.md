@@ -96,6 +96,15 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
     - **연달아 두 회차 실패하면 게이트 6** 으로 멈춘다. 예산이 다 돼 다시 부를 수 없을 때도 같다. 사이에 성공이 한 번이라도 끼면 셈은 처음부터다.
 - 열린 바깥 판정(`review/1`)이 있는데 Judge 가 wait 를 내고, 그 sha 를 낸 세션에 열린 지시도 없으면 soft 알림을 남긴다. 판정은 바꾸지 않는다.
 
+## 모형 턴을 여는 Runner 의 허락 (METHOD rev 13 §4c)
+
+- 헤드리스 · Agent SDK · 원격 Runner 는 **사람의 허락이 있어야** 첫 턴을 연다. 수동 Runner 는 모형을 부르지 않으므로 허락이 필요 없다.
+- **옮기는 법(기존 설정):** 사람이 `ga permit --runner agent_sdk --model haiku --sandbox require [--budget runs=8] [--measurement-calls]` 로 허락을 남긴다(`decision/1`, by user, `scope`). 나온 id 를 설정에 넣는다: `"runner": {"kind": "agent_sdk", ..., "permission": "BD-n"}`. 이 칸이 없는 설정은 그 Runner 들에서 게이트 6 으로 멈춘다.
+- 허락의 범위(Runner 종류 · 모형 · 샌드박스 · 예산) 밖이면 보내지 않는다. 지시는 상태에 `not_sent` 로 남고, 통로에는 아무것도 쓰지 않으며, 게이트 6 질문(허락한다 · 수동으로 강등한다 · 멈춘다)이 생긴다.
+- 실행이 거부되면(`refused:…`) 그 지시는 `not_sent` 로 남고 실행 수에 넣지 않는다. 게이트 6 으로 묻고, **다른 길로 다시 시도하지 않는다.** 보낸 뒤 예외가 나도 상태를 먼저 남긴다.
+- **수동 강등은 사람의 답으로만 한다.** `ga answer <질문> 수동으로 강등한다` 를 하면 같은 지시를 수동 Runner 로 내고, 기록에 `runner: manual` · 강등 전 Runner · 까닭 · 결정 id 를 남긴다. 기본 권고는 "멈춘다" 다.
+- 측정 호출(LLM Judge)은 `scope.measurement_calls` 에 적을 수 있다. 다만 지금은 Runner 만 이 허락으로 막는다.
+
 ## 시험
 
 ```sh

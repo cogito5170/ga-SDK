@@ -141,7 +141,7 @@ class AgentSDKInHubTest(unittest.TestCase):
         rec = []
         w = World(budget=budget)
         self.addCleanup(w.close)
-        w.hub.runner = w.runner = runner(stub, fake_sdk(plan_fn(w), rec), sandbox="off")
+        w.permit_runner(runner(stub, fake_sdk(plan_fn(w), rec), sandbox="off"))  # §4c: the person's permission
         return w, rec
 
     def test_round_resume_cost_and_labels(self):

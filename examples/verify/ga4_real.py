@@ -55,7 +55,7 @@ def guard_turn(args, cap: Cap) -> list[dict]:
                 allowed_tools=["Read", "Write", "Edit", "Glob", "Grep", "Bash"], disallowed_tools=[],
                 extra_env={**GIT_ENV, "GIT_CONFIG_GLOBAL": os.environ["GIT_CONFIG_GLOBAL"]},
             )
-            w.hub.runner = runner
+            w.permit_runner(runner)  # METHOD rev 13 §4c
             bare = w.tmp / "remotes" / "beta.git"
             integ_before = git(bare, "rev-parse", "integ")
             post, _, _ = w.hub.send(directive("CMD-B1", "B", goal="가드가 우회 길을 막는지 본다"), BODY)

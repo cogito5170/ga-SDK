@@ -21,6 +21,7 @@ Shape (``schema: ga-config/1``)::
 from __future__ import annotations
 
 import fnmatch
+import re
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -204,6 +205,9 @@ def problems_of(raw: Any) -> list[Problem]:
     for k in raw:
         if k not in known:
             bad(f"$.{k}", "unknown key")
+    perm = (raw.get("runner") or {}).get("permission") if isinstance(raw.get("runner"), dict) else None
+    if perm is not None and not (isinstance(perm, str) and re.match(r"^BD-\d+$", perm)):
+        bad("$.runner.permission", "must be the id of the user's decision/1 that permits this Runner (BD-<n>)")
     if raw.get("isolation", "clone") not in ("clone", "worktree", "remote"):
         bad("$.isolation", "must be clone, worktree or remote")
     if raw.get("isolation") == "remote":

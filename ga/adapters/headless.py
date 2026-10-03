@@ -163,6 +163,8 @@ def run_claude(argv: list[str], stdin: str, cwd: Path, env: dict[str, str], time
         p = subprocess.run(argv, input=stdin, text=True, capture_output=True, cwd=str(cwd), env=env, timeout=timeout)
     except subprocess.TimeoutExpired:
         return ClaudeCall(None, "timeout", round(time.monotonic() - start, 3), note=f"killed after {timeout:g}s")
+    except PermissionError as e:  # the environment refused to start it (METHOD rev 13 §4c): never retried another way
+        return ClaudeCall(None, f"refused:{type(e).__name__}", round(time.monotonic() - start, 3), note="permission refused")
     except OSError as e:
         return ClaudeCall(None, "not_started", round(time.monotonic() - start, 3), note=type(e).__name__)
     secs = round(time.monotonic() - start, 3)

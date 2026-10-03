@@ -49,7 +49,7 @@ def pre_receive_turn(args, cap: Cap) -> dict:
             disallowed_tools=["Bash(git config:*)", "Bash(git -c:*)"],
             extra_env={**GIT_ENV, "GIT_CONFIG_GLOBAL": os.environ["GIT_CONFIG_GLOBAL"]},
         )
-        w.hub.runner = runner
+        w.permit_runner(runner)  # METHOD rev 13 §4c
         body = (
             "## 할 일 (보고는 쓰지 않는다)\n"
             "1. `beta/notes/b1.txt` 를 만들고 내용은 `B1` 한 줄. `git -C beta add -A`, `git -C beta commit -m b1`.\n"

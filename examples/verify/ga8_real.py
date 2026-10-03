@@ -104,7 +104,11 @@ def cmd_init(a) -> None:
         "budget": {"runs": 1},
     }
     (work / "ga.json").write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"integ": git(sdk, "rev-parse", INTEG)}))
+    # METHOD rev 13 §4c: the person's permission for the remote Runner (recorded here as the person's act)
+    d = hub(work).permit("remote", note="GA8 시연")
+    raw["runner"] = {"permission": d["id"]}
+    (work / "ga.json").write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps({"integ": git(sdk, "rev-parse", INTEG), "permission": d["id"]}))
 
 
 def cmd_send(a) -> None:

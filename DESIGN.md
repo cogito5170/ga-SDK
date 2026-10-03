@@ -229,3 +229,12 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - 실패 2(연속) 또는 다시 부를 예산이 없음(`budget.judge_runs`): 게이트 6. 재시도는 지운다.
 - 성공 한 번이면 `judge_failures = 0`, 재시도는 지운다.
 
+## 21. 권한 사전 확인 · 보내지 않음 · 수동 강등 (CMD-GA15, METHOD rev 13 §4c)
+
+- `decision/1.scope`(runner · model · sandbox · budget · measurement_calls)는 선택 칸이다. `Hub.permit` · `ga permit` 이 by user 로 남긴다. 설정 `runner.permission` 이 그 id 를 가리킨다(형식 검사 `BD-n`, Runner 인자로는 넘기지 않음).
+- `Hub._permission_gap`: Runner 의 kind 가 `RUNNER_KINDS` 이면 결정이 있는지, user 인지, scope 가 있는지 본다. 그리고 runner · model · sandbox 가 같은지, scope 예산을 넘지 않았는지 본다. 하나라도 어긋나면 통로에 쓰기 전에 `not_sent` 와 게이트 6.
+- 거부: Runner 가 `refused:…` 를 돌려준다. 헤드리스 · Agent SDK 는 `PermissionError`, 원격은 콜백의 `PermissionError` 나 `{"refused": …}` 다. 허브는 지시를 `not_sent` 로 두고, 턴 기록에 `sent: false` 를 남기고, 실행 수에 넣지 않고, 게이트 6 을 낸다. 같은 id · rev 는 고친 뒤 다시 보낼 수 있다.
+- 질문: 혼자 부른 `send` 는 질문(`Q-<n>-p<k>`)을 스스로 쓴다. tick 안에서는 그 회차의 질문으로 쓴다. 게이트에 `options` · `directive` 를 실어 보낸다.
+- `answer` 가 그 질문에 `수동으로 강등한다` 를 받으면 `_downgrade` 한다(같은 지시 · ManualRunner · 기록). 이 질문들은 Judge 회차를 부르지 않는다(`processed`).
+- 시험 세계(`World.permit_runner`)는 모형 턴 Runner 에 그것과 같은 범위의 허락을 남긴다. 사람이 첫 send 전에 하는 일과 같다.
+

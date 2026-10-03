@@ -82,8 +82,7 @@ def main() -> int:
         disallowed_tools=list(DEFAULT_DISALLOWED) + ["Bash(git -C alpha config:*)", "Bash(git -C beta config:*)"],
         extra_env={**GIT_ENV, "GIT_CONFIG_GLOBAL": str(gitcfg), "PYTHONPATH": str(ROOT)},
     )
-    w.runner = runner
-    w.hub.runner = runner
+    w.permit_runner(runner)  # METHOD rev 13 §4c
     w.cfg.hub["post_command"] = f"{py} -m ga --config {w.tmp / 'ga.json'} --ga-dir {w.ga} post --channel {{session}} --from {{session}} <보고 파일>"
 
     def d(id_, to, repo, goal, extra=""):

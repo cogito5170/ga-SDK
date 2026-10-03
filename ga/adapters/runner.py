@@ -58,8 +58,12 @@ class RemoteSessionRunner:
     def run_turn(self, req: TurnRequest) -> TurnResult:
         try:
             out = self.send(req) or {}
+        except PermissionError as e:  # refused (METHOD rev 13 §4c): reported, never worked around
+            return TurnResult(ended=None, error=f"refused:{type(e).__name__}")
         except Exception as e:  # the kind only
             return TurnResult(ended=None, error=f"send_failed:{type(e).__name__}")
+        if out.get("refused"):  # a callback that was told no (e.g. a tool call the environment refused)
+            return TurnResult(ended=None, error=f"refused:{str(out['refused'])[:80]}")
         return TurnResult(ended=None, session_id=out.get("session_id"), note=str(out.get("note", ""))[:120])
 
 
