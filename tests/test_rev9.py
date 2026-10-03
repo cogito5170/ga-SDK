@@ -106,6 +106,23 @@ class InstallCheckTest(unittest.TestCase):
         self.assertFalse(any("missing_in_install" in n or "not_install_checked" in n for n in res.verdict["evidence"]["notes"]))
 
 
+    def test_install_mode_drops_the_repository_pythonpath(self):
+        w = World(judge_fn=ok, remote=True, modes=("path", "install"))
+        self.addCleanup(w.close)
+        out = w.tmp / "probe"
+        out.mkdir()
+        w.cfg.repos["alpha"].env = {"PYTHONPATH": "/nonexistent-shadow", "GA_OUT": str(out)}
+        w.hub.send(directive("CMD-A1", "A"))
+        probe = ("import os, pathlib, sys, unittest\n\nclass T(unittest.TestCase):\n    def test_env(self):\n"
+                 "        mode = 'install' if '/install/' in sys.prefix else 'path'\n"
+                 "        pathlib.Path(os.environ['GA_OUT'], mode).write_text(os.environ.get('PYTHONPATH', ''))\n")
+        sha = w.work("A", "alpha", {"tests/test_env.py": probe})
+        w.report("A", [("CMD-A1", 1, "done")], [("alpha", sha)])
+        w.hub.tick()
+        self.assertEqual((out / "path").read_text(), "/nonexistent-shadow")  # the path mode keeps the repository's own
+        self.assertNotIn("/nonexistent-shadow", (out / "install").read_text())  # (b) never puts it back
+
+
 class RelativeGaDirTest(unittest.TestCase):
     def test_relative_ga_dir_makes_the_session_clone(self):
         w = World()

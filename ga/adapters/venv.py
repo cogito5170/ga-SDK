@@ -111,7 +111,8 @@ class VenvBundle:
             return RepoRun(repo, sha, mode, True, None, problem="no_test_command")
         argv = [python if a == "{python}" else a for a in spec.test]
         full = dict(env)
-        full.update(spec.env)
+        # (b) tests the installed packages: a repository's own PYTHONPATH (for the path mode) would shadow them
+        full.update({k: v for k, v in spec.env.items() if not (mode == "install" and k == "PYTHONPATH")})
         try:
             p = subprocess.run(argv, cwd=str(cwd), env=full, capture_output=True, timeout=self.timeout)
         except subprocess.TimeoutExpired:
