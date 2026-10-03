@@ -103,7 +103,11 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 - 허락의 범위(Runner 종류 · 모형 · 샌드박스 · 예산) 밖이면 보내지 않는다. 지시는 상태에 `not_sent` 로 남고, 통로에는 아무것도 쓰지 않으며, 게이트 6 질문(허락한다 · 수동으로 강등한다 · 멈춘다)이 생긴다.
 - 실행이 거부되면(`refused:…`) 그 지시는 `not_sent` 로 남고 실행 수에 넣지 않는다. 게이트 6 으로 묻고, **다른 길로 다시 시도하지 않는다.** 보낸 뒤 예외가 나도 상태를 먼저 남긴다.
 - **수동 강등은 사람의 답으로만 한다.** `ga answer <질문> 수동으로 강등한다` 를 하면 같은 지시를 수동 Runner 로 내고, 기록에 `runner: manual` · 강등 전 Runner · 까닭 · 결정 id 를 남긴다. 기본 권고는 "멈춘다" 다.
-- 측정 호출(LLM Judge)은 `scope.measurement_calls` 에 적을 수 있다. 다만 지금은 Runner 만 이 허락으로 막는다.
+- **`by: user` 는 기록이지 신원 증명이 아니다.** 운영자는 사람의 직접 답을 받은 뒤에만 `ga permit` 을 하고, `--note` 에 그 답의 요지를 적는다(METHOD rev 14, BD-158).
+- **LLM Judge 도 같은 허락으로 막는다**(rev 14 §4c 6). 허락 범위에 `measurement_calls` 가 없으면 Judge 를 부르지 않는다. 그 회차는 기계의 클래스로 판정하고 근거 note 에 "Judge 허락 없음" 을 남긴다.
+  - 게이트 6 으로 한 번 묻는다. 그 질문이 열려 있는 동안은 다시 묻지 않는다. rev 12 의 재시도 · 연속 실패 셈에는 넣지 않는다.
+  - Runner 를 허락할 때 `--measurement-calls` 를 붙이면 함께 허락된다. 수동 Runner 허브는 `ga permit --judge-only` 로 Judge 만 허락한다(`scope.runner: manual`). 이 허락으로는 모형 턴 Runner 를 열 수 없다.
+  - 모형을 부르지 않는 Judge(`FileJudge` · `CallableJudge`)는 허락이 필요 없다.
 
 ## 시험
 

@@ -184,7 +184,7 @@ DECISION = [
     Field("supersedes", list_of(decision_id), required=False),
     # §4c: a person's permission for a Runner that opens model turns, and how far it goes
     Field("scope", obj([
-        Field("runner", one_of(*RUNNER_KINDS)),
+        Field("runner", one_of(*RUNNER_KINDS, "manual")),  # manual: the Judge alone is permitted (rev 14)
         Field("model", is_str, required=False),
         Field("sandbox", one_of("auto", "require", "off"), required=False),
         Field("budget", _budget, required=False),

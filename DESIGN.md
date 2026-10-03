@@ -238,3 +238,10 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - `answer` 가 그 질문에 `수동으로 강등한다` 를 받으면 `_downgrade` 한다(같은 지시 · ManualRunner · 기록). 이 질문들은 Judge 회차를 부르지 않는다(`processed`).
 - 시험 세계(`World.permit_runner`)는 모형 턴 Runner 에 그것과 같은 범위의 허락을 남긴다. 사람이 첫 send 전에 하는 일과 같다.
 
+## 22. Judge 호출의 허락 (CMD-GA16, METHOD rev 14 §4c 6)
+
+- `LLMJudge.calls_model = True`. 허브는 그런 Judge 를 부르기 전에 `_judge_permission_gap` 을 본다. 결정이 user 의 것이고, `scope.measurement_calls` 가 true 이고, (Judge 만 허락이면) 모형이 같고, `budget.judge_runs` 안이어야 한다.
+- 어긋나면 `_machine_proposal`(기계 클래스 그대로)로 판정하고, note "Judge 허락 없음" 을 남긴다. 게이트 6(`JUDGE_PERMIT_OPTIONS`)은 같은 꼴의 질문이 열려 있지 않을 때만 낸다. `judge_failures` 는 그대로 두고, 이 회차가 쓴 rev 12 재시도는 지운다. 그 질문의 답은 Judge 회차를 부르지 않는다.
+- `decision/1.scope.runner` 에 `manual` 을 더했다(Judge 만 허락). `ga permit --judge-only` 가 그것을 남긴다.
+- 시험 세계: `World.permit_judge(judge)`.
+

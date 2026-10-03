@@ -33,6 +33,10 @@ PERMIT_OPTIONS = [
     (DOWNGRADE, "같은 지시를 수동 Runner 로 낸다(사람이 세션에 붙여 넣는다) · 기록에 runner: manual 과 까닭"),
     ("멈춘다", "보내지 않은 채로 둔다"),
 ]
+JUDGE_PERMIT_OPTIONS = [
+    ("허락한다", "`ga permit --judge-only`(또는 Runner 허락에 `--measurement-calls`)로 남기고 runner.permission 에 넣는다 — 다음 회차부터 Judge 를 부른다"),
+    ("멈춘다", "Judge 없이 기계의 클래스로만 판정한다"),
+]
 REFUSED_OPTIONS = [
     (DOWNGRADE, "같은 지시를 수동 Runner 로 낸다(사람이 세션에 붙여 넣는다) · 기록에 runner: manual 과 까닭"),
     ("멈춘다", "보내지 않은 채로 둔다 — 권한을 고친 뒤 다시 보낼 수 있다"),
@@ -230,11 +234,44 @@ class Hub:
                 return f"{bd} permits {k} up to {lim:g}; {st['spent'].get(k, 0):g} spent"
         return ""
 
+    def _judge_permission_gap(self, st: dict[str, Any]) -> str:
+        """Why this hub's Judge may not call a model, or "" (METHOD rev 14 §4c 6). A Judge that calls no model (a person,
+        code) needs nothing."""
+        if not getattr(self.judge, "calls_model", False):
+            return ""
+        bd = self.cfg.runner.get("permission")
+        if not bd:
+            return "config runner.permission names no decision/1"
+        d = self.records.decision(bd)
+        if d is None or d["by"] != "user":
+            return f"{bd} is not a decision of the user"
+        sc = d.get("scope") or {}
+        if sc.get("measurement_calls") is not True:
+            return f"{bd} does not include measurement calls"
+        if sc.get("runner") == "manual" and "model" in sc and sc["model"] != getattr(self.judge, "model", None):
+            return f"{bd} permits Judge model {sc['model']!r}, not {getattr(self.judge, 'model', None)!r}"
+        lim = (sc.get("budget") or {}).get("judge_runs")
+        if isinstance(lim, (int, float)) and st["spent"].get("judge_runs", 0) >= lim:
+            return f"{bd} permits judge_runs up to {lim:g}"
+        return ""
+
+    @staticmethod
+    def _machine_proposal(pending: dict[str, Any], reason: str, summary: str) -> dict[str, Any]:
+        """A proposal that is the machine's class itself (no model was asked)."""
+        m = pending["machine"] or {}
+        v = {"schema": "verdict/1", "class": m.get("class", "insufficient"), "evidence": pending["evidence"],
+             "claims_vs_evidence": [], "next": {"choice": "wait", "reason": reason}}
+        if v["class"] != "success":
+            v["cause"] = m.get("cause", "measurement")
+        if m.get("subclass"):
+            v["subclass"] = m["subclass"]
+        return {"verdict": v, "summary": summary, "directive": None}
+
     def permit(self, runner: str, *, model: str | None = None, sandbox: str | None = None, budget: dict[str, float] | None = None,
                measurement_calls: bool = False, note: str = "") -> dict[str, Any]:
         """The person's permission for a Runner that opens model turns (decision/1 by user, with its scope).
         Put its id in the config as ``runner.permission``."""
-        scope: dict[str, Any] = {"runner": runner, "measurement_calls": bool(measurement_calls)}
+        scope: dict[str, Any] = {"runner": runner, "measurement_calls": bool(measurement_calls or runner == "manual")}
         if model is not None:
             scope["model"] = model
         if sandbox is not None:
@@ -268,7 +305,8 @@ class Hub:
         q = question_for(g, why=why, changed=changed, next_=next_, recommendation=recommendation, options=g.options)
         self._write(self.ga / "questions" / f"{qid}.md", dump_text(q, f"# {qid}\n\n{q['about']}\n"))
         st["questions"][qid] = {"status": "open", "gate": g.number, "session": g.session, "round": n, "doc": q,
-                                **({"directive": g.directive} if g.directive else {})}
+                                **({"directive": g.directive} if g.directive else {}),
+                                **({"judge_permission": True} if g.options is JUDGE_PERMIT_OPTIONS else {})}
         return dict(q, id=qid)
 
     def _downgrade(self, st: dict[str, Any], did: str, bd: str) -> None:
@@ -474,6 +512,8 @@ class Hub:
             if label == DOWNGRADE:
                 self._downgrade(st, q["directive"], bd)
             q["processed"] = True
+        if q.get("judge_permission"):  # rev 14: the permission itself is a config change; no Judge round for the answer
+            q["processed"] = True
         self.save_state(st)
         return decision
 
@@ -649,14 +689,14 @@ class Hub:
         ctx.reviews = reviews
         jb = self.cfg.budget.get("judge_runs")
         budget_out = bool(pending.get("retry_of") and isinstance(jb, (int, float)) and st["spent"].get("judge_runs", 0) >= jb)
+        judge_gap = self._judge_permission_gap(st)
         try:
-            if budget_out:  # METHOD rev 12: a retry only within the budget — not called, the machine's class stands
-                m = pending["machine"] or {}
-                v = {"schema": "verdict/1", "class": m.get("class", "insufficient"), "evidence": pending["evidence"],
-                     "claims_vs_evidence": [], "next": {"choice": "wait", "reason": "judge budget exhausted"}}
-                if v["class"] != "success":
-                    v["cause"] = m.get("cause", "measurement")
-                proposal = {"verdict": v, "summary": "판정 보조 예산이 다 됐다", "directive": None, "judge_failed": "judge budget exhausted"}
+            if judge_gap:  # METHOD rev 14 §4c 6: no permission for measurement calls — not called, not a failure
+                pending["evidence"].setdefault("notes", []).append(f"Judge 허락 없음: {judge_gap}")
+                proposal = self._machine_proposal(pending, "Judge 허락 없음", "판정 보조를 부르지 않았다(허락 없음)")
+            elif budget_out:  # METHOD rev 12: a retry only within the budget — not called, the machine's class stands
+                proposal = dict(self._machine_proposal(pending, "judge budget exhausted", "판정 보조 예산이 다 됐다"),
+                                judge_failed="judge budget exhausted")
             else:
                 proposal = self.judge.propose(ctx)
         except NeedJudgement as e:
@@ -691,7 +731,13 @@ class Hub:
         if pending.get("retry_of"):  # the reports were already gated in the round that failed
             gates = []
         retry_note = ""
-        if judge_failed or budget_out:
+        if judge_gap:
+            # rev 14: a known state, not a failure — no retry, no count; one question until it is answered
+            if pending.get("retry_of"):
+                st["judge_retry"] = None  # a pending rev 12 retry is used up by this round (else every tick would re-run it)
+            if not any(q.get("judge_permission") and q["status"] == "open" for q in st["questions"].values()):
+                gates.append(Gate(6, f"the LLM Judge is not permitted: {judge_gap}", options=JUDGE_PERMIT_OPTIONS))
+        elif judge_failed or budget_out:
             fails = st.get("judge_failures", 0) + 1
             st["judge_failures"] = fails
             why = judge_failed or "judge budget exhausted"

@@ -144,6 +144,19 @@ class World:
             d = self.hub.permit(kind, model=getattr(self.hub.runner, "model", None), sandbox=getattr(self.hub.runner, "sandbox", None))
             self.cfg.runner["permission"] = d["id"]
 
+    def permit_judge(self, judge) -> None:
+        """Use ``judge`` and give the person's permission for its model calls (METHOD rev 14 §4c 6): the Runner's
+        permission with measurement calls, or the Judge alone on a manual hub."""
+        from ga.forms.kinds import RUNNER_KINDS
+        self.hub.judge = judge
+        kind = getattr(self.hub.runner, "kind", "manual")
+        if kind in RUNNER_KINDS:
+            d = self.hub.permit(kind, model=getattr(self.hub.runner, "model", None), sandbox=getattr(self.hub.runner, "sandbox", None),
+                                measurement_calls=True)
+        else:
+            d = self.hub.permit("manual")
+        self.cfg.runner["permission"] = d["id"]
+
     # ------------------------------------------------------------------ setup
 
     def _make_repo(self, name: str, pkg: str, deps: list[str] | None = None) -> Path:
