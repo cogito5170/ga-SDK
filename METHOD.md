@@ -1,4 +1,4 @@
-# METHOD — 허브 세션이 지시 · 보고로 개발 세션들을 굴리는 방법 (method-1 rev 15, 2026-10-03)
+# METHOD — 허브 세션이 지시 · 보고로 개발 세션들을 굴리는 방법 (method-1 rev 16, 2026-10-03)
 
 > 이 문서는 ga-SDK 가 지을 것의 **명세**다. 원본은 cogito5170/baseline 에서 실제로 돌린 고리다.
 > - 근거 자료: baseline 의 `GUIDANCE.md`(허브 쪽 안내) · `SESSION_GUIDANCE.md`(작업 세션 쪽 안내, 사용자가 각 세션에 준 프롬프트) · `PROTOCOL.md` · `DECISION_LOG.md`(BD-1–130) · `BASELINE.md` §13(1–90 회차) · `STAGES.md`(stage-1–4).
@@ -148,6 +148,40 @@ ga-SDK 는 이 고리에서 **기계적인 부분을 자동으로** 하고, **�
 
 - 교신을 시작한 세션이 교신 직후 자기 통로에 `exchange/1` 을 올린다. 받은 세션은 다음 보고의 `handled` 옆에 그 교신을 적는다.
 - 허브는 교신을 받으면 판정 고리(§2 의 4–6)에 넣는다. 결과는 각 세션에 대한 지시이거나 wait 다.
+
+### 3.6 판 2 꼴 — 항목 단위 · 바뀐 것만 · 결과는 칸으로 (rev 16, BD-173)
+
+실측(BD-173)에서 나온 문제가 넷이다.
+- 범위 칸 하나에 항목 5–12 개가 든 281–1,231 자의 글이 들어갔다. 기계는 그 칸이 비었는지만 본다.
+- 판을 올리면 전체를 다시 썼다. rev 4 → 5 는 88 % 가 같았다.
+- 핵심 결과가 본문에만 있었다.
+- 머리가 꼴과 다르거나 아예 없는 보고가 우리 통로에 그대로 들어왔다.
+
+그래서 판 2 꼴을 둔다. 판 1 꼴은 옮기는 동안 받되, soft 알림을 남긴다.
+
+**`directive/2`**
+- 판 1 과 같은 칸: `id` · `rev` · `to` · `goal`(한 문장) · `why`(짧게) · `after` · `budget` · `change_size` · `contradicts` · `supersedes`.
+- `scope`: 항목 목록 `[{id: "S1", text}]`. 한 항목에는 한 요구만 둔다.
+- `done_when`: 항목 목록 `[{id: "D1", text}]`. 한 항목은 따로 확인할 수 있어야 한다.
+- `refs`(선택): 근거로 삼은 결정 · 문서 · 링크.
+- `changes`: **rev > 1 이면 반드시** 둔다. `[{item: "S3"|"D2", op: add|edit|drop, text?}]`. 바뀐 항목만 적는다. 받는 쪽은 앞 판에 이 바뀐 것을 얹어 지금 판을 만든다. 허브도 같은 계산으로 전체 판을 기록한다.
+
+**`report/2`**
+- 판 1 과 같은 칸: `from` · `handled` · `commits` · `tests` · `change_size` · `needs` · `exchanges`.
+- `items`: 다룬 지시의 `done_when` 항목마다 하나씩 답한다. `[{id: "D1", state: met|unmet|blocked|na, evidence: [sha · 경로 · URL]}]`.
+- `results`(선택): `[{name, value, unit?, ci?: [lo, hi], evidence}]`. 수치 결과는 여기에 둔다. 본문에만 두지 않는다.
+- `blockers`(선택): `[{kind: env|permission|credential|budget|dependency|design, what, gate?}]`.
+- `deviations` · `proposals`(선택): 짧은 글의 목록.
+
+**`notify/1`** — 세션을 깨우는 메시지(`send_message` 등)의 꼴이다. `{to, kind: directive|report|verdict|question|ack, ref: URL, id?}`. 글을 싣지 않는다. 내용은 `ref` 가 가리키는 통로에 있다.
+
+**기계 규칙**
+- `done` 으로 보고했는데 `met` 이 아닌 항목이 있으면 바닥은 부분 성공이다. 막힘 항목이 있으면 바닥은 막힘이다.
+- `blockers.kind` 가 permission 이나 credential 이면 게이트 6 으로 묻는다.
+- `items` 가 지시의 `done_when` 항목을 빠뜨리면 R7 hard 다.
+- `changes` 가 없는 지시를 rev > 1 로 보내면 soft 알림이다. 판 2 에서는 hard 다.
+
+**본문** — 머리만으로 판정할 수 있어야 한다. 본문은 사람을 위한 요약이다. 머리를 되풀이하지 않고, 1,500 자 안팎으로 쓴다(soft).
 
 ## 4. 어댑터 — 환경에 묶이지 않게
 
