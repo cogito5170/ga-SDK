@@ -15,6 +15,7 @@ Common: --config PATH (default ga.json), --ga-dir PATH (default <config dir>/.ga
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -233,7 +234,41 @@ def cmd_render(args) -> int:
     return 0
 
 
+RLO_CLI = "ga.rlo.cli"
+
+
+def cmd_rlo(argv: list[str]) -> int:
+    """``ga rlo ...`` (CMD-GA20): hand the rest of the command line to ``ga.rlo.cli.main`` (GR's module). The import is
+    here, not at the top, so ga runs without rlo. A missing module is exit 2 naming it, never a silent pass."""
+    try:
+        cli = importlib.import_module(RLO_CLI)
+    except ModuleNotFoundError as e:
+        missing = e.name or "?"
+        why = "is not there yet" if missing in (RLO_CLI, "ga.rlo") else f"is missing ({RLO_CLI} needs it)"
+        print(f"ga rlo: module {missing} {why}", file=sys.stderr)
+        return 2
+    return int(cli.main(list(argv)) or 0)
+
+
+def _rlo_argv(argv: list[str]) -> list[str] | None:
+    """The arguments after ``rlo`` when it is the command (past ga's own --config / --ga-dir), else None."""
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--config", "--ga-dir"):
+            i += 2
+        elif a.startswith(("--config=", "--ga-dir=")):
+            i += 1
+        else:
+            return argv[i + 1:] if a == "rlo" else None
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    rest = _rlo_argv(argv)
+    if rest is not None:  # before argparse, so `ga rlo --help` and every other option reach ga.rlo.cli unchanged
+        return cmd_rlo(rest)
     ap = argparse.ArgumentParser(prog="ga", description="ga-SDK hub loop (local edition)")
     ap.add_argument("--config", default="ga.json")
     ap.add_argument("--ga-dir", default=None)
@@ -261,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to", required=True); p.add_argument("--kind", required=True, choices=["directive", "report", "verdict", "question", "ack"])
     p.add_argument("--ref", required=True); p.add_argument("--id"); p.set_defaults(fn=cmd_notify)
     p = sub.add_parser("render"); p.set_defaults(fn=cmd_render)
+    sub.add_parser("rlo", add_help=False, help="rlo Autonomy commands (ga.rlo, owned by GR)")  # listed here, run above
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
         ap.error("prompt needs SESSION or --hub")

@@ -10,6 +10,11 @@
 pip install -e .
 ```
 
+- **One ga (CMD-GA20, BD-206):** installing ga-sdk also installs `rlo-sdk[sensor]`, pinned by sha (`ga/_pins.py` is the source; `pyproject.toml` must say the same, and `tests/test_unified.py` checks both, plus the installed metadata in a clean venv). rlo's seven layers stay in their own repositories; ga copies none of their code.
+- ga core still imports only the standard library and never imports rlo. rlo comes in only through `ga rlo ...`.
+- **`ga rlo ...`** hands everything after `rlo` to `ga.rlo.cli.main(argv)`, unchanged (`--help` included). ga's own `--config` / `--ga-dir` before `rlo` are not passed on. If that module is not there, it exits 2 with `ga rlo: module ga.rlo.cli is not there yet`. If one of its imports is missing, it exits 2 naming that module. An error raised inside `main` is not caught.
+- **Ownership:** `ga/rlo/*` and `tests/rlo/*` belong to GR (the ga_rlo session). GA does not edit them; a change there goes to GR as a `요청:`. GA owns the seam's entry (`ga/__main__.py` `cmd_rlo`) and the pins (`ga/_pins.py`).
+
 ## 한 바퀴
 
 1. 설정 파일 `ga.json`(꼴은 `ga-config/1`)에 다음을 적는다: 저장소(로컬 경로), 세션, 소유표, 통합 브랜치. 예는 [`examples/baseline/config.json`](examples/baseline/config.json)에 있다.

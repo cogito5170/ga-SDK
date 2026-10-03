@@ -9,6 +9,7 @@
 ## 0. 제약과 정신
 
 - Python ≥ 3.10, 핵심은 표준 라이브러리만. (git · pip 는 하위 프로세스로 부른다 — import 하지 않는다.)
+- Since CMD-GA20 (BD-206), ga-sdk also *depends on* `rlo-sdk[sensor]` (pinned, `ga/_pins.py`). Core still imports only the standard library; rlo is imported only below `ga.rlo` (§26).
 - 저장소 · 세션 id · 브랜치 이름은 코드에 없고 모두 설정에서 온다.
 - 1판: **로컬만.** LLM 호출 없음, GitHub · 원격 · 헤드리스 Runner 없음(인터페이스만 그것을 담을 수 있게). 원격 · 네트워크 없이 고리가 돈다.
 - **SDK 는 안전만 막고 나머지는 알린다**(METHOD §0). 그래서 검사 결과는 늘 `hard`(막음) · `soft`(알림)를 가진다.
@@ -265,3 +266,10 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - `_reproduce`: for a report/2 with `done`, an item with state `na` and a non-empty `evidence` list leaves the partial-success floor (`_has_reason`), and the round notes name it. An `na` with no evidence stays "not met". Blank evidence strings never reach this point: the forms refuse them (hard), so that post is refused and the rev 8 floor applies. A reasoned `na` excuses only itself; an `unmet` or `blocked` item beside it still floors.
 - `guard_summary`: `{"kind": "state", "labels": {…}}` lines fill `state` (GR1 request 1, so ga_rlo's Sensor state can live in ga's own turn evidence). They are not counted as allow or deny. Keys and string values must match `STATE_LABEL`; numbers, bools and null pass. A rejected entry is dropped, and the line counts once in `errors`. The field appears only when some state was kept, so the rev 15 records are unchanged.
 - `prompts._guidance`: a missing or empty `hub.guidance` / `hub.session_guidance`, or an unreadable file, raises `FormError` with the key's path. `ga prompt` turns that (and an unknown session) into exit 2 on stderr (GR1 request 2).
+
+## 26. One ga: the rlo pin and the `ga.rlo` seam (CMD-GA20, GA_UNIFIED U2, BD-206)
+
+- **Pins.** `ga/_pins.py` `PINS` is the source: `rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@3323f88…` (rlo 0.6.0). `pyproject.toml` `[project] dependencies` must match it by meaning (name, extras, URL, marker; spacing and name case do not count). The URL text is part of the pin: pip refuses two spellings of a URL for one distribution, so anything else that pins rlo-sdk next to ga-sdk must use the same text. `tests/test_unified.py` also checks, where ga-sdk is installed, the Requires-Dist, rlo-sdk's version and the commit pip fetched (`direct_url.json`).
+- **Lazy import.** No ga module outside `ga.rlo.*` imports rlo. The test puts a fake `rlo` first on the path, imports every ga module (except GR's below the seam), runs `ga --help`, `ga check` and `ga rlo`, and asserts that no `rlo` module was loaded.
+- **Seam.** `ga/rlo/__init__.py` holds only a docstring and `__version__`. `ga rlo ...` is caught in `main` before argparse (`_rlo_argv` skips `--config` / `--ga-dir` and their values). It is still listed in `ga --help`. `cmd_rlo` imports `ga.rlo.cli` and calls `main(argv)` with the rest. Only that import is guarded: `ModuleNotFoundError` gives exit 2 naming `e.name`, either "is not there yet" (the module itself) or "is missing (ga.rlo.cli needs it)" (one of its imports).
+- **Ownership.** `ga/rlo/*` and `tests/rlo/*` are GR's (GA_UNIFIED U-P2); GA does not edit them. GA owns `cmd_rlo`, `_rlo_argv` and `ga/_pins.py`. A change GR needs on GA's side goes to GA as a `요청:`, and the reverse too.
