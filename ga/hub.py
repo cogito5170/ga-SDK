@@ -195,7 +195,8 @@ class Hub:
         """What a session's turn may not write (protect) and the only places inside them it may (writable).
 
         Empty in worktree isolation: a worktree keeps its git data inside the hub's repository, so it cannot work
-        with that repository read-only — that mode has no structural R3 (see README)."""
+        with that repository read-only — that mode has no structural R3 (see README). Empty in remote isolation
+        too: the session runs on another machine, where only the platform's branch rules apply."""
         if self.cfg.isolation != "clone":
             return {"allow": post_allow(self.cfg, session)}
         protect = [self.cfg.base_dir, self.ga]
@@ -213,6 +214,8 @@ class Hub:
         return {"protect": [str(p) for p in protect], "writable": [str(p) for p in writable], "allow": post_allow(self.cfg, session)}
 
     def _prepare_worktrees(self, session: str) -> Path:
+        if self.cfg.isolation == "remote":  # the session's checkout is wherever the session runs, not here
+            return self.ga
         s = self.cfg.sessions[session]
         paths = [self.vcs.ensure_session_worktree(session, r) for r in s.repos]
         return paths[0].parent if paths else self.ga

@@ -164,6 +164,9 @@ class GitVcs:
         return git(self.repo_dir(repo), "rev-parse", "--verify", "--quiet", rev + "^{commit}", check=False) or None
 
     def integration_head(self, repo: str) -> str | None:
+        if self._remote(repo) and not self.cfg.repos[repo].push:  # kept local: the remote's copy is not the hub's
+            return git(self.repo_dir(repo), "rev-parse", "--verify", "--quiet",
+                       f"refs/heads/{self.cfg.integration_branch}^{{commit}}", check=False) or None
         return self.ref(repo, self.cfg.integration_branch)
 
     def session_head(self, repo: str, session: str) -> str | None:
@@ -213,13 +216,14 @@ class GitVcs:
         return None
 
     def fast_forward(self, repo: str, new: str) -> str:
-        """Move the integration branch to ``new`` (must be a fast-forward) and push it if there is a remote."""
+        """Move the integration branch to ``new`` (must be a fast-forward) and push it if there is a remote
+        (unless the repository says ``push: false``)."""
         branch = self.cfg.integration_branch
         rd = self.repo_dir(repo)
         old = self.integration_head(repo)
         if old and not self.is_ancestor(repo, old, new):
             raise GitError(f"{repo}: {new[:7]} is not a fast-forward of {branch}@{old[:7]}")
-        remote = self._remote(repo)
+        remote = self._remote(repo) if self.cfg.repos[repo].push else ""
         if remote:
             # no force: the remote refuses a non-fast-forward by itself; the hub names itself to the pre-receive hook
             git(rd, "-c", "push.negotiate=false", "push", "--quiet", f"--receive-pack={_receivepack(self.cfg.hub_name)}",

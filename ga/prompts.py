@@ -61,19 +61,31 @@ def post_allow(cfg: Config, session: str) -> list[str]:
 def turn_prompt(cfg: Config, session: str, directive_text: str) -> str:
     """What a Runner hands to a session for one turn: the directive, how to work, and how to report back."""
     s = cfg.sessions[session]
-    repos = ", ".join(f"./{r} (브랜치 {s.branch_for(r)})" for r in s.repos) or "-"
-    clone = cfg.isolation == "clone"
-    how = [
-        "## 일하는 방법 (ga)",
-        f"- 현재 디렉터리가 네 자리다. 저장소: {repos}.",
-        "- 파일은 Write · Edit 도구로 만들고 고친다(필요한 디렉터리도 저절로 생긴다).",
-        "- git 은 `git -C <저장소> …` 꼴로 쓴다(add · commit · status · log · rev-parse).",
-        "- push 하지 않는다. 허브가 네 clone 에서 네 브랜치를 가져간다." if clone else "- 자기 브랜치만 push 한다.",
-        "- 어떤 명령이 거부되면 위의 방법으로 다른 길을 찾는다. 같은 명령을 되풀이하지 않는다.",
-        "- **일을 다 못 했어도 보고는 반드시 올린다.** 막힌 것은 `## Blocker` 에, 한 것은 `## Result` 에 적는다. "
-        "보고 없이 턴을 끝내면 허브는 아무 일도 없었던 것으로 본다.",
-        f"- 보고: report/1 꼴의 파일을 Write 로 쓰고 이 명령으로 올린다: `{post_command(cfg, session)}`",
-    ]
+    if cfg.isolation == "remote":
+        # the session runs elsewhere with its own checkout; it pushes its branch and posts on its channel itself
+        repos = ", ".join(f"{cfg.repos[r].slug or r} (브랜치 {s.branch_for(r)})" for r in s.repos) or "-"
+        how = [
+            "## 일하는 방법 (ga)",
+            f"- 저장소: {repos}. 네 checkout 에서 그 브랜치로 일하고 커밋한 뒤 그 브랜치만 push 한다. 다른 브랜치는 건드리지 않는다.",
+            "- 어떤 명령이 거부되면 다른 길을 찾는다. 같은 명령을 되풀이하지 않는다.",
+            "- **일을 다 못 했어도 보고는 반드시 올린다.** 막힌 것은 `## Blocker` 에, 한 것은 `## Result` 에 적는다.",
+            f"- 보고: report/1 꼴(```ga 머리 + 본문) 글 하나를 통로 {s.channel or session} 에 올린다. "
+            f"글의 마지막 줄은 `<!-- ga-author: {session} -->` 이다.",
+        ]
+    else:
+        repos = ", ".join(f"./{r} (브랜치 {s.branch_for(r)})" for r in s.repos) or "-"
+        clone = cfg.isolation == "clone"
+        how = [
+            "## 일하는 방법 (ga)",
+            f"- 현재 디렉터리가 네 자리다. 저장소: {repos}.",
+            "- 파일은 Write · Edit 도구로 만들고 고친다(필요한 디렉터리도 저절로 생긴다).",
+            "- git 은 `git -C <저장소> …` 꼴로 쓴다(add · commit · status · log · rev-parse).",
+            "- push 하지 않는다. 허브가 네 clone 에서 네 브랜치를 가져간다." if clone else "- 자기 브랜치만 push 한다.",
+            "- 어떤 명령이 거부되면 위의 방법으로 다른 길을 찾는다. 같은 명령을 되풀이하지 않는다.",
+            "- **일을 다 못 했어도 보고는 반드시 올린다.** 막힌 것은 `## Blocker` 에, 한 것은 `## Result` 에 적는다. "
+            "보고 없이 턴을 끝내면 허브는 아무 일도 없었던 것으로 본다.",
+            f"- 보고: report/1 꼴의 파일을 Write 로 쓰고 이 명령으로 올린다: `{post_command(cfg, session)}`",
+        ]
     return (
         f"[{cfg.hub_name} → {s.tag}] 새 지시가 통로 {s.channel or session} 에 왔다. 아래가 그 글이다.\n\n"
         f"{directive_text.rstrip()}\n\n" + "\n".join(how) + "\n"

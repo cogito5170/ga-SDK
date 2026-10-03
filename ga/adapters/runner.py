@@ -38,3 +38,47 @@ class ManualRunner:
         """Prompts written for a session, oldest first (what the person has to paste)."""
         d = self.outbox / session
         return sorted(d.glob("*.md")) if d.is_dir() else []
+
+
+class RemoteSessionRunner:
+    """§4c remote sessions: one turn = a message to a cloud session (baseline's way).
+
+    The library has no public API it can call to create or wake a remote session, so the waking is a
+    callback supplied by whoever has that power — an agent with remote-session tools, or a person.
+    ``send(request) -> {"session_id": ...}``. The runner cannot see the end of the turn (``ended=None``):
+    the session's report on its channel, and the safety-net ``ga tick``, carry the loop on.
+    ``OutboxCallback`` is the plain form: it writes the request where the agent relays it from.
+    """
+
+    kind = "remote"
+
+    def __init__(self, send):
+        self.send = send
+
+    def run_turn(self, req: TurnRequest) -> TurnResult:
+        try:
+            out = self.send(req) or {}
+        except Exception as e:  # the kind only
+            return TurnResult(ended=None, error=f"send_failed:{type(e).__name__}")
+        return TurnResult(ended=None, session_id=out.get("session_id"), note=str(out.get("note", ""))[:120])
+
+
+class OutboxCallback:
+    """Writes each turn request as JSON to ``<outbox>/<session>/<n>.json`` for an agent to relay; returns the
+    remote session id the agent recorded for that session (``<outbox>/<session>/session_id``), if any."""
+
+    def __init__(self, outbox: str | Path):
+        self.outbox = Path(outbox)
+
+    def __call__(self, req: TurnRequest) -> dict:
+        import json
+
+        d = self.outbox / req.session
+        d.mkdir(parents=True, exist_ok=True)
+        name = f"{time.time_ns():020d}.json"
+        tmp = d / f".{name}.tmp"
+        tmp.write_text(json.dumps({"session": req.session, "prompt": req.prompt, "resume_id": req.resume_id},
+                                  ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, d / name)
+        sid = d / "session_id"
+        return {"session_id": sid.read_text(encoding="utf-8").strip() if sid.exists() else None, "note": name}

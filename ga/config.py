@@ -7,7 +7,7 @@ Shape (``schema: ga-config/1``)::
       "hub": {"name", "repo", "session_id", "guidance", "session_guidance",
               "worker_head", "worker_tail", "wake"},
       "integration_branch": "...",
-      "repos": {"<name>": {"path", "remote", "src", "test": [...], "env", "package", "extras", "url", "slug"}},
+      "repos": {"<name>": {"path", "remote", "src", "test": [...], "env", "package", "extras", "url", "slug", "push"}},
       "sessions": {"<name>": {"prefix", "tag", "branch", "branches", "repos", "channel",
                               "session_id", "first_directive"}},
       "ownership": [{"repo", "path", "session"}],        # first match wins
@@ -50,6 +50,9 @@ class Repo:
     slug: str = ""  # owner/name, for user-facing commands
     package: str = ""  # distribution name for Bundle (b); empty = not installable
     extras: str = ""
+    # False: the integration branch is moved only in the hub's local repository and never pushed to the remote
+    # (e.g. a real GitHub repository whose branches the hub must not write)
+    push: bool = True
 
 
 @dataclass
@@ -81,6 +84,8 @@ class Config:
     bundle: dict[str, Any] = field(default_factory=dict)  # {"pip_args": [...], "timeout": seconds}
     # "clone" (default): each session works in its own full clone and never pushes; the hub fetches its branch.
     # "worktree" (0.1): sessions share the repository's refs through git worktrees and push their branches.
+    # "remote" (2nd edition fourth): sessions live elsewhere (cloud sessions) with their own checkouts and push
+    # their branches to the repository's remote; the hub fetches the remote. R3 is the platform's, not ga's.
     isolation: str = "clone"
     judge: dict[str, Any] = field(default_factory=dict)  # {"kind": "file" | "llm", "model", "max_runs", ...}
     runner: dict[str, Any] = field(default_factory=dict)  # {"kind": "manual" | "headless", "model", "timeout", "max_budget_usd", ...}
@@ -195,8 +200,15 @@ def problems_of(raw: Any) -> list[Problem]:
     for k in raw:
         if k not in known:
             bad(f"$.{k}", "unknown key")
-    if raw.get("isolation", "clone") not in ("clone", "worktree"):
-        bad("$.isolation", "must be clone or worktree")
+    if raw.get("isolation", "clone") not in ("clone", "worktree", "remote"):
+        bad("$.isolation", "must be clone, worktree or remote")
+    if raw.get("isolation") == "remote":
+        for name, r in repos.items():
+            if isinstance(r, dict) and not r.get("remote"):
+                bad(f"$.repos.{name}.remote", "is required with isolation remote (sessions reach the hub through it)")
+    for name, r in repos.items():
+        if isinstance(r, dict) and "push" in r and not isinstance(r["push"], bool):
+            bad(f"$.repos.{name}.push", "must be true or false")
     budget = raw.get("budget", {})
     if not isinstance(budget, dict) or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in budget.values()):
         bad("$.budget", "must map names to non-negative numbers")
