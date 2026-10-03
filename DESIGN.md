@@ -260,3 +260,8 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - 받기: report/2 의 items 가 다룬 directive/2 의 done_when 을 빠뜨리면 그 글을 받지 않는다(R7 hard, rev 8 의 "모두 거절" 바닥과 맞물림). 바닥(blocked · 부분 성공)은 `_reproduce` 에, 게이트 6 은 `gates.detect` 에 있다.
 - 턴 프롬프트의 보고 틀은 report/2 다(directive/2 면 items 를 미리 채움). 세션 첫 프롬프트에 꼴 안내를 넣었다. CLI 는 `ga check`(판 1 이면 deprecated 알림), `ga post`(report/2 · report/1), `ga notify` 다.
 
+## 25. na rule, guard state, prompt config errors (CMD-GA19, METHOD rev 17)
+
+- `_reproduce`: for a report/2 with `done`, an item with state `na` and a non-empty `evidence` list leaves the partial-success floor (`_has_reason`), and the round notes name it. An `na` with no evidence stays "not met". Blank evidence strings never reach this point: the forms refuse them (hard), so that post is refused and the rev 8 floor applies. A reasoned `na` excuses only itself; an `unmet` or `blocked` item beside it still floors.
+- `guard_summary`: `{"kind": "state", "labels": {…}}` lines fill `state` (GR1 request 1, so ga_rlo's Sensor state can live in ga's own turn evidence). They are not counted as allow or deny. Keys and string values must match `STATE_LABEL`; numbers, bools and null pass. A rejected entry is dropped, and the line counts once in `errors`. The field appears only when some state was kept, so the rev 15 records are unchanged.
+- `prompts._guidance`: a missing or empty `hub.guidance` / `hub.session_guidance`, or an unreadable file, raises `FormError` with the key's path. `ga prompt` turns that (and an unknown session) into exit 2 on stderr (GR1 request 2).

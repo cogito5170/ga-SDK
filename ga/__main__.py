@@ -180,7 +180,16 @@ def cmd_answer(args) -> int:
 
 def cmd_prompt(args) -> int:
     cfg = gacfg.load(args.config)
-    sys.stdout.write(hub_prompt(cfg) if args.hub else worker_prompt(cfg, args.session))
+    if not args.hub and args.session not in cfg.sessions:
+        print(f"$.sessions: no session {args.session!r} (known: {', '.join(cfg.sessions) or '-'})", file=sys.stderr)
+        return 2
+    try:
+        text = hub_prompt(cfg) if args.hub else worker_prompt(cfg, args.session)
+    except FormError as e:  # CMD-GA19 (GR1 request 2): a config error, not a KeyError traceback
+        for p in e.problems:
+            print(f"config: {p}", file=sys.stderr)
+        return 2
+    sys.stdout.write(text)
     return 0
 
 

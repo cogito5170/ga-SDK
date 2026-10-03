@@ -5,6 +5,18 @@ The guidance texts are not in code: the config points at the hub's files.
 from __future__ import annotations
 
 from .config import Config
+from .forms import FormError, Problem
+
+
+def _guidance(cfg: Config, key: str) -> str:
+    """The text of the guidance file ``hub.<key>`` names; a FormError naming the key when it is not set or unreadable."""
+    rel = cfg.hub.get(key)
+    if not isinstance(rel, str) or not rel:
+        raise FormError([Problem(f"$.hub.{key}", "is required by ga prompt (the path of the guidance file)")])
+    try:
+        return cfg.read_text(rel).rstrip("\n")
+    except OSError as e:
+        raise FormError([Problem(f"$.hub.{key}", f"cannot read {rel}: {type(e).__name__}")]) from None
 
 
 def _ownership_table(cfg: Config, session: str) -> str:
@@ -24,7 +36,7 @@ def _fmt(template: str, cfg: Config, **extra: str) -> str:
 def worker_prompt(cfg: Config, session: str) -> str:
     s = cfg.sessions[session]
     head = _fmt(cfg.hub["worker_head"], cfg, name=s.name, tag=s.tag)
-    guidance = cfg.read_text(cfg.hub["session_guidance"]).rstrip("\n")
+    guidance = _guidance(cfg, "session_guidance")
     branches = ", ".join(f"{r}@`{s.branch_for(r)}`" for r in s.repos) or "(없음)"
     wake = _fmt(cfg.hub["wake"], cfg, tag=s.tag, link="<글 링크>")
     channel = [
@@ -84,6 +96,7 @@ def report_template(cfg: Config, session: str, directive: dict | None) -> list[s
         "커밋하지 않은 저장소의 줄은 지운다. **커밋을 `commits` 로 주장하지 않으면 허브는 그것을 통합하지 않는다.** "
         "다 못 했으면 `status` 를 `paused` 로 둔다.",
         "- `items` 는 지시의 done_when 항목마다 하나: `state` 는 met · unmet · blocked · na, `evidence` 는 sha · 경로 · URL. "
+        "`na` 는 `evidence` 에 해당 없는 까닭을 적는다(까닭이 없으면 met 이 아닌 항목으로 센다). "
         "**항목을 빠뜨린 보고는 받지 않는다(R7).** 수치 결과는 `results`([{name, value, unit?, ci?, evidence}])에, "
         "막힌 까닭은 `blockers`([{kind: env|permission|credential|budget|dependency|design, what}])에 둔다. 본문은 사람을 위한 요약이다.",
         "",
@@ -133,7 +146,7 @@ def turn_prompt(cfg: Config, session: str, directive_text: str, directive: dict 
 
 
 def hub_prompt(cfg: Config) -> str:
-    guidance = cfg.read_text(cfg.hub["guidance"]).rstrip("\n")
+    guidance = _guidance(cfg, "guidance")
     head = (
         f"넌 이제부터 {cfg.hub_name} 세션이야. 허브로서 기준선을 쥐고 지시 · 판정 · 기록을 한다. "
         f"결정의 원본은 <{cfg.hub['repo']}> 레포다. 세션끼리는 직접 말하지 않고 모두 {cfg.hub_name}를 거친다. "

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 from dataclasses import dataclass, field
@@ -69,11 +70,24 @@ def _new_lines(path: Path, skip: int) -> list[str]:
         return []
 
 
+# a state label or value from a guard record: a short name, not text (no spaces, no slashes — no paths, URLs or prose)
+STATE_LABEL = re.compile(r"^[A-Za-z0-9_.:+-]{1,40}$")
+
+
+def _state_value(v: Any) -> bool:
+    return v is None or isinstance(v, (bool, int, float)) or (isinstance(v, str) and bool(STATE_LABEL.match(v)))
+
+
 def guard_summary(lines: list[str]) -> dict[str, Any]:
     """Allow · deny counts and the deny labels of a PreToolUse guard's JSONL record: ga's own guard log
-    ({"decision", "rule"}) or rlo.hooks --record ({"kind": "guard", "result": {"verdict", "rule"}}). No line is kept."""
+    ({"decision", "rule"}) or rlo.hooks --record ({"kind": "guard", "result": {"verdict", "rule"}}). No line is kept.
+
+    A state line ({"kind": "state", "labels": {name: value}}, CMD-GA19 · GR1 request 1) puts its labels in ``state``,
+    a later line's value over an earlier one's. Only short label names and scalar or label values are kept; a line
+    with anything else counts once in ``errors`` and keeps only its good entries."""
     allow = deny = errors = 0
     labels: set[str] = set()
+    state: dict[str, Any] = {}
     for line in lines:
         if not line.strip():
             continue
@@ -88,6 +102,13 @@ def guard_summary(lines: list[str]) -> dict[str, Any]:
         if "error" in str(d.get("kind", "")):
             errors += 1
             continue
+        if d.get("kind") == "state":
+            got = d.get("labels")
+            good = {k: v for k, v in got.items() if STATE_LABEL.match(k) and _state_value(v)} if isinstance(got, dict) else {}
+            if not isinstance(got, dict) or len(good) < len(got):
+                errors += 1
+            state.update(good)
+            continue
         res = d.get("result") if isinstance(d.get("result"), dict) else {}
         verdict = str(d.get("decision") or res.get("verdict") or "").lower()
         if not verdict:
@@ -97,7 +118,16 @@ def guard_summary(lines: list[str]) -> dict[str, Any]:
         else:
             deny += 1
             labels.add(str(d.get("rule") or res.get("rule") or verdict)[:40])
-    return {"allow": allow, "deny": deny, "errors": errors, "labels": sorted(labels)}
+    out = {"allow": allow, "deny": deny, "errors": errors, "labels": sorted(labels)}
+    if state:
+        out["state"] = dict(sorted(state.items()))
+    return out
+
+
+def _has_reason(item: dict[str, Any]) -> bool:
+    """A report/2 item's evidence is a non-empty list (METHOD rev 17: the reason an na item gives). The forms already
+    refuse a blank entry, so a list that got here holds text."""
+    return bool(item.get("evidence"))
 
 
 @dataclass
@@ -1069,7 +1099,11 @@ class Hub:
                 evidence["notes"].append(f"report/2 {who}: blocked {', '.join(blocked)}")
                 worse("blocked", cause)
             elif any(h["status"] == "done" for h in head.get("handled", [])):
-                short = [f"{k} {v}" for k, v in states.items() if v != "met"]
+                # METHOD rev 17 (BD-177): na with a reason in its evidence leaves the floor; na without one is not met
+                excused = [i["id"] for i in head.get("items", []) if i["state"] == "na" and _has_reason(i)]
+                short = [f"{k} {v}" for k, v in states.items() if v != "met" and k not in excused]
+                if excused:
+                    evidence["notes"].append(f"report/2 {who}: na with a reason, left out of the floor: {', '.join(excused)}")
                 if short:
                     evidence["notes"].append(f"report/2 {who}: done, but not met: {', '.join(short)}")
                     worse("partial", "requirement")

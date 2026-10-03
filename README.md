@@ -116,6 +116,7 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
     `{"name": "rlo", "command": "python3 -m rlo.hooks --model {home}/cc_tools_model.json --mode enforce --grant Bash --record {home}/rlo-{session}.jsonl", "record": "{home}/rlo-{session}.jsonl"}`
   - ga-SDK 는 rlo 에 의존하지 않는다. 명령 문자열만 받는다.
 - `record` 가 있으면 턴 뒤에 그 턴 동안 늘어난 줄만 읽는다. 허락 · 거부 · 오류 수와 거부 라벨만 `turns[].guards`(와 `diag.guards`)에 싣고, 원문은 싣지 않는다. 거부가 있으면 그 세션의 보고가 들어온 회차의 근거 note 에 남는다.
+- State lines (CMD-GA19): a guard record line `{"kind": "state", "labels": {name: value}}` puts its labels in `turns[].guards[].state` (and `diag.guards[].state`); a later line's value wins. Only short label names and values are kept (`[A-Za-z0-9_.:+-]{1,40}`, or a number, bool or null); any other entry is dropped and the line counts once in `errors`. No state line, no `state` field.
 - 가드의 프로그램이 없거나 실행할 수 없으면 턴을 열지 않는다. 지시는 `not_sent` 로 남고 게이트 6 이다(가드를 고친다 · 수동으로 강등한다 · 멈춘다). 가드 없이 조용히 돌지 않는다.
 - 가드는 허락(§4c 1)도, 실행 환경의 권한 검사도 대신하지 않는다.
 
@@ -126,10 +127,15 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 - **`notify/1`:** 세션을 깨우는 한 줄. `ga notify --to <세션> --kind directive|report|verdict|question|ack --ref <URL> [--id]`.
 - **기계 규칙**
   - done 으로 보고했는데 met 이 아닌 항목이 있으면 바닥은 부분 성공이다.
+  - `na` 는 `evidence` 에 까닭이 있으면 바닥에서 뺀다(round note 에 남음). 까닭이 없으면 met 이 아닌 항목으로 센다(METHOD rev 17, CMD-GA19).
   - blocked 항목이 있으면 바닥은 막힘이다(원인은 blockers 의 kind 로 정함).
   - blockers 의 kind 가 permission · credential 이면 게이트 6 이다.
   - items 가 다룬 directive/2 의 done_when 항목을 빠뜨리면 R7 hard 로 그 보고를 받지 않는다.
 - **판 1 꼴(`directive/1` · `report/1`)도 계속 받는다.** 받을 때마다 soft 알림(deprecated)을 남긴다. directive/1 을 rev > 1 로 보내면 "changes 없음" soft 알림이 붙는다. 예: `examples/v2/CMD-GA18.directive2.md`.
+
+## `ga prompt` and the guidance files (CMD-GA19)
+
+- `ga prompt SESSION` reads `hub.session_guidance`; `ga prompt --hub` reads `hub.guidance`. A missing key, an empty one or an unreadable file is a config error: exit 2, and stderr names the key (`config: [hard] $.hub.session_guidance: …`). An unknown session is exit 2 too. The library (`worker_prompt` · `hub_prompt`) raises `FormError`.
 
 ## 시험
 
