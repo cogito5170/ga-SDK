@@ -298,3 +298,23 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
   - ga saves `state.json` before the scheduler can write a row for new steps, so K12's file never names a step ga's file lacks.
   - A tool step that was running when the process died runs again (at least once).
 - Tests: `tests/test_gemini.py` with `fake_gemini.py` (a scripted CLI), `fake_mcp.py` and `gemini_tools.py`. The supervisor tests need rlo ≥ 0.7.0 and skip without it; an installed ga brings it.
+
+## 28. `ga mail` (CMD-GA22, BD-235)
+
+- **`ga/mailbox.py`**, standard library plus git. `Mailbox(repo, remote, retries=20)`.
+  - `tip()` fetches `refs/heads/ga-mailbox` into a ref of its own (`refs/ga-mailbox/fetch-<uuid>`, deleted after) with `--no-write-fetch-head --refmap=`. Concurrent sends in one clone share neither `FETCH_HEAD` nor the remote-tracking ref; without `--refmap=` the 20-sender test failed on `cannot lock ref`.
+  - `send` validates (`parse_text`, `validate`, hard problems refuse) and checks `SECRET_PATTERNS`, then: `hash-object -w`, `read-tree <tip>` (or `--empty`) into a temporary `GIT_INDEX_FILE`, `update-index --add`, `write-tree`, `commit-tree -p <tip>`, `push <commit>:refs/heads/ga-mailbox` (never forced). A rejection loops back to `tip()`. The sleep is `uniform(0.2, 1) × min(3, 0.1 × 2^attempt)`. A name already on the tip gets a new time.
+  - The file name is `to/<recipient>/<YYYYmmddTHHMMSS.ffffffZ>-<sender>-<form id>.md`. The form id is a directive's `id`, else a report's first handled id, else the schema. Senders match `[A-Za-z0-9_.]` (no `-`), so `parse_path` splits one way; recipients match `[A-Za-z0-9_.-]`.
+  - `unread(name)` yields `Message`s (sender, form, schema, validation problems, a from/file-name mismatch) oldest first; the caller marks each read after showing it. The read set is a file of names under the git common dir.
+  - `scan()` reads every message once. Unread is per the local read set (`basis: cursor`) or else the messages after the name's last send (`basis: since_last_send`). The oldest unanswered report is a `report/*` to the name with no later message from the name to its sender.
+  - `guard_report(lines, sender, directive, rev, items)`: `hub.guard_summary` over the lines, wrapped as `report/2` with handled `paused`, a `permission` blocker and the items `blocked`. GR7's own event file is not written yet; these are the two record shapes ga already reads (assumption).
+- The read set is in the git dir, not `.ga/mailbox/` in the work tree as the directive says: a worker that runs `git add -A` would commit a `.ga/` folder. It is still local and never pushed.
+- **CLI** `ga mail send|read|scan` (`ga/__main__.py` `cmd_mail`); refusals are exit 2 with `ga mail: …` on stderr.
+- **Tests** (`tests/test_mailbox.py`): a bare remote with clones as sessions. They cover:
+  - send, read and the read set; untouched trees and branches; no edit;
+  - every refusal; a sender mismatch;
+  - 20 concurrent sends (10 per side) with no loss;
+  - a remote that always rejects (4 pushes, 3 sleeps under the cap);
+  - marking read only after printing; scan; the guard event;
+  - an end-to-end run through `bash -c` with a minimal environment.
+
