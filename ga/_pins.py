@@ -11,7 +11,7 @@ from __future__ import annotations
 
 # name -> (distribution, extras, repository URL, commit sha)
 PINS = {
-    "rlo": ("rlo-sdk", ("sensor",), "https://github.com/cogito5170/rlo-SDK", "250a88e56a74d2776688d34ec732cbd0f4244ba0"),
+    "rlo": ("rlo-sdk", ("sensor",), "https://github.com/cogito5170/rlo-SDK", "3d2e7d0b2696a99d37a09283edb62cab856dbe2e"),
 }
 # the version the pinned commit carries (rlo-SDK pyproject at that sha; K12, branch claude/peaceful-maxwell-i9vqpx, for ga gemini)
 VERSIONS = {"rlo-sdk": "0.7.0"}
