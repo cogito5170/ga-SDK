@@ -189,8 +189,9 @@ class LLMJudge:
             out["gate"] = g  # the §6 ground of an ask_user (METHOD rev 11); anything else is no ground
         draft = obj.get("directive")
         if isinstance(draft, dict):
-            draft = dict(draft, schema="directive/1")
-            dprobs = hard(validate(draft, "directive/1"))
+            kind = "directive/2" if isinstance(draft.get("scope"), list) or draft.get("changes") else "directive/1"
+            draft = dict(draft, schema=kind)
+            dprobs = hard(validate(draft, kind))
             if dprobs:
                 rec["directive_dropped"] = "; ".join(p.message for p in dprobs[:3])
             else:

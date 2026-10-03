@@ -19,6 +19,8 @@ from .kinds import (
     REPORT_SECTIONS,
     SCHEMAS,
     VERDICT_CLASSES,
+    apply_changes,
+    deprecated,
     load,
     parse_post,
     report_body_notes,
@@ -28,5 +30,5 @@ from .kinds import (
 __all__ = [
     "HARD", "SOFT", "FormError", "Problem", "canonical_json", "dump_text", "hard", "parse_sections",
     "parse_text", "soft", "CAUSES", "CHANGE_SIZES", "LABELS", "NEXT_CHOICES", "REPORT_SECTIONS", "SCHEMAS",
-    "VERDICT_CLASSES", "load", "parse_post", "report_body_notes", "validate",
+    "VERDICT_CLASSES", "apply_changes", "deprecated", "load", "parse_post", "report_body_notes", "validate",
 ]

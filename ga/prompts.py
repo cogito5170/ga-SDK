@@ -44,6 +44,15 @@ def worker_prompt(cfg: Config, session: str) -> str:
     ]
     if s.first_directive:
         channel += ["", "### 첫 지시", "", s.first_directive]
+    channel += [
+        "",
+        "### 꼴 (판 2, METHOD rev 16 §3.6)",
+        "",
+        "- 지시는 `directive/2` 로 온다: 범위 `scope` 와 끝난 기준 `done_when` 은 항목 목록(S1… · D1…)이다. rev > 1 은 바뀐 것만 `changes` 에 온다.",
+        "- 보고는 `report/2` 로 올린다: done_when 항목마다 `items`(met · unmet · blocked · na, evidence), 수치는 `results`, "
+        "막힌 까닭은 `blockers`. 머리만으로 판정할 수 있게 쓰고, 본문은 1,500 자 안팎의 요약으로 둔다.",
+        "- 깨우는 메시지는 `notify/1` 한 줄이다: `ga notify --to <허브> --kind report --ref <글 URL>`.",
+    ]
     tail = _fmt(cfg.hub["worker_tail"], cfg)
     return "\n".join([head, "", guidance, "", *channel, "", tail]) + "\n"
 
@@ -64,14 +73,19 @@ def report_template(cfg: Config, session: str, directive: dict | None) -> list[s
     import json
 
     s = cfg.sessions[session]
-    head = {"schema": "report/1", "from": session,
+    done = directive.get("done_when") if directive and isinstance(directive.get("done_when"), list) else []
+    head = {"schema": "report/2", "from": session,
             "handled": [{"id": directive["id"] if directive else "<지시 id>", "rev_seen": directive["rev"] if directive else 1,
                          "status": "done"}],
-            "commits": [{"repo": r, "branch": s.branch_for(r), "sha": "<SHA>"} for r in s.repos]}
+            "commits": [{"repo": r, "branch": s.branch_for(r), "sha": "<SHA>"} for r in s.repos],
+            "items": [{"id": x["id"], "state": "met", "evidence": ["<sha · 경로 · URL>"]} for x in done]}
     return [
-        "- 보고 머리는 이 틀을 채운다. `<SHA>` 는 커밋한 머리의 40 자 sha(`git -C <저장소> rev-parse HEAD`)다. "
+        "- 보고 머리는 이 틀(report/2)을 채운다. `<SHA>` 는 커밋한 머리의 40 자 sha(`git -C <저장소> rev-parse HEAD`)다. "
         "커밋하지 않은 저장소의 줄은 지운다. **커밋을 `commits` 로 주장하지 않으면 허브는 그것을 통합하지 않는다.** "
         "다 못 했으면 `status` 를 `paused` 로 둔다.",
+        "- `items` 는 지시의 done_when 항목마다 하나: `state` 는 met · unmet · blocked · na, `evidence` 는 sha · 경로 · URL. "
+        "**항목을 빠뜨린 보고는 받지 않는다(R7).** 수치 결과는 `results`([{name, value, unit?, ci?, evidence}])에, "
+        "막힌 까닭은 `blockers`([{kind: env|permission|credential|budget|dependency|design, what}])에 둔다. 본문은 사람을 위한 요약이다.",
         "",
         "```ga",
         json.dumps(head, ensure_ascii=False),
@@ -107,6 +121,10 @@ def turn_prompt(cfg: Config, session: str, directive_text: str, directive: dict 
             "보고 없이 턴을 끝내면 허브는 아무 일도 없었던 것으로 본다.",
             f"- 보고: report/1 꼴의 파일을 Write 로 쓰고 이 명령으로 올린다: `{post_command(cfg, session)}`",
         ]
+    if directive and directive.get("schema") == "directive/2" and directive.get("rev", 1) > 1:
+        # METHOD rev 16 §3.6: the post carries only `changes`; this is the previous revision with them applied
+        how = ["## 지금 판 (앞 판에 changes 를 얹은 전체)", "- 범위:"] + [f"  - {x['id']}: {x['text']}" for x in directive.get("scope", [])] \
+            + ["- 끝난 기준:"] + [f"  - {x['id']}: {x['text']}" for x in directive.get("done_when", [])] + [""] + how
     how += report_template(cfg, session, directive)
     return (
         f"[{cfg.hub_name} → {s.tag}] 새 지시가 통로 {s.channel or session} 에 왔다. 아래가 그 글이다.\n\n"

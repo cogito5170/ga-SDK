@@ -252,3 +252,11 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - `Hub._run_turn`: 턴 전 기록 파일의 줄 수를 재고, 턴 뒤 늘어난 줄만 `guard_summary` 로 센다(ga 가드 로그 꼴과 rlo `--record` 꼴). tick 은 보고가 들어온 세션의 턴 가운데 거부가 있는 것을 근거 note 로 한 번 남긴다(`guards_noted`).
 - 설정 검사: guards 는 headless · agent_sdk 만, 항목은 문자열 칸(command 필수)만.
 
+## 24. 꼴 판 2 (CMD-GA18, METHOD rev 16 §3.6)
+
+- `ga/forms/kinds.py`: `directive/2` · `report/2`(= report/1 칸 + items · results · blockers · deviations · proposals) · `notify/1`. 교차 검사는 셋이다. rev 1 은 항목 필수이고 changes 가 없어야 한다. rev > 1 은 changes 필수(hard)다. add · edit 는 text 필수다. 항목 id 는 겹치지 않는다. `deprecated(schema)` 는 판 1 의 soft 알림이다.
+- `apply_changes(prev, doc)`: 앞 판의 항목에 changes 를 얹어 전체 판을 낸다. 허브 `send` 는 전체 판을 `doc` 에, 보낸 그대로를 `sent` 에, 계산의 바탕을 `base` 에 둔다(보내지 않은 판을 다시 보낼 때 같은 바탕을 쓴다). 통로에는 보낸 그대로가 간다. 턴 프롬프트는 전체 판을 보인다.
+- 허브가 스스로 만드는 rev+1(R4 의 합치기, 빈 초안 메우기)은 `_next_rev` 를 거친다. 원래가 directive/2 면 changes 로 만든다(항목 더하기, R4 는 끝난 기준을 바꿈).
+- 받기: report/2 의 items 가 다룬 directive/2 의 done_when 을 빠뜨리면 그 글을 받지 않는다(R7 hard, rev 8 의 "모두 거절" 바닥과 맞물림). 바닥(blocked · 부분 성공)은 `_reproduce` 에, 게이트 6 은 `gates.detect` 에 있다.
+- 턴 프롬프트의 보고 틀은 report/2 다(directive/2 면 items 를 미리 채움). 세션 첫 프롬프트에 꼴 안내를 넣었다. CLI 는 `ga check`(판 1 이면 deprecated 알림), `ga post`(report/2 · report/1), `ga notify` 다.
+

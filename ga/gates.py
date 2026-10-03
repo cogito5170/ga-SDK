@@ -115,6 +115,9 @@ def detect(
     for p in findings or []:
         if p.rule in ("R6", "R12"):
             gates.append(Gate(6, f"{p.rule} {p.path}: {p.message}", [p.path], session))
+    for b in (report or {}).get("blockers", []):  # report/2 (METHOD rev 16 §3.6)
+        if b.get("kind") in ("permission", "credential"):
+            gates.append(Gate(6, f"report blocker {b['kind']}: {b.get('what', '')}"[:300], session=session))
     for need in (report or {}).get("needs", []):
         if need in ("credential", "budget"):
             gates.append(Gate(6, f"report needs {need}", session=session))

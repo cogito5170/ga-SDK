@@ -141,7 +141,7 @@ def r6_secrets(cfg: Config, text: str, where: str) -> list[Problem]:
 
 
 def r7_done_when(cfg: Config, directive: dict[str, Any]) -> list[Problem]:
-    if any(p.rule == "R7" for p in validate(directive, "directive/1")):
+    if any(p.rule == "R7" for p in validate(directive, directive.get("schema", "directive/1"))):
         return [_v(cfg, "R7", directive.get("id", "directive"), "no done_when: what changes on success and how it is checked")]
     return []
 

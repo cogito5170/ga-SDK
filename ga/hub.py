@@ -22,7 +22,7 @@ from .adapters.git import GitVcs
 from .adapters.human import NeedJudgement
 from .adapters.venv import VenvBundle
 from .config import Config
-from .forms import FormError, Problem, canonical_json, dump_text, hard, load, parse_post, parse_sections
+from .forms import FormError, Problem, apply_changes, canonical_json, deprecated, dump_text, hard, load, parse_post, parse_sections
 from .adapters.runner import ManualRunner
 from .forms.kinds import RUNNER_KINDS
 from .gates import Gate, detect, question_for
@@ -179,8 +179,18 @@ class Hub:
         or when the Runner is refused, the directive is recorded as not sent and gate 6 asks — nothing is retried."""
         own = st is None
         st = st or self.load_state()
-        load(directive, "directive/1")
-        findings = rules.r7_done_when(self.cfg, directive)
+        if directive.get("schema") not in ("directive/1", "directive/2"):
+            raise FormError([Problem("$.schema", f"a hub sends directive/1 or directive/2, not {directive.get('schema')!r}")])
+        load(directive)
+        sent_doc = directive
+        prev = st["directives"].get(directive["id"])
+        # METHOD rev 16 §3.6: a rev > 1 carries only its changes; the full revision is the previous one with them applied
+        base = (prev.get("base") if prev.get("status") == "not_sent" and prev["rev"] == directive["rev"] else prev["doc"]) if prev else None
+        directive = apply_changes(base, directive) if directive["schema"] == "directive/2" else directive
+        findings = [Problem(f"directive {directive['id']}", p.message, p.strength) for p in deprecated(directive["schema"])]
+        if directive["schema"] == "directive/1" and directive["rev"] > 1:
+            findings.append(Problem(f"directive {directive['id']}", "rev > 1 without changes (directive/1); in directive/2 changes are required", "soft"))
+        findings += rules.r7_done_when(self.cfg, directive)
         history = [{"directive": d["doc"], "status": d["status"], "round": d.get("round")} for d in st["directives"].values()]
         findings += rules.r8_duplicate(self.cfg, directive, history)
         findings += rules.r12_budget(self.cfg, dict(directive, budget={"runs": 1, **directive.get("budget", {})}), st["spent"])
@@ -188,10 +198,9 @@ class Hub:
         if gates or hard(findings):
             return None, findings, gates
         to = directive["to"]
-        prev = st["directives"].get(directive["id"])
         if prev and prev["rev"] >= directive["rev"] and prev.get("status") != "not_sent":
             raise FormError([Problem("$.rev", f"{directive['id']} rev {directive['rev']} already sent (rev {prev['rev']})")])
-        text = dump_text(directive, body)
+        text = dump_text(sent_doc, body)
         findings += rules.r6_secrets(self.cfg, text, f"directive {directive['id']}")
         if hard(findings):
             return None, findings, detect(self.cfg, findings=findings)
@@ -201,13 +210,13 @@ class Hub:
             gap, options = self._guard_gap(to), GUARD_OPTIONS  # rev 15 §4c 7: never quietly without the operator's guard
         if gap:  # §4c: nothing is written to the channel; the directive is kept as not sent, for the person to decide
             st["directives"][directive["id"]] = {"rev": directive["rev"], "to": to, "status": "not_sent", "round": round_n,
-                                                 "doc": directive, "body": body, "not_sent": gap, "post": None}
+                                                 "doc": directive, "sent": sent_doc, "base": base, "body": body, "not_sent": gap, "post": None}
             gate = Gate(6, f"{directive['id']} not sent: {gap}", [directive["id"]], to, options, directive["id"])
             return None, findings, self._gates_out(st, [gate], own)
         post = self.channel.post(to, self.cfg.hub_name, text)
         self._writes += 1
         st["directives"][directive["id"]] = {"rev": directive["rev"], "to": to, "status": "open", "round": round_n, "doc": directive,
-                                             "body": body, "post": post.id}
+                                             "sent": sent_doc, "base": base, "body": body, "post": post.id}
         try:
             result = self._run_turn(st, directive, text, post, self.runner)
         except Exception as e:  # never leave a posted directive without its state (GA10 intervention 1)
@@ -393,7 +402,7 @@ class Hub:
         if d is None or d["status"] != "not_sent":
             return
         directive, body = d["doc"], d.get("body", "")
-        text = dump_text(directive, body)
+        text = dump_text(d.get("sent") or directive, body)
         post = self.channel.post(directive["to"], self.cfg.hub_name, text)
         self._writes += 1
         d.update(status="open", post=post.id, downgraded={"from": getattr(self.runner, "kind", "?"), "why": d.get("not_sent"), "decision": bd})
@@ -423,7 +432,7 @@ class Hub:
                 head, _, _ = parse_post(p.text)
             except FormError:
                 continue
-            if head["schema"] != "report/1":
+            if head["schema"] not in ("report/1", "report/2"):
                 continue
             reports_ok += 1
             for c in head.get("commits", []):
@@ -486,12 +495,12 @@ class Hub:
             prev = st["directives"].get(target)
             if prev is None or target in sent_r4:
                 continue
-            doc = dict(prev["doc"], rev=prev["rev"] + 1, supersedes={"id": target, "rev": prev["rev"]},
-                       done_when=f"{prev['doc'].get('done_when', '')} — 그리고 아래 '고칠 것' 이 모두 풀린다".lstrip(" —"))
-            doc.pop("budget", None)
             try:
-                load(doc, "directive/1")
-            except FormError:
+                doc = self._next_rev(prev, target, "아래 '고칠 것' 을 푼다(범위는 처음 지시와 같다)",
+                                     "아래 '고칠 것' 이 모두 풀린다", replace_done=False)
+                load(doc)
+                apply_changes(prev["doc"], doc)  # a directive/2 draft must apply to the revision it follows
+            except (FormError, KeyError, TypeError, ValueError):
                 continue
             mine = [g for g in grounds if not g.startswith("R1b: ") or g.startswith(f"R1b: {session} ")]
             body = ("## 고칠 것 (허브가 판정 근거로 만든 초안, METHOD rev 10 — Judge 가 초안을 비웠다)\n"
@@ -501,6 +510,26 @@ class Hub:
             out.append((doc, body))
         return out
 
+    @staticmethod
+    def _next_rev(prev: dict[str, Any], did: str, scope_more: str, done_when: str, *, replace_done: bool) -> dict[str, Any]:
+        """rev+1 of a directive the hub makes by itself. directive/1: the text fields are rewritten. directive/2
+        (METHOD rev 16 §3.6): only what changed — one scope item added, and done_when items added (or all replaced)."""
+        doc = {k: v for k, v in prev["doc"].items() if k not in ("budget", "changes")}
+        doc.update(rev=prev["rev"] + 1, supersedes={"id": did, "rev": prev["rev"]})
+        if doc.get("schema") != "directive/2":
+            doc["scope"] = f"{doc['scope']} — {scope_more}"
+            doc["done_when"] = done_when if replace_done else f"{doc.get('done_when', '')} — {done_when}".lstrip(" —")
+            return doc
+        nxt = lambda items, p: f"{p}{max([int(x['id'][1:]) for x in items] or [0]) + 1}"
+        changes = [{"item": nxt(doc.get("scope", []), "S"), "op": "add", "text": scope_more}]
+        if replace_done:
+            changes += [{"item": x["id"], "op": "drop"} for x in doc.get("done_when", [])]
+        changes.append({"item": nxt(doc.get("done_when", []), "D"), "op": "add", "text": done_when})
+        for k in ("scope", "done_when"):
+            doc.pop(k, None)
+        doc["changes"] = changes
+        return doc
+
     def _merge_again(self, st: dict[str, Any], repo: str, session: str, did: str) -> tuple[dict[str, Any] | None, str]:
         """rev+1 of ``did`` after an R4 non-fast-forward: merge the integration branch, report the merged head."""
         prev = st["directives"].get(did)
@@ -509,10 +538,8 @@ class Hub:
         rev = prev["rev"] + 1
         branch = self.cfg.sessions[session].branch_for(repo)
         integ = self.cfg.integration_branch
-        doc = dict(prev["doc"], rev=rev, supersedes={"id": did, "rev": prev["rev"]},
-                   scope=f"{prev['doc']['scope']} — 이번 판은 통합 브랜치를 합치고 다시 보고만 한다(새 기능 없음)",
-                   done_when=f"{branch} 가 통합 브랜치 {integ} 를 포함하고, 합친 머리를 commits 로 주장한 보고가 올라온다")
-        doc.pop("budget", None)
+        doc = self._next_rev(prev, did, "이번 판은 통합 브랜치를 합치고 다시 보고만 한다(새 기능 없음)",
+                             f"{branch} 가 통합 브랜치 {integ} 를 포함하고, 합친 머리를 commits 로 주장한 보고가 올라온다", replace_done=True)
         if self.cfg.isolation == "worktree":
             how = f"`git -C {repo} merge --no-edit {integ}`"
         else:
@@ -614,7 +641,7 @@ class Hub:
                     res.findings += rules.r1_post(self.cfg, name, p.author)
         for repo in self.cfg.repos:
             self.vcs.fetch(repo)
-        reports, exchanges, notices, rejected = self._parse_posts(new_posts)
+        reports, exchanges, notices, rejected = self._parse_posts(new_posts, st)
         # R1b: a change is integrated only as far as a report claims it under a directive sent to that session.
         # Commits nobody claims are not new work for the hub (the report is still to come) and are never integrated.
         claims: dict[tuple[str, str], str] = {}
@@ -952,7 +979,7 @@ class Hub:
 
     # ================================================================== helpers
 
-    def _parse_posts(self, posts: list[Post]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], int]:
+    def _parse_posts(self, posts: list[Post], st: dict[str, Any] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], int]:
         """Split new posts into reports (report/1) and exchanges (exchange/1, §3.5). Anything else is a notice.
         The last value counts the posts refused by the forms (no valid report/1 or exchange/1 in them)."""
         reports, exchanges, notices = [], [], []
@@ -969,15 +996,36 @@ class Hub:
                     notices.append(f"post {p.id}: exchange from {head['from']} posted in {p.channel}'s channel")
                 exchanges.append({"post": p, "head": head, "body": body})
                 continue
-            if head["schema"] != "report/1":
-                notices.append(f"post {p.id} by {p.author}: a session may post report/1 or exchange/1, not {head['schema']}")
+            if head["schema"] not in ("report/1", "report/2"):
+                notices.append(f"post {p.id} by {p.author}: a session may post report/2 (report/1) or exchange/1, not {head['schema']}")
                 rejected += 1
                 continue
+            missing = self._items_missing(head, p.channel, st)
+            if missing:  # METHOD rev 16 §3.6: R7 hard — the report must answer every done_when item it handles
+                notices.append(f"post {p.id} by {p.author}: R7 [hard] report/2 items miss {', '.join(missing)}: refused")
+                rejected += 1
+                continue
+            notices += [f"post {p.id}: {q.message}" for q in deprecated(head["schema"])]
+            if head["schema"] == "report/2" and len(body) > 1500:
+                notices.append(f"post {p.id}: the body is {len(body)} chars; the head carries the judgement, keep the body near 1,500 (soft)")
             if head["from"] != p.channel:
                 notices.append(f"post {p.id}: report from {head['from']} in {p.channel}'s channel")
             reports.append({"post": p, "head": head, "body": body})
             notices += [f"post {p.id}: {n}" for n in notes]
         return reports, exchanges, notices, rejected
+
+    @staticmethod
+    def _items_missing(head: dict[str, Any], channel: str, st: dict[str, Any] | None) -> list[str]:
+        """done_when items of the handled directive/2s that a report/2 does not answer (as "CMD-X:D2")."""
+        if head.get("schema") != "report/2" or st is None:
+            return []
+        have = {i["id"] for i in head.get("items", [])}
+        out = []
+        for h in head.get("handled", []):
+            d = st["directives"].get(h["id"])
+            if d and d.get("to") == channel and d["doc"].get("schema") == "directive/2":
+                out += [f"{h['id']}:{x['id']}" for x in d["doc"].get("done_when", []) if x["id"] not in have]
+        return out
 
     @staticmethod
     def _exchange_note(x: dict[str, Any]) -> str:
@@ -1007,6 +1055,24 @@ class Hub:
             # integrated — a fact the machine proves, so it is a floor, not a notice only (GA8 round 1)
             evidence["notes"].append(f"all {rejected} session post(s) of the round refused by the forms; nothing integrated")
             worse("insufficient", "requirement")
+        for r in reports:  # METHOD rev 16 §3.6: the items of a report/2 are a floor
+            head = r["head"]
+            if head.get("schema") != "report/2":
+                continue
+            who = head.get("from")
+            states = {i["id"]: i["state"] for i in head.get("items", [])}
+            blocked = [k for k, v in states.items() if v == "blocked"]
+            if blocked:
+                kinds = [b["kind"] for b in head.get("blockers", [])]
+                cause = {"env": "environment", "permission": "environment", "credential": "environment", "budget": "requirement",
+                         "dependency": "dependency", "design": "requirement"}.get(kinds[0] if kinds else "", "requirement")
+                evidence["notes"].append(f"report/2 {who}: blocked {', '.join(blocked)}")
+                worse("blocked", cause)
+            elif any(h["status"] == "done" for h in head.get("handled", [])):
+                short = [f"{k} {v}" for k, v in states.items() if v != "met"]
+                if short:
+                    evidence["notes"].append(f"report/2 {who}: done, but not met: {', '.join(short)}")
+                    worse("partial", "requirement")
         for p in hard(findings):
             if p.rule in ("R1b", "R2", "R3", "R6"):
                 worse("blocked", {"R1b": "requirement", "R2": "requirement", "R3": "environment", "R6": "implementation"}[p.rule])

@@ -109,6 +109,71 @@ DIRECTIVE = [
     Field("contradicts", list_of(decision_id), required=False),
 ]
 
+# ---- METHOD rev 16 §3.6 (BD-173): version 2 forms — items, only what changed, results in fields
+S_ID = re.compile(r"^S\d+$")
+D_ID = re.compile(r"^D\d+$")
+ITEM_STATES = ("met", "unmet", "blocked", "na")
+BLOCKER_KINDS = ("env", "permission", "credential", "budget", "dependency", "design")
+NOTIFY_KINDS = ("directive", "report", "verdict", "question", "ack")
+
+
+def _items(prefix: re.Pattern[str], what: str) -> Check:
+    return list_of(obj([Field("id", matches(prefix, what)), Field("text", is_str)]))
+
+
+DIRECTIVE2 = [
+    Field("id", directive_id),
+    Field("rev", is_int(1)),
+    Field("supersedes", obj([Field("id", directive_id), Field("rev", is_int(1))]), required=False),
+    Field("to", is_str),
+    Field("goal", is_str),
+    Field("why", is_str),
+    # required at rev 1; at rev > 1 the receiver builds them from the previous revision and `changes`
+    Field("scope", _items(S_ID, "S<number>"), required=False),
+    Field("done_when", _items(D_ID, "D<number>"), required=False),
+    Field("refs", list_of(is_str), required=False),
+    Field("changes", list_of(obj([Field("item", matches(re.compile(r"^[SD]\d+$"), "S<n> or D<n>")),
+                                  Field("op", one_of("add", "edit", "drop")),
+                                  Field("text", is_str, required=False)])), required=False),
+    Field("after", list_of(directive_id), required=False),
+    Field("budget", _budget, required=False),
+    Field("change_size", one_of(*CHANGE_SIZES), required=False),
+    Field("contradicts", list_of(decision_id), required=False),
+]
+
+
+def _evidence(v: Any) -> str | None:
+    return None if (isinstance(v, str) and v.strip()) or (isinstance(v, list) and all(isinstance(x, str) for x in v)) else \
+        "must be a string or a list of strings"
+
+
+def _value(v: Any) -> str | None:
+    return None if (isinstance(v, (int, float, str)) and not isinstance(v, bool)) else "must be a number or a string"
+
+
+def _ci(v: Any) -> str | None:
+    ok = isinstance(v, list) and len(v) == 2 and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in v)
+    return None if ok and v[0] <= v[1] else "must be [lo, hi] numbers with lo <= hi"
+
+
+REPORT2_ONLY = [
+    Field("items", list_of(obj([Field("id", matches(D_ID, "D<number>")), Field("state", one_of(*ITEM_STATES)),
+                                Field("evidence", list_of(is_str), required=False)]))),
+    Field("results", list_of(obj([Field("name", is_str), Field("value", _value), Field("unit", is_str, required=False),
+                                  Field("ci", _ci, required=False), Field("evidence", _evidence, required=False)])), required=False),
+    Field("blockers", list_of(obj([Field("kind", one_of(*BLOCKER_KINDS)), Field("what", is_str),
+                                   Field("gate", is_int(1), required=False)])), required=False),
+    Field("deviations", list_of(is_str), required=False),
+    Field("proposals", list_of(is_str), required=False),
+]
+
+NOTIFY = [
+    Field("to", is_str),
+    Field("kind", one_of(*NOTIFY_KINDS)),
+    Field("ref", matches(re.compile(r"^https?://\S+$"), "a URL")),
+    Field("id", is_str, required=False),
+]
+
 REPORT = [
     Field("from", is_str),
     Field(
@@ -131,6 +196,8 @@ REPORT = [
     # exchanges this session took part in since its last report (§3.5): post ids or one-line notes
     Field("exchanges", list_of(is_str), required=False),
 ]
+
+REPORT2 = REPORT + REPORT2_ONLY
 
 EXCHANGE = [
     Field("from", is_str),
@@ -250,6 +317,71 @@ def _directive_cross(doc: dict[str, Any]) -> list[Problem]:
     return []
 
 
+def _unique(items: Any, path: str) -> list[Problem]:
+    ids = [i.get("id") for i in items or [] if isinstance(i, dict)]
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    return [Problem(path, f"item ids repeat: {', '.join(dup)}")] if dup else []
+
+
+def _directive2_cross(doc: dict[str, Any]) -> list[Problem]:
+    out = _directive_cross(doc)
+    rev = doc.get("rev")
+    if rev == 1:
+        for k in ("scope", "done_when"):
+            if not doc.get(k):
+                out.append(Problem(f"$.{k}", "is required at rev 1 (a list of items)"))
+        if doc.get("changes"):
+            out.append(Problem("$.changes", "rev 1 has nothing to change"))
+    elif isinstance(rev, int) and not doc.get("changes"):
+        out.append(Problem("$.changes", "is required when rev > 1: write only what changed (METHOD rev 16 §3.6)"))
+    out += _unique(doc.get("scope"), "$.scope") + _unique(doc.get("done_when"), "$.done_when")
+    for i, c in enumerate(doc.get("changes") or []):
+        if isinstance(c, dict) and c.get("op") in ("add", "edit") and not c.get("text"):
+            out.append(Problem(f"$.changes[{i}].text", f"is required for {c.get('op')}"))
+    return out
+
+
+def _report2_cross(doc: dict[str, Any]) -> list[Problem]:
+    return _unique(doc.get("items"), "$.items")
+
+
+def apply_changes(prev: dict[str, Any] | None, doc: dict[str, Any]) -> dict[str, Any]:
+    """The full directive/2 of this revision: the previous revision's scope and done_when items with this revision's
+    ``changes`` put on them (add · edit · drop), the other fields from this revision. Hub records and turn prompts
+    use the same computation. Raises FormError on a change to an item that is not there, or an add that is."""
+    if doc.get("rev", 1) == 1 or not doc.get("changes"):
+        return dict(doc)
+    if prev is None:
+        raise FormError([Problem("$.changes", f"rev {doc.get('rev')} needs the previous revision to apply its changes to")])
+    lists = {"S": [dict(x) for x in prev.get("scope") or []], "D": [dict(x) for x in prev.get("done_when") or []]}
+    problems = []
+    for i, c in enumerate(doc["changes"]):
+        items = lists[c["item"][0]]
+        at = next((k for k, x in enumerate(items) if x["id"] == c["item"]), None)
+        if c["op"] == "add":
+            if at is not None:
+                problems.append(Problem(f"$.changes[{i}]", f"{c['item']} is already there"))
+            else:
+                items.append({"id": c["item"], "text": c["text"]})
+        elif at is None:
+            problems.append(Problem(f"$.changes[{i}]", f"{c['item']} is not in the previous revision"))
+        elif c["op"] == "edit":
+            items[at] = {"id": c["item"], "text": c["text"]}
+        else:
+            items.pop(at)
+    if problems:
+        raise FormError(problems)
+    full = {k: v for k, v in doc.items() if k != "changes"}
+    full["scope"], full["done_when"] = lists["S"], lists["D"]
+    return full
+
+
+def deprecated(schema: str | None) -> list[Problem]:
+    """Version 1 forms are still taken while moving, with a soft notice (METHOD rev 16 §3.6)."""
+    new = {"directive/1": "directive/2", "report/1": "report/2"}.get(schema or "")
+    return [Problem("$.schema", f"{schema} is deprecated: use {new} (METHOD rev 16 §3.6)", SOFT)] if new else []
+
+
 def _review_cross(doc: dict[str, Any]) -> list[Problem]:
     if doc.get("class") not in (None, "success") and not doc.get("cause"):
         return [Problem("$.cause", "is required when class is not success")]
@@ -272,6 +404,9 @@ SCHEMAS: dict[str, tuple[list[Field], Callable[[dict[str, Any]], list[Problem]] 
     "question/1": (QUESTION, _question_cross),
     "exchange/1": (EXCHANGE, _exchange_cross),
     "review/1": (REVIEW, _review_cross),
+    "directive/2": (DIRECTIVE2, _directive2_cross),
+    "report/2": (REPORT2, _report2_cross),
+    "notify/1": (NOTIFY, None),
 }
 
 
@@ -323,6 +458,6 @@ def parse_post(text: str, expect: str | None = None) -> tuple[dict[str, Any], st
     problems = validate(head, expect)
     if hard(problems):
         raise FormError(hard(problems))
-    if head.get("schema") == "report/1":
+    if head.get("schema") in ("report/1", "report/2"):
         problems += report_body_notes(body)
     return head, body, [p for p in problems if p.strength != HARD]

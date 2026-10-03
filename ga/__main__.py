@@ -27,7 +27,7 @@ from .adapters.llm_judge import LLMJudge
 from .adapters.mailbox import FileMailbox
 from .adapters.headless import HeadlessRunner
 from .adapters.runner import ManualRunner
-from .forms import FormError, hard, parse_post, parse_text, validate
+from .forms import FormError, Problem, deprecated, hard, parse_post, parse_text, validate
 from .hub import Hub
 from .prompts import hub_prompt, worker_prompt
 from .records import RecordStore
@@ -119,10 +119,13 @@ def cmd_post(args) -> int:
     ga_dir = Path(args.ga_dir).resolve() if args.ga_dir else Path(args.config).resolve().parent / ".ga"
     text = _read(args.file)
     try:
-        head, _, notes = parse_post(text, "report/1")
+        head, _, notes = parse_post(text)
+        if head.get("schema") not in ("report/1", "report/2"):
+            raise FormError([Problem("$.schema", f"a session posts report/2 (or report/1), not {head.get('schema')!r}")])
     except FormError as e:
-        print(f"not a valid report/1: {e}", file=sys.stderr)
+        print(f"not a valid report/2 or report/1: {e}", file=sys.stderr)
         return 2
+    notes = deprecated(head["schema"]) + notes
     found = rules.r1_post(cfg, args.channel, args.author) + rules.r6_secrets(cfg, text, "report")
     for p in found + notes:
         print(p, file=sys.stderr)
@@ -188,7 +191,7 @@ def cmd_check(args) -> int:
         text = _read(f)
         try:
             head, body = parse_text(text)
-            probs = validate(head)
+            probs = validate(head) + deprecated(head.get("schema"))
         except FormError as e:
             probs = e.problems
         if cfg is not None:
@@ -198,6 +201,18 @@ def cmd_check(args) -> int:
         if hard(probs):
             status = 2
     return status
+
+
+def cmd_notify(args) -> int:
+    """METHOD rev 16 §3.6: the one-line notify/1 that wakes a session; the content stays at ``ref``."""
+    doc = {"schema": "notify/1", "to": args.to, "kind": args.kind, "ref": args.ref, **({"id": args.id} if args.id else {})}
+    probs = validate(doc)
+    if hard(probs):
+        for p in probs:
+            print(p, file=sys.stderr)
+        return 2
+    print(json.dumps(doc, ensure_ascii=False, separators=(",", ":")))
+    return 0
 
 
 def cmd_render(args) -> int:
@@ -233,6 +248,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("answer"); p.add_argument("question"); p.add_argument("label"); p.add_argument("--note"); p.set_defaults(fn=cmd_answer)
     p = sub.add_parser("prompt"); p.add_argument("session", nargs="?"); p.add_argument("--hub", action="store_true"); p.set_defaults(fn=cmd_prompt)
     p = sub.add_parser("check"); p.add_argument("files", nargs="+"); p.set_defaults(fn=cmd_check)
+    p = sub.add_parser("notify", help="the notify/1 line that wakes a session (METHOD rev 16)")
+    p.add_argument("--to", required=True); p.add_argument("--kind", required=True, choices=["directive", "report", "verdict", "question", "ack"])
+    p.add_argument("--ref", required=True); p.add_argument("--id"); p.set_defaults(fn=cmd_notify)
     p = sub.add_parser("render"); p.set_defaults(fn=cmd_render)
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
