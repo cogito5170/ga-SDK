@@ -9,6 +9,9 @@ description = "Hub loop SDK: directive / report / verdict forms, integration, ru
 requires-python = ">=3.10"
 dependencies = []
 
+[project.optional-dependencies]
+agent = ["claude-agent-sdk>=0.2"]
+
 [project.scripts]
 ga = "ga.__main__:main"
 

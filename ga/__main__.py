@@ -65,6 +65,10 @@ def make_runner(cfg, ga_dir: Path):
         return ManualRunner(ga_dir / "outbox")
     if kind == "headless":
         return HeadlessRunner(ga_dir / "headless" / "home", **r)
+    if kind == "agent_sdk":
+        from .adapters.agent_sdk import AgentSDKRunner
+
+        return AgentSDKRunner(ga_dir / "agent_sdk" / "home", **r)
     raise SystemExit(f"unknown runner kind {kind!r}")
 
 

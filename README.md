@@ -37,6 +37,12 @@ pip install -e .
 - 설정에 `"judge": {"kind": "llm", "model": "haiku", "max_runs": 10}` 을 넣으면 `claude -p` 가 판정과 다음 지시 초안을 제안한다. 기계의 클래스와 게이트가 그 위에 선다.
 - 실제 실행 기록은 [`examples/verify/ga3_results.json`](examples/verify/ga3_results.json) 에 있고, 재생에 쓴 사례는 [`judge_cases.json`](examples/verify/judge_cases.json) 이다.
 
+## 턴 진단 라벨
+
+허브는 턴마다 다음 네 가지를 수와 라벨로만 남긴다: 커밋했나 · 보고가 몇 개 왔나 · 형식이 맞는 보고가 몇 개인가 · 주장한 sha 를 허브가 아는가. 저장 위치는 `.ga/state.json` 의 `turns[].diag` 다.
+- 턴의 끝을 아는 Runner(헤드리스 · Agent SDK)는 턴이 끝나자마자 남긴다.
+- 끝을 모르는 Runner(수동 · 원격)는 그 세션이 글을 올린 다음 tick 에서 남긴다.
+
 ## R3 는 무엇으로 지켜지나 (Runner 모드별)
 
 R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직인다. 기본 배치는 `isolation: "clone"` 이다.
@@ -47,6 +53,7 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 | 모드 | 지켜 주는 것 | 못 지키는 것 |
 |---|---|---|
 | **헤드리스 + 쓰기 샌드박스**(Linux, 비특권 user namespace. `ga.adapters.sandbox.available()`) | 턴 안의 모든 프로세스에서 다음이 **읽기 전용**이다(OS 수준, 잠긴 마운트): 설정 디렉터리, `.ga`, 모든 저장소, 로컬 원격, 다른 세션의 clone · 우편함. 쓸 수 있는 곳은 자기 clone, 자기 우편함, 자기 Claude 홈뿐이다. 따옴표로 나누기 · 옵션 줄임 · 스크립트 · 다른 언어 · 다시 마운트 · 새 namespace 로도 원격과 허브의 ref 를 바꾸지 못한다(시험: 공격 15 가지 모두 실패) | 읽기는 막지 않는다(다른 세션의 파일이 보인다). 네트워크와 CPU 는 그대로다. user namespace 가 꺼진 배포판, macOS, Windows 에서는 샌드박스가 없다. 이때 `sandbox: "require"` 는 턴을 돌리지 않고, `"auto"` 는 샌드박스 없이 돌린 뒤 턴 기록에 `sandboxed: false` 를 남긴다 |
+| **Agent SDK Runner + 쓰기 샌드박스**(`runner: {"kind": "agent_sdk"}`, `pip install "ga-sdk[agent]"`) | 헤드리스 + 샌드박스와 같다. SDK 가 띄우는 CLI 를 ga 의 래퍼(`cli_path`)가 감싼다. 래퍼는 `env -i` 로 허락한 변수만 넘기고, 샌드박스 안에서 실행한다. 래퍼는 턴이 쓸 수 없는 곳에 있고, 턴마다 다시 써진다. 가드는 `settings`, 사용자 설정 파일은 `setting_sources=[]` 로 다룬다 | 헤드리스 + 샌드박스와 같다. 또 SDK 가 없으면 턴을 돌리지 않고 `sdk_not_installed` 로 기록한다 |
 | **헤드리스, 샌드박스 없음** | 허브가 pull 하므로 신원을 주장할 일이 없다. 문자열 가드(PreToolUse)가 첫 겹으로 흔한 우회를 막고, pre-receive 가 이름 없는 push 를 막는다. 허브는 통합 브랜치가 자기 모르게 움직이면 알아챈다(R3 알림) | **보장하지 않는다.** 같은 사용자 권한이므로 셸을 마음대로 쓰는 턴은 원격 · 허브 저장소 · 다른 세션의 clone 과 우편함 · 허브 상태를 직접 고칠 수 있다(시험: 샌드박스를 끄면 공격 15 가지 중 11 가지가 통과). 가드는 문자열 규칙이라 완전하지 않다 |
 | **수동**(사람이 세션 터미널에서 일함) | `ga sandbox <세션>` 으로 연 셸은 헤드리스 + 샌드박스와 같은 보장을 받는다 | 그 밖의 보통 셸은 "샌드박스 없음" 과 같다. 사람은 가드 밖에 있다 |
 | `isolation: "worktree"`(0.1 방식) | pre-push(보내는 쪽)와 pre-receive(받는 쪽)가 실수를 막는다 | worktree 의 git 데이터가 허브 저장소 안에 있어서 샌드박스를 걸 수 없다. 받는 쪽 명령(`--receive-pack`)도 push 하는 쪽이 고른다. **구조로 지켜지는 R3 는 없다** |

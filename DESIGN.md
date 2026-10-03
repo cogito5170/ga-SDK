@@ -174,3 +174,13 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
   - Claude 홈은 세션마다 따로 둔다. 턴 기록에는 `sandboxed` 가 남는다.
 - **문자열 가드:** 첫 겹으로 남긴다. 따옴표를 뺀 꼴도 보고, 옵션 줄임과 스크립트 실행도 더했다. **보장으로 세지 않는다.**
 - 모드별로 무엇이 지켜지고 무엇이 안 지켜지는지는 README 의 표에 있다.
+
+## 15. Agent SDK Runner · 턴 진단 라벨 (CMD-GA6)
+
+- `ga/adapters/agent_sdk.py`: 한 턴 = `claude_agent_sdk.query()` 한 번이다. 끝은 `ResultMessage` 로 안다(session_id · total_cost_usd · is_error).
+  - SDK 는 선택 의존(`[agent]`)이다. 핵심 시험은 가짜 SDK(`fake_sdk`)로 돌므로 SDK 없이도 초록이다.
+- 보장은 SDK 가 띄우는 CLI 자리(`cli_path`)에서 지킨다. SDK 는 이 프로세스의 환경을 통째로 넘기기 때문이다(`CLAUDECODE` 만 뺀다).
+  - 세션마다 래퍼를 둔다: `env -i` + 허락한 변수 + (샌드박스) + 실제 CLI.
+  - 래퍼는 Runner 의 `_wrappers/` 에 있다. 이곳은 샌드박스가 보호하고, 턴마다 다시 쓴다.
+- 턴 진단 라벨 `turns[].diag = {committed, posts, reports_ok, claims_known}` (GA5 rev 2 의 F8 꼴을 막는다).
+  - 턴 시작 때 세션 머리와 지시 글 id 를 기록한다. 끝을 아는 Runner 는 턴 직후에, 그 밖의 Runner 는 세션이 글을 올린 tick 에서 계산한다.

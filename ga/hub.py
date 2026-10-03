@@ -129,6 +129,7 @@ class Hub:
             st["directives"][sup["id"]].update(status="superseded", by=directive["id"])
         st["seen"].setdefault(to, None)
         workdir = self._prepare_worktrees(to)
+        start = self._session_heads(to)
         resume = st["resume"].get(to)
         result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text), workdir, resume,
                                                   permissions=self.sandbox_paths(to), budget=dict(directive.get("budget", {}))))
@@ -138,7 +139,10 @@ class Hub:
             "session": to, "directive": directive["id"], "rev": directive["rev"], "runner": getattr(self.runner, "kind", "?"),
             "ended": result.ended, "error": result.error, "cost": result.cost, "seconds": result.seconds,
             "resumed": resume, "session_id": result.session_id, "sandboxed": result.sandboxed,
+            "start": start, "post": post.id,
         })
+        if result.ended:  # the runner knows the turn is over: label it now (GA5 rev 2 lost a cause for want of this)
+            st["turns"][-1]["diag"] = self._turn_diag(st["turns"][-1])
         if result.error:
             findings.append(Problem(f"turn {to} {directive['id']}", f"runner {getattr(self.runner, 'kind', '?')}: {result.error}", "soft", None))
         spent = st["spent"]
@@ -153,6 +157,39 @@ class Hub:
         if own:
             self.save_state(st)
         return post, findings, []
+
+    # ================================================================== turn diagnostics (labels and counts only)
+
+    def _session_heads(self, session: str) -> dict[str, str | None]:
+        heads = {}
+        for r in self.cfg.sessions[session].repos:
+            self.vcs.fetch(r)
+            heads[r] = self.vcs.session_head(r, session)
+        return heads
+
+    def _turn_diag(self, turn: dict[str, Any]) -> dict[str, Any]:
+        """Did the turn commit, did its report come, does it parse, does the hub know what it claims."""
+        s = turn["session"]
+        now = self._session_heads(s)
+        posts = [p for p in self.channel.read(s, turn.get("post")) if p.author == s]
+        reports_ok, claims_known = 0, None
+        for p in posts:
+            try:
+                head, _, _ = parse_post(p.text)
+            except FormError:
+                continue
+            if head["schema"] != "report/1":
+                continue
+            reports_ok += 1
+            for c in head.get("commits", []):
+                known = c["repo"] in self.cfg.repos and self.vcs.resolve(c["repo"], c["sha"]) is not None
+                claims_known = known if claims_known is None else (claims_known and known)
+        return {
+            "committed": any(now[r] and now[r] != (turn.get("start") or {}).get(r) for r in now),
+            "posts": len(posts),
+            "reports_ok": reports_ok,
+            "claims_known": claims_known,
+        }
 
     def sandbox_paths(self, session: str) -> dict[str, list[str]]:
         """What a session's turn may not write (protect) and the only places inside them it may (writable).
@@ -271,6 +308,10 @@ class Hub:
                     extra = len(self.vcs.commit_subjects(repo, claim, sh))
                     notices.append(f"R1b: {repo} {s.name}: {extra} commit(s) after the claimed {claim[:7]} are not integrated (no directive claims them)")
                 candidates.append((repo, s.name, claim))
+        if new_posts:  # turns whose end the runner could not see get their labels when their session posts
+            for turn in st.get("turns", []):
+                if "post" in turn and (turn.get("diag") or {}).get("reports_ok", 0) == 0 and any(p.channel == turn["session"] for p in new_posts):
+                    turn["diag"] = self._turn_diag(turn)
         answered = [qid for qid, q in st["questions"].items() if q["status"] == "answered" and not q.get("processed")]
         pending = st.get("pending")
         if not new_posts and not candidates and not answered and not pending and not hard(res.findings):

@@ -56,7 +56,9 @@ def fingerprint(w: World) -> dict:
     out = {}
     for r in ("alpha", "beta"):
         out[f"remote:{r}"] = git(w.tmp / "remotes" / f"{r}.git", "for-each-ref", "--format=%(refname) %(objectname)")
-        out[f"hub:{r}"] = git(w.repos[r], "for-each-ref", "--format=%(refname) %(objectname)")
+        # the hub's own pull of A's branch (turn diagnostics) is the hub's doing; every other hub ref must not move
+        out[f"hub:{r}"] = "\n".join(l for l in git(w.repos[r], "for-each-ref", "--format=%(refname) %(objectname)").splitlines()
+                                    if not l.startswith("refs/ga/sessions/A/"))
     b_ws = w.ga / "worktrees" / "B" / "beta"
     out["B:head"] = git(b_ws, "rev-parse", "HEAD")
     out["B:files"] = hashlib.sha256((b_ws / "README.md").read_bytes()).hexdigest()
@@ -135,8 +137,10 @@ class CloneIsolationTest(unittest.TestCase):
         self.assertTrue(objs)
         self.assertTrue(all(p.stat().st_nlink == 1 for p in objs))  # --no-hardlinks
         # a branch the session moves in its own clone is not the hub's until the hub pulls it
+        before = w.vcs.session_head("alpha", "A")  # what the hub pulled when the turn started
         git(ws, "commit", "--quiet", "--allow-empty", "-m", "x")
-        self.assertIsNone(w.vcs.session_head("alpha", "A"))
+        self.assertNotEqual(w.vcs.session_head("alpha", "A"), git(ws, "rev-parse", "HEAD"))
+        self.assertEqual(w.vcs.session_head("alpha", "A"), before)
         w.vcs.fetch("alpha")
         self.assertEqual(w.vcs.session_head("alpha", "A"), git(ws, "rev-parse", "HEAD"))
         paths = w.hub.sandbox_paths("A")
