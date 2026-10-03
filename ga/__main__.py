@@ -143,6 +143,18 @@ def cmd_send(args) -> int:
     return 0 if post else 3
 
 
+def cmd_review(args) -> int:
+    """METHOD rev 10 §3.3b: an outside verdict (review/1) on an integrated result."""
+    hub = _hub(args)
+    try:
+        doc = hub.review(args.by, args.repo, args.sha, args.cls, args.why, cause=args.cause)
+    except FormError as e:
+        print("\n".join(str(p) for p in e.problems), file=sys.stderr)
+        return 2
+    print(json.dumps({k: doc[k] for k in ("id", "repo", "sha", "class", "round", "amends") if k in doc}, ensure_ascii=False))
+    return 0
+
+
 def cmd_answer(args) -> int:
     d = _hub(args).answer(args.question, args.label, args.note or "")
     print(d["id"])
@@ -194,6 +206,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("post"); p.add_argument("--channel", required=True); p.add_argument("--from", dest="author", required=True)
     p.add_argument("file"); p.set_defaults(fn=cmd_post)
     p = sub.add_parser("send"); p.add_argument("file"); p.set_defaults(fn=cmd_send)
+    p = sub.add_parser("review", help="an outside verdict on an integrated result (review/1)")
+    p.add_argument("--by", required=True); p.add_argument("--repo", required=True); p.add_argument("--sha", required=True)
+    p.add_argument("--class", dest="cls", required=True); p.add_argument("--cause"); p.add_argument("--why", required=True)
+    p.set_defaults(fn=cmd_review)
     p = sub.add_parser("answer"); p.add_argument("question"); p.add_argument("label"); p.add_argument("--note"); p.set_defaults(fn=cmd_answer)
     p = sub.add_parser("prompt"); p.add_argument("session", nargs="?"); p.add_argument("--hub", action="store_true"); p.set_defaults(fn=cmd_prompt)
     p = sub.add_parser("check"); p.add_argument("files", nargs="+"); p.set_defaults(fn=cmd_check)

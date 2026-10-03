@@ -191,6 +191,22 @@ STAGE = [
     Field("decision", decision_id, required=False),
 ]
 
+# METHOD rev 10 §3.3b (BD-147): an outside verdict on an integrated result (a person, an upper hub). The hub folds
+# it into the next round (Judge context, draft) and only ever makes the reviewed round stricter; records only grow.
+REVIEW = [
+    Field("id", matches(re.compile(r"^RV-\d+$"), "RV-<number>")),
+    Field("date", is_str),
+    Field("by", is_str),
+    Field("repo", is_str),
+    Field("sha", sha),
+    Field("class", one_of(*VERDICT_CLASSES)),
+    Field("cause", one_of(*CAUSES), required=False),
+    Field("why", is_str),
+    Field("round", is_int(1), required=False),  # the round that integrated the sha, when the hub found it
+    Field("amends", obj([Field("round", is_int(1)), Field("from", one_of(*VERDICT_CLASSES)), Field("to", one_of(*VERDICT_CLASSES))]),
+          required=False),
+]
+
 QUESTION = [
     Field("gate", is_int(1)),
     Field("about", is_str),
@@ -224,6 +240,12 @@ def _directive_cross(doc: dict[str, Any]) -> list[Problem]:
     return []
 
 
+def _review_cross(doc: dict[str, Any]) -> list[Problem]:
+    if doc.get("class") not in (None, "success") and not doc.get("cause"):
+        return [Problem("$.cause", "is required when class is not success")]
+    return []
+
+
 def _exchange_cross(doc: dict[str, Any]) -> list[Problem]:
     if doc.get("from") == doc.get("to"):
         return [Problem("$.to", "an exchange is between two different sessions")]
@@ -239,6 +261,7 @@ SCHEMAS: dict[str, tuple[list[Field], Callable[[dict[str, Any]], list[Problem]] 
     "stage/1": (STAGE, None),
     "question/1": (QUESTION, _question_cross),
     "exchange/1": (EXCHANGE, _exchange_cross),
+    "review/1": (REVIEW, _review_cross),
 }
 
 

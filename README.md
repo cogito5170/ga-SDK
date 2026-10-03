@@ -80,6 +80,15 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 - **R4(ff 아님)** 는 게이트가 아니다. 통합하지 않고 그 세션 몫을 `partial · requirement` 로 둔 뒤, 허브가 그 지시의 rev+1(통합 브랜치를 합치고 다시 보고)을 스스로 보낸다.
 - 턴 프롬프트에는 채울 report/1 머리 틀이 들어간다(지시 id · rev, 자기 저장소마다 브랜치와 `<SHA>`).
 
+## 바깥 판정과 빈 초안 (METHOD rev 10)
+
+- **바깥 판정:** `ga review --by baseline --repo rlo --sha 6c33b85 --class partial --cause implementation --why "…"`.
+  - `review/1` 기록을 덧붙인다. 그 sha 를 통합한 회차의 판정은 더 엄한 쪽으로만 고친다(`amends`). 회차 기록 자체는 다시 쓰지 않는다. `ROUNDS.md` 에는 그 회차 밑에 한 줄로 보인다.
+  - 다음 tick 은 그것만으로도 회차를 돈다. Judge 문맥(`outside_reviews`)과 근거 note 에 들어간다. 그 sha 가 아직 통합 머리면 기계 바닥이 된다.
+- **빈 초안 메우기:** Judge 가 refine · verify 를 내면서 지시 초안을 비우면, 허브가 세션마다 rev+1 초안을 만든다. 근거는 판정 · 근거 note · 주장과 증거의 차이 · 바깥 판정이다. `directive/1` 검사를 통과한 것만 보낸다.
+  - 커밋했지만 보고에서 주장하지 않은 세션은 근거 note 에 `R1b: … claims no commit` 으로 남는다.
+- **설치 환경:** (b) 의 근거 note 에 `bundle (install): built with python · pip · setuptools · wheel` 판이 남는다.
+
 ## 시험
 
 ```sh

@@ -178,20 +178,31 @@ class VenvBundle:
         reqs = self.requirements(heads)
         env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
         seeded = self._seed_build_backend(vpy, env)
+        tools = self.build_tools(vpy, env)
         if seeded:
-            return BundleResult("install", False, [], "install_failed", seeded)
+            return BundleResult("install", False, [], "install_failed", seeded, tools=tools)
         if reqs:
             argv = [vpy, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "--no-build-isolation", *self.pip_args, *reqs]
             p = subprocess.run(argv, capture_output=True, env=env, timeout=self.timeout)
             out = p.stdout.decode(errors="replace") + p.stderr.decode(errors="replace")
             if p.returncode != 0:
                 conflict = "ResolutionImpossible" in out or "conflicting dependencies" in out
-                return BundleResult("install", False, [], "pin_conflict" if conflict else "install_failed", out[-4000:])
+                return BundleResult("install", False, [], "pin_conflict" if conflict else "install_failed", out[-4000:], tools=tools)
         dirs = self._export_all(heads, base / "src")
         runs = [self.import_check(r, heads[r], (dirs[r] / self.cfg.repos[r].src).resolve(), vpy, env, base)
                 for r in sorted(heads) if self.cfg.repos[r].package]
         runs += [self._run_tests(r, heads[r], dirs[r], vpy, env, "install") for r in sorted(heads)]
-        return BundleResult("install", all(r.ok for r in runs), runs)
+        return BundleResult("install", all(r.ok for r in runs), runs, tools=tools)
+
+    def build_tools(self, vpy: str, env: dict[str, str]) -> dict[str, str]:
+        """Versions of what builds and installs in the clean venv (METHOD rev 10): install metadata depends on them —
+        one setuptools writes ``name@ url``, another ``name @ url`` (rlo test_versions, GA11)."""
+        code = ("import sys, importlib.metadata as m\n"
+                "def v(d):\n    try:\n        return m.version(d)\n    except m.PackageNotFoundError:\n        return '-'\n"
+                "print(sys.version.split()[0], v('pip'), v('setuptools'), v('wheel'))")
+        p = subprocess.run([vpy, "-c", code], capture_output=True, env=env, timeout=120)
+        parts = p.stdout.decode(errors="replace").split()
+        return dict(zip(("python", "pip", "setuptools", "wheel"), parts)) if len(parts) == 4 else {}
 
     def import_check(self, repo: str, sha: str, src: Path, vpy: str, env: dict[str, str], base: Path) -> RepoRun:
         """Import, from an empty directory, each source module of the packages the distribution installed.

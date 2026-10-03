@@ -13,7 +13,7 @@ from typing import Any
 
 from .forms import LABELS, FormError, Problem, canonical_json, load
 
-KINDS = {"round/1": "rounds", "decision/1": "decisions", "stage/1": "stages"}
+KINDS = {"round/1": "rounds", "decision/1": "decisions", "stage/1": "stages", "review/1": "reviews"}
 
 
 def _file_name(doc: dict[str, Any]) -> str:
@@ -22,6 +22,8 @@ def _file_name(doc: dict[str, Any]) -> str:
         return f"round-{doc['n']:04d}.json"
     if kind == "decision/1":
         return f"BD-{int(doc['id'][3:]):04d}.json"
+    if kind == "review/1":
+        return f"RV-{int(doc['id'][3:]):04d}.json"
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", doc["name"])
     return f"{safe}.json"
 
@@ -70,7 +72,7 @@ class RecordStore:
         docs = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(d.glob("*.json"))]
         if kind == "round/1":
             docs.sort(key=lambda r: r["n"])
-        elif kind == "decision/1":
+        elif kind in ("decision/1", "review/1"):
             docs.sort(key=lambda r: int(r["id"][3:]))
         else:
             docs.sort(key=lambda r: (r["date"], r["name"]))
@@ -83,6 +85,10 @@ class RecordStore:
     def next_decision(self) -> str:
         ds = self.all("decision/1")
         return f"BD-{int(ds[-1]['id'][3:]) + 1 if ds else 1}"
+
+    def next_review(self) -> str:
+        rs = self.all("review/1")
+        return f"RV-{int(rs[-1]['id'][3:]) + 1 if rs else 1}"
 
     def decision(self, bd: str) -> dict[str, Any] | None:
         return next((d for d in self.all("decision/1") if d["id"] == bd), None)
@@ -113,6 +119,9 @@ class RecordStore:
 
     def _render_rounds(self) -> str:
         lines = ["# 회차 기록", "", "> ga-SDK 가 `rounds/*.json` 에서 만든 파일이다. 손으로 고치지 않는다.", ""]
+        reviews: dict[int, list[dict[str, Any]]] = {}
+        for rv in self.all("review/1"):
+            reviews.setdefault(rv.get("round", 0), []).append(rv)
         for r in self.all("round/1"):
             repos = " · ".join(f"{x['repo']} `{x['sha'][:7]}`{_counts_text(x.get('tests'))}" for x in r["repos"]) or "저장소 변화 없음"
             dirs = ", ".join(r["directives"]) or "지시 없음"
@@ -122,6 +131,13 @@ class RecordStore:
             lines.append(line)
             for n in r.get("notices", []):
                 lines.append(f"  - 알림: {n}")
+            for rv in reviews.get(r["n"], []):  # outside verdicts are appended, the round record is never rewritten
+                cause = f" · {LABELS[rv['cause']]}" if rv.get("cause") else ""
+                fix = (f" → 이 회차 판정을 **{LABELS[rv['amends']['from']]} → {LABELS[rv['amends']['to']]}** 로 고침"
+                       if rv.get("amends") else "")
+                lines.append(f"  - 바깥 판정 {rv['id']} ({rv['by']}, {rv['date']}): `{rv['sha'][:7]}` **{LABELS[rv['class']]}**{cause} — {rv['why']}{fix}")
+        for rv in reviews.get(0, []):  # a review of a sha no round integrated
+            lines.append(f"- 바깥 판정 {rv['id']} ({rv['by']}, {rv['date']}): {rv['repo']} `{rv['sha'][:7]}` **{LABELS[rv['class']]}** — {rv['why']}")
         return "\n".join(lines) + "\n"
 
     def _render_decisions(self) -> str:

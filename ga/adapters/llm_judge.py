@@ -68,6 +68,7 @@ def context_json(ctx: JudgeContext, body_limit: int = 4000) -> str:
         "reports": reports,
         "open_directives": ctx.open_directives,
         "exchanges": ctx.exchanges,
+        "outside_reviews": [{k: v for k, v in r.items() if k != "schema"} for r in getattr(ctx, "reviews", [])],
         "user_answers": [{"gate": a.get("gate"), "label": a.get("label"), "decision": a.get("decision")} for a in ctx.answers],
     }
     return canonical_json(doc)

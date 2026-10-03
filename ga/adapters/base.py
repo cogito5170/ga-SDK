@@ -84,6 +84,7 @@ class BundleResult:
     runs: list[RepoRun] = field(default_factory=list)
     problem: str = ""
     output: str = ""
+    tools: dict[str, str] = field(default_factory=dict)  # (b): build tool versions in the clean venv (METHOD rev 10)
 
 
 class Bundle(Protocol):
@@ -104,6 +105,7 @@ class JudgeContext:
     open_directives: list[dict[str, Any]]
     answers: list[dict[str, Any]] = field(default_factory=list)  # gate questions the user answered since last round
     exchanges: list[dict[str, Any]] = field(default_factory=list)  # exchange/1 heads: information, never actions (§3.5)
+    reviews: list[dict[str, Any]] = field(default_factory=list)  # review/1: outside verdicts since the last round (§3.3b)
 
 
 class Judge(Protocol):

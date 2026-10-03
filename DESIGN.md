@@ -204,3 +204,13 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - `report_template`: 턴 프롬프트에 report/1 머리 틀. `ga_dir` 는 Hub · GitVcs · CLI 에서 `resolve()` 한다.
 - 시험 세계(`tests/world.py`)는 Bundle (b) 를 돌릴 때만 포장된 저장소를 만든다(`packaged`). 경로만 돌리는 세계가 포장돼 있으면 rev 9 바닥에 걸리기 때문이다.
 
+## 18. 바깥 판정 · 빈 초안 · 설치 환경 (CMD-GA12, METHOD rev 10)
+
+- `review/1`(id `RV-n`, by · repo · sha · class · cause · why, round · amends 는 허브가 채움)은 append-only 기록이다(`records/reviews/`). `Hub.review` · `ga review`.
+  - 회차는 다시 쓰지 않는다. 고침은 리뷰 쪽 `amends` 에 있고, `ROUNDS.md` 가 그 회차 밑에 그린다.
+  - 열린 리뷰는 다음 tick 을 깨운다. 그 회차에서 `used` 가 된다.
+- `Hub._fill_drafts`: Judge 가 refine · verify 에 초안을 비우면 세션마다 하나씩 만든다. 대상은 바깥 판정의 sha 를 통합한 지시(`state.integrated_by`), 보고가 다룬 지시, 보고가 아무 지시도 다루지 않으면 그 세션의 열린 지시 순이다.
+  - 각 세션 초안에는 자기 `R1b` note 만 넣는다. R4 로 이미 rev+1 이 나간 지시는 건너뛴다. 게이트가 생기면 그 뒤 초안은 보내지 않는다.
+- `VenvBundle.build_tools` → `BundleResult.tools` → 근거 note.
+- `examples/verify/ga12_replay.py`: GA10–11 운영자 개입 6 번을 고친 ga 로 다시 만든다. 3 번은 필요 없고, 2 번은 Judge 의 선택에 달렸고, 1 번(설정)은 남는다.
+

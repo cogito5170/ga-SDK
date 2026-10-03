@@ -213,6 +213,49 @@ class Hub:
         (self.ga / "worktrees" / session).mkdir(parents=True, exist_ok=True)
         return {"protect": [str(p) for p in protect], "writable": [str(p) for p in writable], "allow": post_allow(self.cfg, session)}
 
+    def _fill_drafts(self, st: dict[str, Any], verdict: dict[str, Any], reports: list[dict[str, Any]], reviews: list[dict[str, Any]],
+                     not_ff: list[tuple[str, str, str]]) -> list[tuple[dict[str, Any], str]]:
+        """rev+1 of each directive the round's grounds point at, one per session: an outside verdict's commit first,
+        then each report's directive (or, for a report that names none, its session's open directive). The grounds
+        (floor, notes, claims vs evidence, reviews) become the body. Each is checked as directive/1; one that does not
+        check is dropped."""
+        sent_r4 = {did for _, _, did in not_ff}
+        targets: dict[str, str] = {}  # session -> directive id
+        for rv in reviews:
+            who = st.get("integrated_by", {}).get(rv["sha"])
+            if who and who.get("directive") and who.get("session"):
+                targets.setdefault(who["session"], who["directive"])
+        for r in reports:
+            session = r["post"].channel
+            ids = [h["id"] for h in r["head"].get("handled", []) if st["directives"].get(h["id"], {}).get("to") == session]
+            if not ids:
+                ids = [i for i, d in st["directives"].items() if d.get("to") == session and d["status"] == "open"]
+            if ids:
+                targets.setdefault(session, ids[-1])
+        grounds = [f"판정: {verdict['class']}" + (f" · {verdict['cause']}" if verdict.get("cause") else "")
+                   + (f" · {verdict['subclass']}" if verdict.get("subclass") else "") + f" — 다음 {verdict['next']['choice']}: {verdict['next']['reason']}"]
+        grounds += [n for n in verdict["evidence"].get("notes", []) if "— known:" not in n and not n.startswith("judge proposed")]
+        grounds += [f"보고의 주장과 증거가 다름: {c}" for c in verdict.get("claims_vs_evidence", [])]
+        out = []
+        for session, target in targets.items():
+            prev = st["directives"].get(target)
+            if prev is None or target in sent_r4:
+                continue
+            doc = dict(prev["doc"], rev=prev["rev"] + 1, supersedes={"id": target, "rev": prev["rev"]},
+                       done_when=f"{prev['doc'].get('done_when', '')} — 그리고 아래 '고칠 것' 이 모두 풀린다".lstrip(" —"))
+            doc.pop("budget", None)
+            try:
+                load(doc, "directive/1")
+            except FormError:
+                continue
+            mine = [g for g in grounds if not g.startswith("R1b: ") or g.startswith(f"R1b: {session} ")]
+            body = ("## 고칠 것 (허브가 판정 근거로 만든 초안, METHOD rev 10 — Judge 가 초안을 비웠다)\n"
+                    + "".join(f"- {g}\n" for g in mine)
+                    + "\n## 할 일\n1. 위 '고칠 것' 가운데 네 몫을 푼다. 범위는 처음 지시와 같다.\n2. 시험을 다시 돌린다.\n"
+                      "3. 커밋하고, 머리를 `commits` 로 주장해 보고한다(머리 틀은 아래 '일하는 방법').\n")
+            out.append((doc, body))
+        return out
+
     def _merge_again(self, st: dict[str, Any], repo: str, session: str, did: str) -> tuple[dict[str, Any] | None, str]:
         """rev+1 of ``did`` after an R4 non-fast-forward: merge the integration branch, report the merged head."""
         prev = st["directives"].get(did)
@@ -243,6 +286,36 @@ class Hub:
         return paths[0].parent if paths else self.ga
 
     # ================================================================== answers to gates
+
+    def review(self, by: str, repo: str, sha: str, cls: str, why: str, cause: str | None = None) -> dict[str, Any]:
+        """METHOD rev 10 §3.3b: record an outside verdict (review/1) on an integrated result. The round that integrated
+        the sha is only ever made stricter (an appended review, never a rewritten round); the next round's Judge and
+        draft see it."""
+        if repo not in self.cfg.repos:
+            raise FormError([Problem("$.repo", f"unknown repo {repo!r}")])
+        self.vcs.fetch(repo)
+        full = self.vcs.resolve(repo, sha)
+        if full is None:
+            raise FormError([Problem("$.sha", f"{repo} has no commit {sha}")])
+        st = self.load_state()
+        doc: dict[str, Any] = {"schema": "review/1", "id": self.records.next_review(), "date": self.today(), "by": by,
+                               "repo": repo, "sha": full, "class": cls, "why": why}
+        if cause:
+            doc["cause"] = cause
+        for r in reversed(self.records.all("round/1")):
+            if any(x["repo"] == repo and full.startswith(x["sha"]) for x in r["repos"]):
+                doc["round"] = r["n"]
+                if CLASS_RANK.get(cls, 0) > CLASS_RANK.get(r["verdict"], 0):
+                    doc["amends"] = {"round": r["n"], "from": r["verdict"], "to": cls}
+                break
+        load(doc, "review/1")
+        self.records.put(doc)
+        self._writes += 1
+        st.setdefault("reviews", {})[doc["id"]] = {"status": "open", "doc": doc}
+        for name, text in self.records.render({r: s.slug for r, s in self.cfg.repos.items() if s.slug}).items():
+            self._write(self.records.root / name, text)
+        self.save_state(st)
+        return doc
 
     def answer(self, qid: str, label: str, note: str = "") -> dict[str, Any]:
         """Record the user's answer to a gate question as a decision/1 (by user)."""
@@ -341,7 +414,8 @@ class Hub:
                     turn["diag"] = self._turn_diag(turn)
         answered = [qid for qid, q in st["questions"].items() if q["status"] == "answered" and not q.get("processed")]
         pending = st.get("pending")
-        if not new_posts and not candidates and not answered and not pending and not hard(res.findings):
+        reviews = [v["doc"] for v in st.get("reviews", {}).values() if v["status"] == "open"]
+        if not new_posts and not candidates and not answered and not pending and not reviews and not hard(res.findings):
             res.quiet = True
             return res  # R9: nothing new, nothing written
 
@@ -370,6 +444,7 @@ class Hub:
                 res.plan.append(f"ff {repo} {self.cfg.integration_branch} {base[:7]} → {head[:7]} ({session})")
             else:
                 self.vcs.fast_forward(repo, head)
+                st.setdefault("integrated_by", {})[head] = {"session": session, "directive": (claimed_under.get((repo, session)) or [None])[-1]}
             heads[repo] = head
             integrated[repo] = head
         res.integrated = integrated
@@ -380,7 +455,16 @@ class Hub:
         # ---------------------------------------------------------- 3 reproduce
         notices += [self._exchange_note(x) for x in exchanges]
         if pending is None:
-            evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st, rejected=rejected)
+            evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st, rejected=rejected, reviews=reviews)
+            for r in reports:  # a commit the session made but its report did not claim (GA10 round 1)
+                if r["head"].get("commits"):
+                    continue
+                s_ = self.cfg.sessions.get(r["post"].channel)
+                for repo in (s_.repos if s_ else []):
+                    sh = self.vcs.session_head(repo, s_.name)
+                    if sh and heads.get(repo) and not self.vcs.is_ancestor(repo, sh, heads[repo]):
+                        evidence["notes"].append(f"R1b: {s_.name} committed {sh[:7]} on {s_.branch_for(repo)} but its report claims "
+                                                 f"no commit — not integrated")
             for repo, session, did in not_ff:
                 evidence["notes"].append(f"R4: {repo} {session} is not a fast-forward of {self.cfg.integration_branch}; "
                                          f"the hub sends {did} rev+1 (merge it, report again) by itself — not a question (METHOD rev 9)")
@@ -423,6 +507,7 @@ class Hub:
         )
         ctx.answers = [dict(st["questions"][q], id=q) for q in answered]
         ctx.exchanges = [x["head"] for x in pending.get("exchanges", [])]
+        ctx.reviews = reviews
         try:
             proposal = self.judge.propose(ctx)
         except NeedJudgement as e:
@@ -443,6 +528,12 @@ class Hub:
         # ---------------------------------------------------------- 6a gates on what is proposed
         approved = self._approved_gates(proposal.get("approved_by", []), answered, st)
         directive = proposal.get("directive")
+        directive_body = proposal.get("directive_body", "")
+        drafts: list[tuple[dict[str, Any], str]] = []
+        if directive is None and verdict["next"]["choice"] in ("refine", "verify"):
+            # METHOD rev 10 (BD-147): the Judge left the draft empty — the hub makes rev+1 from the verdict's grounds
+            drafts = self._fill_drafts(st, verdict, all_reports, reviews, not_ff)
+        drafted = [f"hub drafted {d['id']} rev {d['rev']} (the Judge's {verdict['next']['choice']} had no draft)" for d, _ in drafts]
         gates: list[Gate] = []
         for r in all_reports:
             gates += detect(self.cfg, report=r["head"], body=r["body"], findings=[], user_decision=self._is_user_decision)
@@ -468,8 +559,16 @@ class Hub:
         if directive and directive.get("id") in sent:
             send_findings.append(Problem("directive", f"judge's {directive['id']} not sent: the hub already sent its rev+1 this round", "soft", None))
             directive = None
+        for d, body in drafts:  # the hub's drafts go through the same gates as a Judge's directive
+            if gates:
+                break
+            post, f_d, g_d = self.send(d, body, st, n)
+            send_findings += f_d
+            gates += [g for g in g_d if g.number not in approved]
+            if post:
+                sent.append(d["id"])
         if directive and not gates:
-            post, send_findings, send_gates = self.send(directive, proposal.get("directive_body", ""), st, n)
+            post, send_findings, send_gates = self.send(directive, directive_body, st, n)
             gates += [g for g in send_gates if g.number not in approved]
             if post:
                 sent.append(directive["id"])
@@ -497,6 +596,8 @@ class Hub:
             qdocs.append(dict(q, id=qid))
         for qid in answered:
             st["questions"][qid]["processed"] = True
+        for rv in reviews:
+            st["reviews"][rv["id"]].update(status="used", round=n)
 
         # ---------------------------------------------------------- 5 record
         decisions = []
@@ -522,7 +623,7 @@ class Hub:
             "verdict": verdict["class"],
             "summary": proposal.get("summary") or verdict["next"]["reason"],
             "next": choice,
-            "notices": [str(p) for p in all_findings] + pending["notices"] + list(pending["evidence"].get("notes", [])),
+            "notices": [str(p) for p in all_findings] + pending["notices"] + list(pending["evidence"].get("notes", [])) + drafted,
         }
         if decisions:
             round_doc["decisions"] = decisions
@@ -580,7 +681,7 @@ class Hub:
             note += f" · proposal {h['proposal']}"
         return note
 
-    def _reproduce(self, heads, integrated, reports, findings, st, rejected: int = 0):
+    def _reproduce(self, heads, integrated, reports, findings, st, rejected: int = 0, reviews=()):
         tested = {r: heads[r] for r in heads if self.cfg.repos[r].test or self.cfg.repos[r].package}
         evidence: dict[str, Any] = {"heads": dict(sorted(heads.items())), "tests": {}, "notes": []}
         machine: dict[str, Any] | None = None
@@ -590,6 +691,11 @@ class Hub:
             if machine is None or CLASS_RANK[cls] > CLASS_RANK[machine["class"]]:
                 machine = {"class": cls, "cause": cause, **({"subclass": sub} if sub else {})}
 
+        for rv in reviews:  # METHOD rev 10: an outside verdict on the head still in place is a floor; else a note
+            cause = f" · {rv['cause']}" if rv.get("cause") else ""
+            evidence["notes"].append(f"review {rv['id']} ({rv['by']}): {rv['repo']}@{rv['sha'][:7]} {rv['class']}{cause} — {rv['why']}")
+            if heads.get(rv["repo"]) == rv["sha"] and rv["class"] in CLASS_RANK:
+                worse(rv["class"], rv.get("cause") or "requirement")
         if rejected and not reports and not integrated:
             # METHOD rev 8 §3.3 (BD-144): every report of the round was refused by the forms and nothing was
             # integrated — a fact the machine proves, so it is a floor, not a notice only (GA8 round 1)
@@ -609,6 +715,8 @@ class Hub:
             if "install" in self.modes and any(self.cfg.repos[r].package for r in tested):
                 results["install"] = self.bundle.run_install(tested)
             for mode, br in results.items():
+                if br.tools:
+                    evidence["notes"].append(f"bundle ({mode}): built with " + " · ".join(f"{k} {v}" for k, v in br.tools.items()))
                 if br.problem:
                     evidence["notes"].append(f"bundle ({mode}): {br.problem}")
                     worse("failure", "dependency" if br.problem == "pin_conflict" else "environment")
