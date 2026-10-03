@@ -245,3 +245,10 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - `decision/1.scope.runner` 에 `manual` 을 더했다(Judge 만 허락). `ga permit --judge-only` 가 그것을 남긴다.
 - 시험 세계: `World.permit_judge(judge)`.
 
+## 23. 작업 턴의 운영자 가드 (CMD-GA17, METHOD rev 15 §4c 7)
+
+- `HeadlessRunner(guards=...)`(Agent SDK 는 같은 layout 을 씀): `settings_file` 이 ga 의 bash_guard 다음에 운영자 가드를 넣는다. ga 가드를 끄면(`guard=False`) 운영자 가드만 들어간다. `fill` 이 `{session}` · `{home}` 을 채우고, `guard_records` 가 (이름, 기록 파일)을 낸다.
+- `Hub._guard_gap`: 명령의 첫 낱말(프로그램)이 경로면 실행 가능한 파일인지, 아니면 PATH 에 있는지 본다. 없으면 통로에 쓰기 전에 `not_sent` · 게이트 6(`GUARD_OPTIONS`).
+- `Hub._run_turn`: 턴 전 기록 파일의 줄 수를 재고, 턴 뒤 늘어난 줄만 `guard_summary` 로 센다(ga 가드 로그 꼴과 rlo `--record` 꼴). tick 은 보고가 들어온 세션의 턴 가운데 거부가 있는 것을 근거 note 로 한 번 남긴다(`guards_noted`).
+- 설정 검사: guards 는 headless · agent_sdk 만, 항목은 문자열 칸(command 필수)만.
+

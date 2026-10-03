@@ -57,6 +57,7 @@ class AgentSDKRunner:
         guard: bool = True,
         sandbox: str = "auto",
         sdk: Any = None,
+        guards: Iterable[dict] = (),
     ):
         self.home = Path(home)
         self.executable = executable
@@ -72,7 +73,8 @@ class AgentSDKRunner:
             raise ValueError("sandbox must be auto, require or off")
         self.sandbox = sandbox
         # the guard settings, session homes and guard log are shared with the headless runner's layout
-        self._layout = HeadlessRunner(self.home, guard=guard, sandbox="off")
+        self._layout = HeadlessRunner(self.home, guard=guard, sandbox="off", guards=guards)
+        self.guards = self._layout.guards
         self.guard = guard
 
     def session_home(self, session: str) -> Path:
@@ -80,6 +82,9 @@ class AgentSDKRunner:
 
     def guard_log(self, session: str) -> Path:
         return self._layout.guard_log(session)
+
+    def guard_records(self, session: str) -> list[tuple[str, Path]]:
+        return self._layout.guard_records(session)
 
     # ------------------------------------------------------------------ the CLI wrapper
 
@@ -122,7 +127,7 @@ class AgentSDKRunner:
             kw["max_budget_usd"] = float(cap)
         if req.resume_id:
             kw["resume"] = req.resume_id
-        if self.guard:
+        if self.guard or self.guards:
             kw["settings"] = str(self._layout.settings_file(req.session, sandboxed))
         return sdk.ClaudeAgentOptions(**kw)
 

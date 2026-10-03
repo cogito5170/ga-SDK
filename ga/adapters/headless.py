@@ -60,8 +60,11 @@ class HeadlessRunner:
         extra_args: Iterable[str] = (),
         guard: bool = True,
         sandbox: str = "auto",
+        guards: Iterable[dict] = (),
     ):
         self.home = Path(home)
+        # METHOD rev 15 §4c 7: the operator's PreToolUse guards (e.g. rlo.hooks enforce), after ga's own
+        self.guards = [dict(g) for g in guards]
         self.executable = executable
         self.model = model
         self.permission_mode = permission_mode
@@ -94,11 +97,22 @@ class HeadlessRunner:
         home.mkdir(parents=True, exist_ok=True)
         parts = [sys.executable, bash_guard.__file__, "--log", str(self.guard_log(session))] + (["--sandboxed"] if sandboxed else [])
         cmd = " ".join(shlex.quote(x) for x in parts)
-        settings = {"hooks": {"PreToolUse": [{"matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
-                                              "hooks": [{"type": "command", "command": cmd}]}]}}
+        pre = [{"matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit", "hooks": [{"type": "command", "command": cmd}]}] if self.guard else []
+        for g in self.guards:  # after ga's guard; only in this turn's settings, never the person's ~/.claude
+            pre.append({"matcher": g.get("matcher", "*"), "hooks": [{"type": "command", "command": self.fill(g["command"], session)}]})
+        settings = {"hooks": {"PreToolUse": pre}}
         path = home / "ga-settings.json"
         path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
         return path
+
+    def fill(self, text: str, session: str) -> str:
+        """``{session}`` and ``{home}`` (the session's own, writable, home) in a guard's command or record path."""
+        return text.replace("{session}", session).replace("{home}", str(self.session_home(session)))
+
+    def guard_records(self, session: str) -> list[tuple[str, Path]]:
+        """(name, record file) of each operator guard that keeps a record (JSONL)."""
+        return [(g.get("name") or f"guard{i + 1}", Path(self.fill(g["record"], session)))
+                for i, g in enumerate(self.guards) if g.get("record")]
 
     def env(self, session: str) -> dict[str, str]:
         home = self.session_home(session)
@@ -123,7 +137,7 @@ class HeadlessRunner:
             argv += ["--max-budget-usd", f"{cap:g}"]
         if req.resume_id:
             argv += ["--resume", req.resume_id]
-        if self.guard:
+        if self.guard or self.guards:
             argv += ["--settings", str(self.settings_file(req.session, sandboxed))]
         return argv + self.extra_args
 
