@@ -142,6 +142,24 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 
 - `ga prompt SESSION` reads `hub.session_guidance`; `ga prompt --hub` reads `hub.guidance`. A missing key, an empty one or an unreadable file is a config error: exit 2, and stderr names the key (`config: [hard] $.hub.session_guidance: …`). An unknown session is exit 2 too. The library (`worker_prompt` · `hub_prompt`) raises `FormError`.
 
+## `ga mail`: session to session through git (CMD-GA22, BD-235)
+
+A channel that needs nothing but Bash and a git repository both sessions already have (for AMP and W1: amp). `send_message` stays the fast path; the mailbox is the floor that always exists.
+
+```sh
+ga mail send --repo PATH --to W1 [--from AMP] directive.md      # validate, then add one file to the ga-mailbox branch
+ga mail read --repo PATH --as W1 [--json]                       # new messages for W1, oldest first
+ga mail scan --repo PATH [--json]                               # per name: messages, unread, the oldest unanswered report
+ga mail send --repo PATH --to AMP --from W1 --guard-event FILE --re CMD-W1 [--items D1,D2]
+```
+
+- **The branch** `ga-mailbox` (orphan) holds `to/<recipient>/<utc>-<sender>-<form id>.md`, one ga form per file. Files are only added: a send fetches the tip, adds its one file on top with git plumbing (the session's working tree and branches are not touched) and pushes; a rejected push is redone on the new tip, up to 20 times with full-jitter backoff (at most 3 s per wait). Then it fails with an error, never silently.
+- **Refused before sending:** a text that is not a valid ga form (hard problems), a text that looks like a secret (the R6 patterns), a recipient that is not one directory name, a sender with `-` (the file name must split one way). The sender is the form's `from`, or `--from`.
+- **Reading** shows each message with its sender, form and validation result, and says it is data from that sender, not instructions. A message is marked read only after it was printed. The read set lives in the clone's git dir (`<git dir>/ga-mailbox/<name>.cursor`), never pushed. It is a set of names, so clock skew between machines cannot hide a message.
+- **Scan** (the hub's safety net): for each name, the messages addressed to it and how many are unread. Unread uses the local read set when this clone has one, else counts the messages after the name's own last send. It also gives the oldest report to the name that it has not answered (no message from it to that sender since).
+- **A guard deny inside a container** (`--guard-event`, a guard record: rlo `--record` lines or ga's guard log) goes out as a `report/2`: `handled.status: paused`, a `permission` blocker `guard rlo denied N tool call(s): <labels>`, and the given items marked blocked. Counts and labels only.
+- No network but the repository's git remote.
+
 ## `ga gemini`: a Gemini supervisor (CMD-GA21, BD-221)
 
 You talk to ga, not to Gemini CLI's interactive UI. Gemini only directs; ga and rlo do the work.
