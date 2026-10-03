@@ -1,4 +1,4 @@
-# METHOD — 허브 세션이 지시 · 보고로 개발 세션들을 굴리는 방법 (method-1 rev 16, 2026-10-03)
+# METHOD — 허브 세션이 지시 · 보고로 개발 세션들을 굴리는 방법 (method-1 rev 17, 2026-10-03)
 
 > 이 문서는 ga-SDK 가 지을 것의 **명세**다. 원본은 cogito5170/baseline 에서 실제로 돌린 고리다.
 > - 근거 자료: baseline 의 `GUIDANCE.md`(허브 쪽 안내) · `SESSION_GUIDANCE.md`(작업 세션 쪽 안내, 사용자가 각 세션에 준 프롬프트) · `PROTOCOL.md` · `DECISION_LOG.md`(BD-1–130) · `BASELINE.md` §13(1–90 회차) · `STAGES.md`(stage-1–4).
@@ -177,6 +177,7 @@ ga-SDK 는 이 고리에서 **기계적인 부분을 자동으로** 하고, **�
 
 **기계 규칙**
 - `done` 으로 보고했는데 `met` 이 아닌 항목이 있으면 바닥은 부분 성공이다. 막힘 항목이 있으면 바닥은 막힘이다.
+- `na`(해당 없음)는 `evidence` 에 까닭이 있으면 바닥에서 뺀다. 까닭이 없으면 `met` 이 아닌 항목으로 센다(rev 17, BD-177). 까닭 없이 빼면 지시를 피하는 길이 되기 때문이다.
 - `blockers.kind` 가 permission 이나 credential 이면 게이트 6 으로 묻는다.
 - `items` 가 지시의 `done_when` 항목을 빠뜨리면 R7 hard 다.
 - `changes` 가 없는 지시를 rev > 1 로 보내면 soft 알림이다. 판 2 에서는 hard 다.
