@@ -114,6 +114,11 @@ class LazyImportTest(unittest.TestCase):
         self.assertEqual(out.returncode, 0, out.stderr[-2000:])
         self.assertEqual(out.stdout.strip(), "[]")
 
+    def test_no_tests_rlo_package_shadows_rlo(self):
+        """BD-218: under `discover -s tests` a tests/rlo/ is a top-level `rlo` and hides rlo-sdk; GR's tests are in
+        tests/test_rlo/."""
+        self.assertFalse((ROOT / "tests" / "rlo").exists())
+
     def test_the_seam_is_there_and_empty(self):
         import ga.rlo
         self.assertRegex(ga.rlo.__version__, r"^\d+\.\d+\.\d+$")
