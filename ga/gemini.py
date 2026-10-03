@@ -16,11 +16,13 @@ rlo is imported only inside the functions that run a task, so ``import ga`` neve
 """
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import os
 import re
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,6 +41,10 @@ MAX_PLAN_STEPS = 16
 # the free tier of gemini-3-flash-preview: 20 requests a day, shared by every session on the key (GMG6); Google documents
 # per-day limits as resetting at midnight Pacific
 DAILY_DEFAULT = {"requests": 20, "reset_tz": "America/Los_Angeles", "reset_at": "00:00"}
+# requests per minute the Governor allows by default: meant to sit below the server's per-minute limit, so the CLI rarely
+# meets a 429 it would retry inside the turn (BD-232). The free tier's exact minute limit for gemini-3-flash-preview is
+# not known here — an assumption; set budget.rpm in ga-gemini.json to your key's limit minus a margin.
+DEFAULT_BUDGET = {"rpm": 5}
 
 
 # ---- config ---------------------------------------------------------------------------------------------------------
@@ -48,7 +54,7 @@ class GeminiConfig:
     root: Path
     model: str = DEFAULT_MODEL
     cli: list[str] = field(default_factory=lambda: ["gemini"])
-    budget: dict[str, Any] = field(default_factory=lambda: {"rpm": 10})
+    budget: dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_BUDGET))
     tools: dict[str, dict[str, str]] = field(default_factory=dict)
     mcp_servers: dict[str, dict[str, Any]] = field(default_factory=dict)
     state_dir: str = ".ga-gemini"
@@ -57,6 +63,8 @@ class GeminiConfig:
     turn_timeout_s: float = 600.0
     est_tokens: int = 2000
     daily: dict[str, Any] = field(default_factory=lambda: dict(DAILY_DEFAULT))
+    turn_status_s: float = 20.0          # a turn running longer gets one status line per this many seconds (S7)
+    max_parallel: int | None = None      # tool steps at once; handed to the Scheduler when it takes it (K12 rev 3, S8)
 
     @property
     def state_path(self) -> Path:
@@ -71,7 +79,7 @@ def config_problems(raw: Any) -> list[Problem]:
     if not isinstance(raw, dict):
         return [Problem("$", "must be an object")]
     known = {"schema", "model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps", "result_cap",
-             "turn_timeout_s", "est_tokens", "daily"}
+             "turn_timeout_s", "est_tokens", "daily", "turn_status_s", "max_parallel"}
     for k in sorted(set(raw) - known):
         bad(f"$.{k}", "unknown field")
     if raw.get("schema") != CONFIG_SCHEMA:
@@ -80,7 +88,7 @@ def config_problems(raw: Any) -> list[Problem]:
         bad("$.model", "must be a model name")
     if "cli" in raw and not (isinstance(raw["cli"], list) and raw["cli"] and all(isinstance(x, str) and x for x in raw["cli"])):
         bad("$.cli", "must be a non-empty list of strings (the gemini command)")
-    b = raw.get("budget", {"rpm": 10})
+    b = raw.get("budget", DEFAULT_BUDGET)
     if not isinstance(b, dict) or set(b) - {"rpm", "tpm"} or not any(b.get(k) for k in ("rpm", "tpm")) or \
             any(b.get(k) is not None and not (isinstance(b[k], int) and not isinstance(b[k], bool) and b[k] > 0) for k in b):
         bad("$.budget", "must be {rpm?, tpm?} with at least one positive integer")
@@ -111,8 +119,12 @@ def config_problems(raw: Any) -> list[Problem]:
     for k, lo in (("max_model_steps", 1), ("result_cap", 100), ("est_tokens", 0)):
         if k in raw and not (isinstance(raw[k], int) and not isinstance(raw[k], bool) and raw[k] >= lo):
             bad(f"$.{k}", f"must be an integer >= {lo}")
-    if "turn_timeout_s" in raw and not (isinstance(raw["turn_timeout_s"], (int, float)) and raw["turn_timeout_s"] > 0):
-        bad("$.turn_timeout_s", "must be a positive number")
+    for k in ("turn_timeout_s", "turn_status_s"):
+        if k in raw and not (isinstance(raw[k], (int, float)) and not isinstance(raw[k], bool) and raw[k] > 0):
+            bad(f"$.{k}", "must be a positive number")
+    if "max_parallel" in raw and not (isinstance(raw["max_parallel"], int) and not isinstance(raw["max_parallel"], bool)
+                                      and raw["max_parallel"] >= 1):
+        bad("$.max_parallel", "must be an integer >= 1")
     if "state_dir" in raw and not (isinstance(raw["state_dir"], str) and raw["state_dir"]):
         bad("$.state_dir", "must be a path")
     d = raw.get("daily", DAILY_DEFAULT)
@@ -142,7 +154,7 @@ def load_config(path: str | Path) -> GeminiConfig:
     if probs:
         raise FormError(probs)
     kw = {k: raw[k] for k in ("model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps",
-                              "result_cap", "turn_timeout_s", "est_tokens") if k in raw}
+                              "result_cap", "turn_timeout_s", "est_tokens", "turn_status_s", "max_parallel") if k in raw}
     return GeminiConfig(root=path.resolve().parent, daily={**DAILY_DEFAULT, **raw.get("daily", {})}, **kw)
 
 
@@ -308,6 +320,7 @@ class Supervisor:
                                     settings_dir=self.dir)
         self.day = DayCount(self.dir / "day.json", cfg.daily)
         self._quota: dict[str, str] = {}  # step id -> where its wait comes from: hint · window · daily reset
+        self._lock = threading.RLock()  # tool steps may run on the Scheduler's threads (K12 rev 3): one writer at a time
         self.state_file, self.log_file = self.dir / "state.json", self.dir / "log.jsonl"
         self.st: dict[str, Any] = {}
         self.sched = None
@@ -327,12 +340,13 @@ class Supervisor:
         return True
 
     def save(self) -> None:
-        self.st["updated"] = round(self.clock(), 3)
-        _atomic_write(self.state_file, self.st)
+        with self._lock:
+            self.st["updated"] = round(self.clock(), 3)
+            _atomic_write(self.state_file, self.st)
 
     def log(self, event: str, **kw: Any) -> None:
         row = {"at": round(self.clock(), 3), "event": event, **kw}
-        with open(self.log_file, "a", encoding="utf-8") as f:
+        with self._lock, open(self.log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(row, sort_keys=True) + "\n")
 
     def say(self, text: str) -> None:
@@ -369,11 +383,13 @@ class Supervisor:
             return getattr(importlib.import_module(mod), fn)(**args)
         from .adapters.mcp_stdio import StdioClient
         name = t["mcp"]
-        if name not in self._clients:
-            s = self.cfg.mcp_servers[name]
-            cwd = str((self.cfg.root / s["cwd"]).resolve()) if s.get("cwd") else str(self.cfg.root)
-            self._clients[name] = StdioClient(s["command"], cwd=cwd, timeout_s=self.cfg.turn_timeout_s)
-        return self._clients[name].call(t["tool"], args)
+        with self._lock:
+            if name not in self._clients:
+                s = self.cfg.mcp_servers[name]
+                cwd = str((self.cfg.root / s["cwd"]).resolve()) if s.get("cwd") else str(self.cfg.root)
+                self._clients[name] = StdioClient(s["command"], cwd=cwd, timeout_s=self.cfg.turn_timeout_s)
+            client = self._clients[name]
+        return client.call(t["tool"], args)
 
     def _tool_fn(self, sid: str) -> Callable[[dict], str]:
         def run(_results: dict) -> str:
@@ -384,9 +400,10 @@ class Supervisor:
             except Exception as e:
                 self.log("tool", step=sid, tool=rec["tool"], ok=False, error=type(e).__name__)
                 raise
-            _atomic_write(self.dir / "results" / f"{sid}.json", value)
             preview = (value if isinstance(value, str) else json.dumps(value, ensure_ascii=False))[: self.cfg.result_cap]
-            self.st["done"].append(sid)
+            with self._lock:
+                _atomic_write(self.dir / "results" / f"{sid}.json", value)
+                self.st["done"].append(sid)
             self.log("tool", step=sid, tool=rec["tool"], ok=True, chars=len(preview), seconds=round(self.clock() - t0, 3))
             self.save()
             return preview  # in memory: capped
@@ -407,7 +424,8 @@ class Supervisor:
                 self.log("resume", step=sid, waited_s=waited)
         from .adapters.gemini_cli import GeminiRateLimited, quota_body
         try:
-            turn = self.cli.run_turn(self._prompt(rec), self.st.get("session_id"))
+            turn = self.cli.run_turn(self._prompt(rec), self.st.get("session_id"), on_wait=self._turn_wait(sid),
+                                     wait_every_s=self.cfg.turn_status_s)
         except GeminiRateLimited as e:
             now = self.clock()
             if e.kind == "day":  # not a minute window: wait for the reset, then probe once
@@ -437,6 +455,16 @@ class Supervisor:
         self.st["done"].append(sid)
         self.save()
         return {"usage": {k: turn.usage[k] for k in ("input_tokens", "output_tokens", "total_tokens") if k in turn.usage}}
+
+    def _turn_wait(self, sid: str) -> Callable[[float], None]:
+        """S7: a turn that runs long may be the CLI retrying a quota error inside the process (the preview model's
+        policy allows 10 attempts, whatever general.maxAttempts says) — say so, with the state, once per interval."""
+        def line(seconds: float) -> None:
+            st = self.status()
+            self.say(f"[ga gemini] turn {sid} running {seconds:g} s; the CLI may be retrying a quota error inside the turn"
+                     f" · done {len(st['done'])} · running {len(st['running'])} · parked {len(st['parked'] or [])}")
+            self.log("turn_wait", step=sid, seconds=seconds)
+        return line
 
     def _extend(self, sid: str, plan: dict[str, Any]) -> None:
         """Put a plan's tool steps and its next model step into the state and the running scheduler."""
@@ -552,10 +580,16 @@ class Supervisor:
         kinds = {MODEL_STEP: "model", **{t: "tool" for t in self.cfg.tools}}
         # K12 rev 2 (S6): the scheduler saves its queue, results and Governor windows to this file on every row and,
         # when it exists, loads it — given the same steps again, so all of them are added, done ones too
+        extra = {}
+        if self.cfg.max_parallel is not None:  # S8: K12 rev 3 takes it; an earlier Scheduler runs tool steps one by one
+            if "max_parallel" in inspect.signature(Scheduler).parameters:
+                extra["max_parallel"] = self.cfg.max_parallel
+            else:
+                self.log("max_parallel_pending", max_parallel=self.cfg.max_parallel)
         self.sched = Scheduler([self._step(r, Step) for r in self.st["steps"]], gov, self._model_turn, kinds=kinds,
                                clock=self.clock, sleep=self._sleep_hook, ledger=str(self.dir / "ledger.jsonl"),
                                run_id=self.st["task"], provider_name="gemini", usage_format="otel",
-                               state=str(self.dir / f"scheduler-{self.st['task']}.json"))
+                               state=str(self.dir / f"scheduler-{self.st['task']}.json"), **extra)
         self._shown = ()
         try:
             report = self.sched.run()

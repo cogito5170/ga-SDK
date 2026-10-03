@@ -16,9 +16,13 @@ as 173) — never read. No ``result`` at all is a crashed turn. ``retryDelay`` i
 ``error.message`` is kept as a hint only.
 
 The served model is every key of ``result.stats.models``: any other key than the asked model fails the turn
-(``ModelMismatch``) — 0.62 can switch silently even headless. The CLI would retry a per-minute 429 inside the process
-(``general.maxAttempts``, default 10) and sleep there; ga writes private CLI settings with ``maxAttempts: 1`` so the CLI
-fails fast and ga does the waiting. Standard library only.
+(``ModelMismatch``) — 0.62 can switch silently even headless.
+
+The CLI retries a per-minute 429 inside the process and sleeps there. ga writes private CLI settings with
+``general.maxAttempts: 1`` (``GEMINI_CLI_SYSTEM_SETTINGS_PATH``; system settings win the merge), which binds models
+outside the preview chain. It does **not** bound gemini-3-flash-preview: ``retryWithBackoff`` takes the policy's
+``maxAttempts`` first, and the preview chain sets 10 for that model (BD-232). So a turn can run long while the CLI
+retries; ``run_turn(on_wait=…)`` reports each ``wait_every_s`` of a running turn. Standard library only.
 """
 from __future__ import annotations
 
@@ -30,7 +34,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 DEFAULT_MODEL = "gemini-3-flash-preview"
 SETTINGS_ENV = "GEMINI_CLI_SYSTEM_SETTINGS_PATH"  # system settings override the user's and the workspace's
@@ -204,18 +208,31 @@ class GeminiCLI:
         self.env[SETTINGS_ENV] = str(own)
         return own
 
-    def run_turn(self, prompt: str, session_id: str | None = None) -> GeminiTurn:
-        """One turn. Raises GeminiRateLimited (quota), ModelMismatch, or GeminiError; returns the turn otherwise."""
+    def run_turn(self, prompt: str, session_id: str | None = None, *, on_wait: Callable[[float], None] | None = None,
+                 wait_every_s: float | None = None) -> GeminiTurn:
+        """One turn. Raises GeminiRateLimited (quota), ModelMismatch, or GeminiError; returns the turn otherwise.
+        ``on_wait(seconds)`` is called every ``wait_every_s`` while the process still runs (never for a shorter turn)."""
         self.write_settings()
         t0 = time.monotonic()
         try:
-            p = subprocess.run(self.argv(prompt, session_id), cwd=self.cwd, env=self.env, stdin=subprocess.DEVNULL,
-                               capture_output=True, text=True, timeout=self.timeout_s)
+            p = subprocess.Popen(self.argv(prompt, session_id), cwd=self.cwd, env=self.env, stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         except FileNotFoundError:
             raise GeminiError("cli_not_found") from None
-        except subprocess.TimeoutExpired:
-            raise GeminiError("timeout") from None
-        s = parse_stream(p.stdout.splitlines())  # the exit code is not read: the result event decides
+        step = wait_every_s if on_wait is not None and wait_every_s else None
+        while True:
+            left = self.timeout_s - (time.monotonic() - t0)
+            try:  # communicate may be called again after a timeout: no output is lost
+                stdout, _stderr = p.communicate(timeout=max(0.0, min(left, step) if step else left))
+                break
+            except subprocess.TimeoutExpired:
+                if time.monotonic() - t0 >= self.timeout_s:
+                    p.kill()
+                    p.communicate()
+                    raise GeminiError("timeout") from None
+                if step:
+                    on_wait(round(time.monotonic() - t0, 1))
+        s = parse_stream(stdout.splitlines())  # the exit code is not read: the result event decides
         if not s.has_result:
             raise GeminiError("no_result")
         q = quota_of(s)

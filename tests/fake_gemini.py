@@ -1,8 +1,10 @@
 """A fake headless Gemini CLI for tests (CMD-GA21 rev 2). Its output follows the Gemini CLI 0.62.0 stream-json shapes
 baseline read from the source (baseline#12 5970108172). Plays FAKE_GEMINI_DIR/script.json, one entry per call:
 
-    {"plan": {...}, "served": ["<model>", ...]?}  -> init (asked model), message deltas (```json plan```), result success
-                                                    with stats.models keyed by the served models (default: the asked one)
+    {"plan": {...}, "served": ["<model>", ...]?, "sleep": s?}
+                                                  -> (after sleeping s seconds) init (asked model), message deltas
+                                                    (```json plan```), result success with stats.models keyed by the
+                                                    served models (default: the asked one)
     {"fixture": "<name>", "exit": n?}             -> replays tests/fixtures/gemini/<name>.jsonl as recorded, exit n
                                                     (default 0; a quota error exits 173 = 429 & 255, as 0.62 does)
 
@@ -48,6 +50,9 @@ if "fixture" in entry:
     sys.stdout.write((FIXTURES / f"{entry['fixture']}.jsonl").read_text())
     sys.exit(entry.get("exit", 0))
 model = opt("-m")
+if entry.get("sleep"):  # a long turn (the CLI retrying inside the process, as 0.62 may for the preview model)
+    import time
+    time.sleep(entry["sleep"])
 emit({"type": "init", "session_id": opt("--resume") or "s-1", "model": model})  # the asked model, as 0.62 does
 text = "Here is the plan.\n```json\n" + json.dumps(entry["plan"]) + "\n```\n"
 for i in range(0, len(text), 40):

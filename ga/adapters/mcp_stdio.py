@@ -29,6 +29,7 @@ class StdioClient:
         self.proc: subprocess.Popen | None = None
         self._lines: queue.Queue = queue.Queue()
         self._id = 0
+        self._lock = threading.Lock()  # one request at a time per server: answers are read from one queue
 
     def _start(self) -> None:
         try:
@@ -79,9 +80,10 @@ class StdioClient:
 
     def call(self, tool: str, arguments: dict[str, Any]) -> Any:
         """tools/call -> the result's structuredContent if any, else the text of its content parts."""
-        if self.proc is None:
-            self._start()
-        res = self._request("tools/call", {"name": tool, "arguments": arguments})
+        with self._lock:
+            if self.proc is None:
+                self._start()
+            res = self._request("tools/call", {"name": tool, "arguments": arguments})
         if res.get("isError"):
             raise MCPToolError(tool)
         if res.get("structuredContent") is not None:
