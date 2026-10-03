@@ -1,0 +1,168 @@
+[
+  {
+    "n": 1,
+    "head": "c6b2f95",
+    "ga10": [
+      "partial",
+      "measurement",
+      null
+    ],
+    "baseline": [
+      "insufficient",
+      "hub_directive"
+    ],
+    "A_records": {
+      "machine": {
+        "class": "partial",
+        "cause": "measurement",
+        "subclass": "not_install_checked"
+      },
+      "final": [
+        "partial",
+        "measurement",
+        null
+      ],
+      "tests": {
+        "passed": 63,
+        "failed": 0,
+        "skipped": 2
+      },
+      "notes": [
+        "rlo (path): skipped 2 — known: 설치 메타데이터 시험(PYTHONPATH 방식에서는 건너뜀)",
+        "rlo: packaged, reproduced without a clean install (not_install_checked)"
+      ]
+    },
+    "B_install": {
+      "machine": {
+        "class": "failure",
+        "cause": "implementation"
+      },
+      "final": [
+        "failure",
+        "implementation",
+        null
+      ],
+      "tests": {
+        "passed": 63,
+        "failed": 0,
+        "skipped": 2
+      },
+      "notes": [
+        "rlo (path): skipped 2 — known: 설치 메타데이터 시험(PYTHONPATH 방식에서는 건너뜀)",
+        "rlo: path {'passed': 63, 'failed': 0, 'skipped': 2} vs install {'passed': 64, 'failed': 1, 'skipped': 0}",
+        "judge proposed partial, machine evidence makes it failure"
+      ]
+    }
+  },
+  {
+    "n": 2,
+    "head": "af701a2",
+    "ga10": [
+      "blocked",
+      "dependency",
+      null
+    ],
+    "baseline": [
+      "partial",
+      "requirement"
+    ],
+    "A_records": {
+      "machine": {
+        "class": "partial",
+        "cause": "requirement"
+      },
+      "final": [
+        "blocked",
+        "dependency",
+        null
+      ],
+      "tests": {
+        "passed": 81,
+        "failed": 0,
+        "skipped": 2
+      },
+      "notes": [
+        "rlo (path): skipped 2 — known: 설치 메타데이터 시험(PYTHONPATH 방식에서는 건너뜀)",
+        "rlo: packaged, reproduced without a clean install (not_install_checked)"
+      ]
+    },
+    "B_install": {
+      "machine": {
+        "class": "failure",
+        "cause": "implementation"
+      },
+      "final": [
+        "blocked",
+        "dependency",
+        null
+      ],
+      "tests": {
+        "passed": 81,
+        "failed": 0,
+        "skipped": 2
+      },
+      "notes": [
+        "rlo (path): skipped 2 — known: 설치 메타데이터 시험(PYTHONPATH 방식에서는 건너뜀)",
+        "rlo (install): missing_in_install: rlo.suggest_model",
+        "rlo: path {'passed': 81, 'failed': 0, 'skipped': 2} vs install {'passed': 81, 'failed': 2, 'skipped': 0}"
+      ]
+    }
+  },
+  {
+    "n": 3,
+    "head": "6c33b85",
+    "ga10": [
+      "partial",
+      "measurement",
+      "skipped"
+    ],
+    "baseline": [
+      "partial",
+      "implementation"
+    ],
+    "A_records": {
+      "machine": {
+        "class": "partial",
+        "cause": "measurement",
+        "subclass": "not_install_checked"
+      },
+      "final": [
+        "partial",
+        "measurement",
+        "not_install_checked"
+      ],
+      "tests": {
+        "passed": 93,
+        "failed": 0,
+        "skipped": 2
+      },
+      "notes": [
+        "rlo (path): skipped 2 — known: 설치 메타데이터 시험(PYTHONPATH 방식에서는 건너뜀)",
+        "rlo: packaged, reproduced without a clean install (not_install_checked)",
+        "judge proposed success, machine evidence makes it partial"
+      ]
+    },
+    "B_install": {
+      "machine": {
+        "class": "failure",
+        "cause": "implementation"
+      },
+      "final": [
+        "failure",
+        "implementation",
+        null
+      ],
+      "tests": {
+        "passed": 93,
+        "failed": 0,
+        "skipped": 2
+      },
+      "notes": [
+        "rlo (path): skipped 2 — known: 설치 메타데이터 시험(PYTHONPATH 방식에서는 건너뜀)",
+        "rlo (install): missing_in_install: rlo.suggest_model",
+        "rlo: path {'passed': 93, 'failed': 0, 'skipped': 2} vs install {'passed': 93, 'failed': 2, 'skipped': 0}",
+        "judge proposed success, machine evidence makes it failure"
+      ]
+    }
+  }
+]

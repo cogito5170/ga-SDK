@@ -1,0 +1,90 @@
+{
+  "directive": "CMD-GA11",
+  "continues": "CMD-GA10 hub state (same .ga)",
+  "ga_sdk": "83a5aee",
+  "config_changes": [
+    "Bundle (b) on: package rlo-sdk[sensor], test {python}",
+    "expected_skipped {count 2, why}",
+    "pyproject.toml owned by W1",
+    "budget runs 7"
+  ],
+  "runs": {
+    "turns": 1,
+    "judge": 1,
+    "total": 2,
+    "limit": 4
+  },
+  "cost_usd": 0.9502,
+  "turn": {
+    "session": "W1",
+    "directive": "CMD-WA1",
+    "rev": 3,
+    "error": "",
+    "cost": 0.9227077999999993,
+    "seconds": 70.803,
+    "sandboxed": true,
+    "diag": {
+      "claims_known": true,
+      "committed": true,
+      "posts": 1,
+      "reports_ok": 1
+    },
+    "labels": "num_turns 24 · stop end_turn · denied Bash(grep),Bash(cd),Bash(cd)"
+  },
+  "judge_call": {
+    "cost": 0.027483,
+    "error": "",
+    "round": 4,
+    "seconds": 42.279,
+    "valid": true
+  },
+  "round": {
+    "n": 4,
+    "integrated": "326592c",
+    "verdict": "failure",
+    "cause": "implementation",
+    "subclass": null,
+    "next": "refine",
+    "directive_drafted": false,
+    "tests_path": {
+      "failed": 0,
+      "passed": 93,
+      "skipped": 2
+    },
+    "tests_install": {
+      "passed": 93,
+      "failed": 2,
+      "skipped": 0
+    },
+    "import_check": "passed (no missing_in_install)",
+    "gates": 0,
+    "findings": [
+      "R10 soft: next refine with nothing open"
+    ]
+  },
+  "install_failures": [
+    "tests.test_versions.PinGraph.test_every_pin_agrees_with_this_list (fails at base c6b2f95 too)",
+    "tests.test_versions.Manifest.test_installed_metadata_is_the_same_list (passes at c6b2f95, fails at 6c33b85 and 326592c; cause not verified)"
+  ],
+  "clean_install_check": {
+    "head": "326592c",
+    "python -m rlo.suggest_model": "exit 0",
+    "python -m rlo.parallel_calls": "exit 0",
+    "path_tests": "OK (skipped=2), 95 run"
+  },
+  "interventions_ga11": [
+    {
+      "n": 5,
+      "kind": "config",
+      "what": "CMD-GA11: Bundle (b) on (package rlo-sdk[sensor], test {python}), expected_skipped 2 with reason, pyproject.toml owned by W1 for the packaging fix, budget runs 7 (4 runs left in total)",
+      "runs_spent": 0
+    },
+    {
+      "n": 6,
+      "kind": "directive_authoring",
+      "what": "ga has no inbound path for an outside (baseline) rejection; operator wrote CMD-WA1 rev 3 from it (clean-install ModuleNotFoundError rlo.suggest_model, U+FFFD) and the hub sent it with ga send",
+      "runs_spent": 0
+    }
+  ],
+  "stopped": "after round 4: remaining failures are in tests/test_versions.py (not W1's, SDK session's file); 2 of 4 runs left unspent"
+}
