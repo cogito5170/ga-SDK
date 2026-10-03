@@ -109,6 +109,16 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
   - Runner 를 허락할 때 `--measurement-calls` 를 붙이면 함께 허락된다. 수동 Runner 허브는 `ga permit --judge-only` 로 Judge 만 허락한다(`scope.runner: manual`). 이 허락으로는 모형 턴 Runner 를 열 수 없다.
   - 모형을 부르지 않는 Judge(`FileJudge` · `CallableJudge`)는 허락이 필요 없다.
 
+## 작업 턴의 운영자 가드 — 중간 검증 라인 (METHOD rev 15 §4c 7)
+
+- 설정 `runner.guards: [{"command", "matcher"?, "record"?, "name"?}]`(헤드리스 · Agent SDK 만). 작업 턴 전용 설정(`<Runner 집>/<세션>/ga-settings.json`)의 PreToolUse 에 **ga 가드 다음** 순서로 들어간다. 사람의 `~/.claude` 와 허브 세션 설정은 건드리지 않는다.
+  - 명령과 기록 경로에 `{session}` · `{home}`(그 세션의 집, 샌드박스 안에서도 쓸 수 있음)을 쓸 수 있다. 예:
+    `{"name": "rlo", "command": "python3 -m rlo.hooks --model {home}/cc_tools_model.json --mode enforce --grant Bash --record {home}/rlo-{session}.jsonl", "record": "{home}/rlo-{session}.jsonl"}`
+  - ga-SDK 는 rlo 에 의존하지 않는다. 명령 문자열만 받는다.
+- `record` 가 있으면 턴 뒤에 그 턴 동안 늘어난 줄만 읽는다. 허락 · 거부 · 오류 수와 거부 라벨만 `turns[].guards`(와 `diag.guards`)에 싣고, 원문은 싣지 않는다. 거부가 있으면 그 세션의 보고가 들어온 회차의 근거 note 에 남는다.
+- 가드의 프로그램이 없거나 실행할 수 없으면 턴을 열지 않는다. 지시는 `not_sent` 로 남고 게이트 6 이다(가드를 고친다 · 수동으로 강등한다 · 멈춘다). 가드 없이 조용히 돌지 않는다.
+- 가드는 허락(§4c 1)도, 실행 환경의 권한 검사도 대신하지 않는다.
+
 ## 시험
 
 ```sh

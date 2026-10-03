@@ -208,6 +208,16 @@ def problems_of(raw: Any) -> list[Problem]:
     perm = (raw.get("runner") or {}).get("permission") if isinstance(raw.get("runner"), dict) else None
     if perm is not None and not (isinstance(perm, str) and re.match(r"^BD-\d+$", perm)):
         bad("$.runner.permission", "must be the id of the user's decision/1 that permits this Runner (BD-<n>)")
+    guards = (raw.get("runner") or {}).get("guards") if isinstance(raw.get("runner"), dict) else None
+    if guards is not None:
+        kind = (raw.get("runner") or {}).get("kind", "manual")
+        if kind not in ("headless", "agent_sdk"):
+            bad("$.runner.guards", "only the headless and agent_sdk Runners write a turn's settings")
+        if not isinstance(guards, list) or not all(
+                isinstance(g, dict) and isinstance(g.get("command"), str) and g["command"].strip()
+                and set(g) <= {"command", "matcher", "record", "name"}
+                and all(isinstance(g.get(k, ""), str) for k in ("matcher", "record", "name")) for g in guards):
+            bad("$.runner.guards", "must be a list of {command, matcher?, record?, name?} (strings, command required)")
     if raw.get("isolation", "clone") not in ("clone", "worktree", "remote"):
         bad("$.isolation", "must be clone, worktree or remote")
     if raw.get("isolation") == "remote":

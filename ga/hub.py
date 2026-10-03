@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
+import shutil
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -33,6 +35,11 @@ PERMIT_OPTIONS = [
     (DOWNGRADE, "같은 지시를 수동 Runner 로 낸다(사람이 세션에 붙여 넣는다) · 기록에 runner: manual 과 까닭"),
     ("멈춘다", "보내지 않은 채로 둔다"),
 ]
+GUARD_OPTIONS = [
+    ("가드를 고친다", "설정 runner.guards 의 명령을 고친 뒤 다시 보낸다"),
+    (DOWNGRADE, "같은 지시를 수동 Runner 로 낸다(모형 턴이 아니다) · 기록에 runner: manual 과 까닭"),
+    ("멈춘다", "보내지 않은 채로 둔다"),
+]
 JUDGE_PERMIT_OPTIONS = [
     ("허락한다", "`ga permit --judge-only`(또는 Runner 허락에 `--measurement-calls`)로 남기고 runner.permission 에 넣는다 — 다음 회차부터 Judge 를 부른다"),
     ("멈춘다", "Judge 없이 기계의 클래스로만 판정한다"),
@@ -45,6 +52,52 @@ from .prompts import post_allow, turn_prompt
 from .records import RecordStore
 
 CLASS_RANK = {"blocked": 4, "failure": 3, "insufficient": 2, "partial": 1}
+
+
+def _line_count(path: Path) -> int:
+    try:
+        with open(path, "rb") as f:
+            return sum(1 for _ in f)
+    except OSError:
+        return 0
+
+
+def _new_lines(path: Path, skip: int) -> list[str]:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").splitlines()[skip:]
+    except OSError:
+        return []
+
+
+def guard_summary(lines: list[str]) -> dict[str, Any]:
+    """Allow · deny counts and the deny labels of a PreToolUse guard's JSONL record: ga's own guard log
+    ({"decision", "rule"}) or rlo.hooks --record ({"kind": "guard", "result": {"verdict", "rule"}}). No line is kept."""
+    allow = deny = errors = 0
+    labels: set[str] = set()
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            d = json.loads(line)
+        except ValueError:
+            errors += 1
+            continue
+        if not isinstance(d, dict):
+            errors += 1
+            continue
+        if "error" in str(d.get("kind", "")):
+            errors += 1
+            continue
+        res = d.get("result") if isinstance(d.get("result"), dict) else {}
+        verdict = str(d.get("decision") or res.get("verdict") or "").lower()
+        if not verdict:
+            continue
+        if verdict == "allow":
+            allow += 1
+        else:
+            deny += 1
+            labels.add(str(d.get("rule") or res.get("rule") or verdict)[:40])
+    return {"allow": allow, "deny": deny, "errors": errors, "labels": sorted(labels)}
 
 
 @dataclass
@@ -143,10 +196,13 @@ class Hub:
         if hard(findings):
             return None, findings, detect(self.cfg, findings=findings)
         gap = self._permission_gap(st)
+        options = PERMIT_OPTIONS
+        if not gap:
+            gap, options = self._guard_gap(to), GUARD_OPTIONS  # rev 15 §4c 7: never quietly without the operator's guard
         if gap:  # §4c: nothing is written to the channel; the directive is kept as not sent, for the person to decide
             st["directives"][directive["id"]] = {"rev": directive["rev"], "to": to, "status": "not_sent", "round": round_n,
                                                  "doc": directive, "body": body, "not_sent": gap, "post": None}
-            gate = Gate(6, f"{directive['id']} not sent: {gap}", [directive["id"]], to, PERMIT_OPTIONS, directive["id"])
+            gate = Gate(6, f"{directive['id']} not sent: {gap}", [directive["id"]], to, options, directive["id"])
             return None, findings, self._gates_out(st, [gate], own)
         post = self.channel.post(to, self.cfg.hub_name, text)
         self._writes += 1
@@ -181,6 +237,8 @@ class Hub:
         workdir = self._prepare_worktrees(to)
         start = self._session_heads(to)
         resume = st["resume"].get(to) if runner is self.runner else None
+        records = runner.guard_records(to) if hasattr(runner, "guard_records") else []
+        before = {name: _line_count(path) for name, path in records}
         result = runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text, directive), workdir, resume,
                                              permissions=self.sandbox_paths(to), budget=dict(directive.get("budget", {}))))
         self._writes += 1
@@ -192,10 +250,14 @@ class Hub:
             "resumed": resume, "session_id": result.session_id, "sandboxed": result.sandboxed,
             "start": start, "post": post.id, "labels": result.note[:200], "sent": not refused, **record,
         })
+        if records:  # rev 15 §4c 7: the operator guards' verdicts in this turn — counts and labels, never the lines
+            st["turns"][-1]["guards"] = [dict(guard_summary(_new_lines(path, before[name])), guard=name) for name, path in records]
         if refused:
             return result
         if result.ended:  # the runner knows the turn is over: label it now (GA5 rev 2 lost a cause for want of this)
             st["turns"][-1]["diag"] = self._turn_diag(st["turns"][-1])
+            if records:
+                st["turns"][-1]["diag"]["guards"] = st["turns"][-1]["guards"]
         spent = st["spent"]
         spent["runs"] = spent.get("runs", 0) + 1
         spent[f"runs:{to}"] = spent.get(f"runs:{to}", 0) + 1
@@ -266,6 +328,21 @@ class Hub:
         if m.get("subclass"):
             v["subclass"] = m["subclass"]
         return {"verdict": v, "summary": summary, "directive": None}
+
+    def _guard_gap(self, session: str) -> str:
+        """Why an operator guard cannot run (its program is not there), or "" — a turn never goes on without it."""
+        for g in getattr(self.runner, "guards", []):
+            cmd = self.runner.fill(g["command"], session) if hasattr(self.runner, "fill") else g["command"]
+            try:
+                prog = shlex.split(cmd)[0]
+            except (ValueError, IndexError):
+                return f"guard command cannot be read: {g['command']!r}"
+            if "/" in prog:
+                if not (Path(prog).is_file() and os.access(prog, os.X_OK)):
+                    return f"guard command not found or not executable: {prog}"
+            elif shutil.which(prog) is None:
+                return f"guard command not found on PATH: {prog}"
+        return ""
 
     def permit(self, runner: str, *, model: str | None = None, sandbox: str | None = None, budget: dict[str, float] | None = None,
                measurement_calls: bool = False, note: str = "") -> dict[str, Any]:
@@ -635,6 +712,15 @@ class Hub:
             pending["notices"] = list(pending.get("notices", [])) + [f"retry of round {retry['round']}: the Judge failed there"]
         if pending is None:
             evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st, rejected=rejected, reviews=reviews)
+            for t in st.get("turns", []):  # rev 15 §4c 7: what the operator guards refused in the turns now reported on
+                if t.get("guards_noted") or t["session"] not in {p.channel for p in new_posts}:
+                    continue
+                for g in t.get("guards", []):
+                    if g["deny"]:
+                        evidence["notes"].append(f"guard {g['guard']} refused {g['deny']} tool call(s) in {t['session']}'s "
+                                                 f"{t['directive']} rev {t['rev']} turn: {', '.join(g['labels']) or '-'}")
+                if t.get("guards"):
+                    t["guards_noted"] = True
             for r in reports:  # a commit the session made but its report did not claim (GA10 round 1)
                 if r["head"].get("commits"):
                     continue
