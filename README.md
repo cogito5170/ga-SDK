@@ -185,7 +185,7 @@ ga gemini --config ga-gemini.json --resume                             # after a
   ```
   [ga gemini] turn T1.m2 running 40 s; the CLI may be retrying a quota error inside the turn · done 3 · running 1 · parked 0
   ```
-- **`max_parallel`** (tool steps at once) is handed to the Scheduler once K12 rev 3 is integrated; until then it is accepted, logged as pending, and tool steps run one at a time.
+- **`max_parallel`** (tool steps at once, default 4) is handed to rlo's Scheduler (K12 rev 3): ready tool steps run concurrently in a pool of that size.
 - **The daily quota** (`daily`: `requests`, default 20 for the free tier, shared by every session on the key; `reset_tz`, default `America/Los_Angeles`; `reset_at`, default `00:00`). ga counts the requests it sends today (`day.json`). When none are left, or the server says `TerminalQuotaError`, the step waits for the reset instead of spending a call on a known 429:
   ```
   [ga gemini] daily quota: T1.m3 parked — the quota resets at 00:00 America/Los_Angeles, in 15 h 0 min (at 08:00:00 here); one probe then
