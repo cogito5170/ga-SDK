@@ -7,10 +7,15 @@
     packages (PYTHONPATH removed).
 
 Skipped counts are always reported; F4 was a skip hiding a packaging problem.
+
+(b) also imports, from an empty directory, every module the source tree has under each top-level package the
+distribution installed (``import_check``). The tests run in the exported checkout, whose own copy can shadow the
+installed one; GA10's W1 sub-package was green that way and missing from the installed copy.
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -45,6 +50,35 @@ def parse_counts(output: str) -> Counts | None:
             kv[word.rstrip("s") if word in ("errors", "warnings") else word] = int(n)
         return Counts(kv.get("passed", 0), kv.get("failed", 0), kv.get("skipped", 0), kv.get("error", 0))
     return None
+
+
+# run by the clean venv's python with an empty working directory: argv = distribution name, source root
+IMPORT_CHECK = r"""
+import importlib, importlib.metadata as md, json, pathlib, sys
+dist, src = sys.argv[1], pathlib.Path(sys.argv[2])
+skip = (".dist-info", ".egg-info", ".pth", ".data")
+tops = sorted({(f.parts[0][:-3] if f.parts[0].endswith(".py") else f.parts[0]) for f in (md.distribution(dist).files or [])
+               if f.parts and not f.parts[0].endswith(skip) and f.parts[0] not in ("..", "__pycache__")})
+mods = []
+for top in tops:
+    if (src / top / "__init__.py").exists():
+        for p in sorted((src / top).rglob("*.py")):
+            parts = p.relative_to(src).with_suffix("").parts
+            if parts[-1] == "__main__" or not all((src.joinpath(*parts[:i]) / "__init__.py").exists() for i in range(1, len(parts))):
+                continue
+            mods.append(".".join(parts[:-1] if parts[-1] == "__init__" else parts))
+    elif (src / (top + ".py")).exists():
+        mods.append(top)
+missing, errors = [], []
+for m in mods:
+    try:
+        importlib.import_module(m)
+    except ModuleNotFoundError as e:
+        (missing if e.name and (m == e.name or m.startswith(e.name + ".")) else errors).append(m)
+    except Exception as e:
+        errors.append(m + ":" + type(e).__name__)
+print(json.dumps({"tops": tops, "checked": len(mods), "missing": missing, "errors": errors}))
+"""
 
 
 def file_url(path: Path) -> str:
@@ -153,5 +187,25 @@ class VenvBundle:
                 conflict = "ResolutionImpossible" in out or "conflicting dependencies" in out
                 return BundleResult("install", False, [], "pin_conflict" if conflict else "install_failed", out[-4000:])
         dirs = self._export_all(heads, base / "src")
-        runs = [self._run_tests(r, heads[r], dirs[r], vpy, env, "install") for r in sorted(heads)]
+        runs = [self.import_check(r, heads[r], (dirs[r] / self.cfg.repos[r].src).resolve(), vpy, env, base)
+                for r in sorted(heads) if self.cfg.repos[r].package]
+        runs += [self._run_tests(r, heads[r], dirs[r], vpy, env, "install") for r in sorted(heads)]
         return BundleResult("install", all(r.ok for r in runs), runs)
+
+    def import_check(self, repo: str, sha: str, src: Path, vpy: str, env: dict[str, str], base: Path) -> RepoRun:
+        """Import, from an empty directory, each source module of the packages the distribution installed.
+        A module the source has and the install lacks is ``missing_in_install``."""
+        empty = base / "empty"
+        empty.mkdir(exist_ok=True)
+        p = subprocess.run([vpy, "-c", IMPORT_CHECK, self.cfg.repos[repo].package, str(src)], cwd=str(empty), env=env,
+                           capture_output=True, timeout=self.timeout)
+        try:
+            got = json.loads(p.stdout.decode().strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            return RepoRun(repo, sha, "install", False, None, (p.stdout + p.stderr).decode(errors="replace")[-2000:], "import_check_failed")
+        if got["missing"] or not got["tops"]:
+            what = ", ".join(got["missing"]) or f"{self.cfg.repos[repo].package} installed no package"
+            return RepoRun(repo, sha, "install", False, None, what[:2000], "missing_in_install")
+        if got["errors"]:
+            return RepoRun(repo, sha, "install", False, None, ", ".join(got["errors"])[:2000], "import_error")
+        return RepoRun(repo, sha, "install", True, None, f"imported {got['checked']}", "")

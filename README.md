@@ -72,6 +72,14 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 
 더 강하게 지키려면 원격이 사람을 직접 확인해야 한다(예: GitHub 브랜치 보호). 세션마다 OS 사용자 · 컨테이너를 따로 두는 길도 있다.
 
+## 판정 바닥 (METHOD rev 9)
+
+- **알려진 건너뜀:** 저장소 설정 `"expected_skipped": {"count": 2, "why": "설치 메타데이터 시험"}`. 건너뜀이 정확히 그 수이고 까닭이 있으면 바닥에 넣지 않는다. 다른 수이거나 까닭이 없으면 `partial · measurement · skipped` 다.
+- **포장된 저장소**(`pyproject.toml` · `setup.py` · `setup.cfg`)를 깨끗한 설치(`Bundle` (b), 설정에 `package`) 없이 재현하면 `partial · measurement · not_install_checked` 다.
+- (b) 는 시험과 별도로, 깨끗한 venv 에서 빈 디렉터리를 작업 디렉터리로 두고 설치된 배포의 패키지 아래 **소스의 모든 모듈**을 import 한다. 시험은 checkout 에서 돌아 그 사본이 설치본을 가릴 수 있기 때문이다. 소스에 있고 설치본에 없는 모듈은 `failure · implementation`(`missing_in_install`) 이다.
+- **R4(ff 아님)** 는 게이트가 아니다. 통합하지 않고 그 세션 몫을 `partial · requirement` 로 둔 뒤, 허브가 그 지시의 rev+1(통합 브랜치를 합치고 다시 보고)을 스스로 보낸다.
+- 턴 프롬프트에는 채울 report/1 머리 틀이 들어간다(지시 id · rev, 자기 저장소마다 브랜치와 `<SHA>`).
+
 ## 시험
 
 ```sh

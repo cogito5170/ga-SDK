@@ -34,29 +34,40 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(self.origin_integ(w, "alpha"), sha)
         self.assertEqual(res.verdict["class"], "success")
 
-    def test_not_ff_is_blocked(self):
+    def test_not_ff_is_not_integrated_and_the_hub_sends_rev_plus_one(self):
+        # METHOD rev 9 (BD-146, GA10 F3): a non-fast-forward is routine, not a gate: B's share is partial
+        # (requirement) and the hub itself sends CMD-B1 rev 2 — merge the integration branch, report again
         w = World(judge_fn=ok_judge, remote=True, shared_alpha=True)
         self.addCleanup(w.close)
         w.hub.send(directive("CMD-A1", "A"))
         w.hub.send(directive("CMD-B1", "B"))
+        w.paste("A"), w.paste("B")
         a = w.work("A", "alpha", {"one.txt": "a\n"})
         b = w.work("B", "alpha", {"B_OWNS.txt": "b\n"})  # both branched from the same integration head
         w.report("A", [("CMD-A1", 1, "done")], [("alpha", a)])
         w.report("B", [("CMD-B1", 1, "done")], [("alpha", b)])
         res = w.hub.tick()
         self.assertEqual(res.integrated, {"alpha": a})
-        self.assertEqual(res.verdict["class"], "blocked")
+        self.assertEqual((res.verdict["class"], res.verdict["cause"]), ("partial", "requirement"))
         self.assertIn("R4", [p.rule for p in res.findings])
+        self.assertEqual(res.gates, [])
+        self.assertEqual(res.sent, ["CMD-B1"])
+        self.assertTrue(any("rev+1" in n for n in res.verdict["evidence"]["notes"]))
+        st = w.hub.load_state()
+        self.assertEqual((st["directives"]["CMD-B1"]["rev"], st["directives"]["CMD-B1"]["status"]), (2, "open"))
+        prompt = w.paste("B")
+        self.assertIn("merge --no-edit", prompt)
+        self.assertIn('"rev_seen": 2', prompt)  # the report template carries the new rev
         self.assertEqual(self.origin_integ(w, "alpha"), a)
         # B merges the integration branch first; then it fast-forwards
         wt = w.vcs.session_worktree("B", "alpha")
-        git(wt, "fetch", "--quiet", "origin")
-        git(wt, "merge", "--quiet", "--no-edit", "origin/integ")
-        git(wt, "push", "--quiet", "origin", "sess-b")
-        w.report("B", [("CMD-B1", 1, "done")], [("alpha", git(wt, "rev-parse", "HEAD"))])
+        git(wt, "fetch", "--quiet", "origin", "integ")
+        git(wt, "merge", "--quiet", "--no-edit", "FETCH_HEAD")
+        w.report("B", [("CMD-B1", 2, "done")], [("alpha", git(wt, "rev-parse", "HEAD"))])
         res2 = w.hub.tick()
         self.assertEqual(list(res2.integrated), ["alpha"])
         self.assertEqual(res2.verdict["class"], "success")
+        self.assertEqual(res2.sent, [])
 
     def test_ownership_violation_is_blocked(self):
         w = self.world()

@@ -195,3 +195,12 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - 실제 한 바퀴의 중계 스크립트는 `examples/verify/ga8_real.py` 다(init · send · tick). 허브는 로컬에서 돌고, 에이전트가 글과 세션을 MCP 도구로 나른다.
 
 - 기계 바닥 하나를 더했다(CMD-GA9, METHOD rev 8 §3.3, BD-144): 그 회차의 세션 글이 모두 형식에서 거절되고(report/1 · exchange/1 이 아니거나 세션이 쓸 수 없는 꼴) 받은 보고 0 · 통합 0 이면 `insufficient`(원인 requirement). 근거 notes 에 거절 수가 남는다. 받은 보고가 하나라도 있으면 걸리지 않는다.
+
+## 17. 실사용 1 차의 결함 고침 (CMD-GA11, METHOD rev 9)
+
+- GA10 실사용에서 ga 판정은 baseline 과 클래스 1/3 · 원인 0/3 이었다. 어긋남은 LLM Judge 가 아니라 기계 규칙 · 턴 프롬프트 · 설정에서 왔다.
+- `expected_skipped`(정확한 수 + 까닭) · `not_install_checked` 바닥 · R4 비ff 의 자동 rev+1(`Hub._merge_again`, 게이트 없음, 그 회차 Judge 의 같은 id 지시는 보내지 않는다).
+- `VenvBundle.import_check`: (b) 의 시험은 checkout 에서 돌아 소스 사본이 설치본을 가린다. 그래서 설치된 배포가 낸 최상위 패키지마다 소스의 모듈(`__main__` 빼고, `__init__.py` 가 이어진 곳만)을 빈 디렉터리에서 import 한다.
+- `report_template`: 턴 프롬프트에 report/1 머리 틀. `ga_dir` 는 Hub · GitVcs · CLI 에서 `resolve()` 한다.
+- 시험 세계(`tests/world.py`)는 Bundle (b) 를 돌릴 때만 포장된 저장소를 만든다(`packaged`). 경로만 돌리는 세계가 포장돼 있으면 rev 9 바닥에 걸리기 때문이다.
+

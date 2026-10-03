@@ -58,7 +58,28 @@ def post_allow(cfg: Config, session: str) -> list[str]:
     return [f"Bash({prefix}:*)"]
 
 
-def turn_prompt(cfg: Config, session: str, directive_text: str) -> str:
+def report_template(cfg: Config, session: str, directive: dict | None) -> list[str]:
+    """The report/1 head a turn fills in: the directive it handles and one commit claim per own repository
+    (GA10 F2: without it both first reports claimed no commit, so the hub could integrate nothing)."""
+    import json
+
+    s = cfg.sessions[session]
+    head = {"schema": "report/1", "from": session,
+            "handled": [{"id": directive["id"] if directive else "<지시 id>", "rev_seen": directive["rev"] if directive else 1,
+                         "status": "done"}],
+            "commits": [{"repo": r, "branch": s.branch_for(r), "sha": "<SHA>"} for r in s.repos]}
+    return [
+        "- 보고 머리는 이 틀을 채운다. `<SHA>` 는 커밋한 머리의 40 자 sha(`git -C <저장소> rev-parse HEAD`)다. "
+        "커밋하지 않은 저장소의 줄은 지운다. **커밋을 `commits` 로 주장하지 않으면 허브는 그것을 통합하지 않는다.** "
+        "다 못 했으면 `status` 를 `paused` 로 둔다.",
+        "",
+        "```ga",
+        json.dumps(head, ensure_ascii=False),
+        "```",
+    ]
+
+
+def turn_prompt(cfg: Config, session: str, directive_text: str, directive: dict | None = None) -> str:
     """What a Runner hands to a session for one turn: the directive, how to work, and how to report back."""
     s = cfg.sessions[session]
     if cfg.isolation == "remote":
@@ -86,6 +107,7 @@ def turn_prompt(cfg: Config, session: str, directive_text: str) -> str:
             "보고 없이 턴을 끝내면 허브는 아무 일도 없었던 것으로 본다.",
             f"- 보고: report/1 꼴의 파일을 Write 로 쓰고 이 명령으로 올린다: `{post_command(cfg, session)}`",
         ]
+    how += report_template(cfg, session, directive)
     return (
         f"[{cfg.hub_name} → {s.tag}] 새 지시가 통로 {s.channel or session} 에 왔다. 아래가 그 글이다.\n\n"
         f"{directive_text.rstrip()}\n\n" + "\n".join(how) + "\n"

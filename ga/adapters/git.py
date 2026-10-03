@@ -119,7 +119,8 @@ def git(cwd: str | Path, *args: str, check: bool = True, input: bytes | None = N
 class GitVcs:
     def __init__(self, cfg: Config, ga_dir: str | Path):
         self.cfg = cfg
-        self.ga_dir = Path(ga_dir)
+        # absolute: session clones are made with another working directory than this process's (GA10 F4)
+        self.ga_dir = Path(ga_dir).resolve()
 
     # ------------------------------------------------------------------ basics
 
@@ -190,6 +191,11 @@ class GitVcs:
     def commit_subjects(self, repo: str, base: str, head: str) -> list[str]:
         out = git(self.repo_dir(repo), "log", "--format=%s", f"{base}..{head}")
         return [l for l in out.splitlines() if l]
+
+    def packaged(self, repo: str, sha: str) -> bool:
+        """Whether the tree at ``sha`` is an installable Python package (pyproject.toml or setup.py / setup.cfg)."""
+        return any(subprocess.run(["git", "cat-file", "-e", f"{sha}:{name}"], cwd=str(self.repo_dir(repo)), capture_output=True).returncode == 0
+                   for name in ("pyproject.toml", "setup.py", "setup.cfg"))
 
     def export(self, repo: str, sha: str, dest: str | Path) -> Path:
         """Extract the tree of ``sha`` into ``dest`` (no worktree bookkeeping)."""

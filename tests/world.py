@@ -76,11 +76,14 @@ class World:
     def __init__(self, judge_fn: Callable[[JudgeContext], dict[str, Any]] | None = None, remote: bool = False,
                  modes: tuple[str, ...] = ("path",), runner=None, budget: dict | None = None, shared_alpha: bool = False,
                  beta_deps: list[str] | None = None, server_hooks: bool = True,
-                 isolation: str = "clone"):
+                 isolation: str = "clone", packaged: bool | None = None):
         self.tmp_obj = tempfile.TemporaryDirectory(prefix="ga-world-")
         self.tmp = Path(self.tmp_obj.name)
         isolate_git(self.tmp)
         self.remote = remote
+        # packaged repositories (pyproject.toml) are not a success without a clean install (METHOD rev 9), so by
+        # default a world is packaged only when it reproduces with Bundle (b)
+        self.packaged = ("install" in modes) if packaged is None else packaged
         self.repos = {}
         self.repos["alpha"] = self._make_repo("alpha", "alphapkg")
         self.repos["beta"] = self._make_repo("beta", "betapkg", beta_deps(self) if callable(beta_deps) else beta_deps)
@@ -90,7 +93,7 @@ class World:
             "integration_branch": self.INTEG,
             "repos": {
                 n: {"path": f"repos/{n}", "remote": "origin" if remote else "", "test": ["{python}", "-m", "unittest", "discover", "-s", "tests"],
-                    "package": f"{n}pkg"}
+                    "package": f"{n}pkg" if self.packaged else ""}
                 for n in self.repos
             },
             "sessions": {
@@ -139,7 +142,8 @@ class World:
         (d / pkg / "__init__.py").write_text("V = 1\n", encoding="utf-8")
         (d / "tests").mkdir()
         (d / "tests" / "test_x.py").write_text(TEST_OK, encoding="utf-8")
-        (d / "pyproject.toml").write_text(pyproject(pkg, deps), encoding="utf-8")
+        if self.packaged:
+            (d / "pyproject.toml").write_text(pyproject(pkg, deps), encoding="utf-8")
         (d / "README.md").write_text(f"# {name}\n", encoding="utf-8")
         git(d, "add", "-A")
         git(d, "commit", "--quiet", "-m", "init")

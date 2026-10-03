@@ -61,7 +61,7 @@ class Hub:
         today: Callable[[], str] = lambda: date.today().isoformat(),
     ):
         self.cfg = cfg
-        self.ga = Path(ga_dir)
+        self.ga = Path(ga_dir).resolve()  # a relative ga_dir broke the session clone (GA10 F4)
         self.channel = channel
         self.vcs = vcs
         self.judge = judge
@@ -131,7 +131,7 @@ class Hub:
         workdir = self._prepare_worktrees(to)
         start = self._session_heads(to)
         resume = st["resume"].get(to)
-        result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text), workdir, resume,
+        result = self.runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text, directive), workdir, resume,
                                                   permissions=self.sandbox_paths(to), budget=dict(directive.get("budget", {}))))
         self._writes += 1
         # numbers only: no prompt, transcript or answer text is kept
@@ -213,6 +213,28 @@ class Hub:
         (self.ga / "worktrees" / session).mkdir(parents=True, exist_ok=True)
         return {"protect": [str(p) for p in protect], "writable": [str(p) for p in writable], "allow": post_allow(self.cfg, session)}
 
+    def _merge_again(self, st: dict[str, Any], repo: str, session: str, did: str) -> tuple[dict[str, Any] | None, str]:
+        """rev+1 of ``did`` after an R4 non-fast-forward: merge the integration branch, report the merged head."""
+        prev = st["directives"].get(did)
+        if prev is None:
+            return None, ""
+        rev = prev["rev"] + 1
+        branch = self.cfg.sessions[session].branch_for(repo)
+        integ = self.cfg.integration_branch
+        doc = dict(prev["doc"], rev=rev, supersedes={"id": did, "rev": prev["rev"]},
+                   scope=f"{prev['doc']['scope']} — 이번 판은 통합 브랜치를 합치고 다시 보고만 한다(새 기능 없음)",
+                   done_when=f"{branch} 가 통합 브랜치 {integ} 를 포함하고, 합친 머리를 commits 로 주장한 보고가 올라온다")
+        doc.pop("budget", None)
+        if self.cfg.isolation == "worktree":
+            how = f"`git -C {repo} merge --no-edit {integ}`"
+        else:
+            how = f"`git -C {repo} fetch origin {integ}` 뒤 `git -C {repo} merge --no-edit FETCH_HEAD`"
+        body = (f"## 고친 까닭 (허브가 기계적으로 만든 지시, METHOD rev 9)\n"
+                f"보고한 `{repo}` 커밋이 통합 브랜치 `{integ}` 의 ff 가 아니라서(R4) 통합하지 않았다. 다른 세션의 일이 먼저 들어갔다.\n\n"
+                f"## 할 일\n1. 통합 브랜치를 네 브랜치 `{branch}` 에 합친다: {how}.\n"
+                f"2. 시험을 다시 돌린다.\n3. 합친 머리를 `commits` 로 주장해 다시 보고한다(머리 틀은 아래 '일하는 방법').\n")
+        return doc, body
+
     def _prepare_worktrees(self, session: str) -> Path:
         if self.cfg.isolation == "remote":  # the session's checkout is wherever the session runs, not here
             return self.ga
@@ -272,6 +294,7 @@ class Hub:
         # R1b: a change is integrated only as far as a report claims it under a directive sent to that session.
         # Commits nobody claims are not new work for the hub (the report is still to come) and are never integrated.
         claims: dict[tuple[str, str], str] = {}
+        claimed_under: dict[tuple[str, str], list[str]] = {}
         for r in reports:
             session = r["post"].channel
             under = [h["id"] for h in r["head"].get("handled", []) if st["directives"].get(h["id"], {}).get("to") == session]
@@ -287,6 +310,7 @@ class Hub:
                     res.findings += rules.r1b_unclaimed(self.cfg, c["repo"], session, c["sha"], "the claimed commit is not in the repository")
                     continue
                 claims[(c["repo"], session)] = full  # a later report overrides an earlier one
+                claimed_under[(c["repo"], session)] = under
         heads: dict[str, str] = {}
         candidates: list[tuple[str, str, str]] = []
         for repo in self.cfg.repos:
@@ -324,6 +348,7 @@ class Hub:
         # ---------------------------------------------------------- 2 integrate
         moved = {a.split(":")[1] for a in st.get("alerts", []) if a.startswith("R3:") and heads.get(a.split(":")[1]) == a.split(":", 2)[2]}
         integrated: dict[str, str] = {}
+        not_ff: list[tuple[str, str, str]] = []  # (repo, session, directive id) blocked only because not a fast-forward
         for repo, session, head in candidates:
             base = heads[repo]
             f: list[Problem] = []
@@ -338,6 +363,8 @@ class Hub:
             st["branches"].setdefault(repo, {})[session] = head
             if hard(f):
                 res.blocked.append(f"{repo}@{head[:7]} ({session})")
+                if not ff and all(p.rule == "R4" for p in hard(f)) and claimed_under.get((repo, session)):
+                    not_ff.append((repo, session, claimed_under[(repo, session)][-1]))
                 continue
             if dry_run:
                 res.plan.append(f"ff {repo} {self.cfg.integration_branch} {base[:7]} → {head[:7]} ({session})")
@@ -354,6 +381,9 @@ class Hub:
         notices += [self._exchange_note(x) for x in exchanges]
         if pending is None:
             evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st, rejected=rejected)
+            for repo, session, did in not_ff:
+                evidence["notes"].append(f"R4: {repo} {session} is not a fast-forward of {self.cfg.integration_branch}; "
+                                         f"the hub sends {did} rev+1 (merge it, report again) by itself — not a question (METHOD rev 9)")
             pending = {
                 "posts": [p.id for p in new_posts],
                 "reports": [{"post": r["post"].__dict__, "head": r["head"], "body": r["body"]} for r in reports],
@@ -426,6 +456,18 @@ class Hub:
         # ---------------------------------------------------------- 6b send (unless stopped)
         sent: list[str] = []
         send_findings: list[Problem] = []
+        for repo, session, did in not_ff:  # METHOD rev 9 (BD-146): mechanical, never a gate of its own
+            auto, auto_body = self._merge_again(st, repo, session, did)
+            if auto is None or did in sent:
+                continue
+            post, f_auto, g_auto = self.send(auto, auto_body, st, n)
+            send_findings += f_auto
+            gates += [g for g in g_auto if g.number not in approved]
+            if post:
+                sent.append(did)
+        if directive and directive.get("id") in sent:
+            send_findings.append(Problem("directive", f"judge's {directive['id']} not sent: the hub already sent its rev+1 this round", "soft", None))
+            directive = None
         if directive and not gates:
             post, send_findings, send_gates = self.send(directive, proposal.get("directive_body", ""), st, n)
             gates += [g for g in send_gates if g.number not in approved]
@@ -554,8 +596,12 @@ class Hub:
             evidence["notes"].append(f"all {rejected} session post(s) of the round refused by the forms; nothing integrated")
             worse("insufficient", "requirement")
         for p in hard(findings):
-            if p.rule in ("R1b", "R2", "R3", "R4", "R6"):
-                worse("blocked", {"R1b": "requirement", "R2": "requirement", "R3": "environment", "R4": "implementation", "R6": "implementation"}[p.rule])
+            if p.rule in ("R1b", "R2", "R3", "R6"):
+                worse("blocked", {"R1b": "requirement", "R2": "requirement", "R3": "environment", "R6": "implementation"}[p.rule])
+            elif p.rule == "R4":
+                # METHOD rev 9 (BD-146): a non-fast-forward is routine, not a design fork — not integrated, that
+                # session's share is partial (requirement), and the hub sends it rev+1 by itself (no gate)
+                worse("partial", "requirement")
         if tested and (integrated or reports):
             results = {}
             if "path" in self.modes:
@@ -575,15 +621,34 @@ class Hub:
                         if mode == "install" and other and other != c:
                             evidence["notes"].append(f"{run.repo}: path {other} vs install {c}")
                         if c["skipped"]:
-                            evidence["notes"].append(f"{run.repo} ({mode}): skipped {c['skipped']}")
-                            worse("partial", "measurement", "skipped")
+                            known = self.cfg.repos[run.repo].expected_skipped
+                            if known.get("why") and c["skipped"] == known.get("count"):
+                                # METHOD rev 9: exactly the known skips, with their reason, are not a floor
+                                evidence["notes"].append(f"{run.repo} ({mode}): skipped {c['skipped']} — known: {known['why']}")
+                            else:
+                                evidence["notes"].append(f"{run.repo} ({mode}): skipped {c['skipped']}")
+                                worse("partial", "measurement", "skipped")
                         if c["failed"] or c.get("errors"):
                             worse("failure", "implementation")
                     elif run.problem == "unparsed_output":
                         evidence["notes"].append(f"{run.repo} ({mode}): test output not understood")
                         worse("insufficient", "measurement")
+                    elif run.problem in ("missing_in_install", "import_error", "import_check_failed"):
+                        # the installed copy lacks (or cannot import) what the source has: the package is broken
+                        evidence["notes"].append(f"{run.repo} ({mode}): {run.problem}: {run.output[:300]}")
+                        if run.problem == "import_check_failed":
+                            worse("insufficient", "measurement")
+                        else:
+                            worse("failure", "implementation")
                     if not run.ok and run.counts and not (run.counts.failed or run.counts.errors):
                         worse("failure", "implementation")
+            # METHOD rev 9 (BD-146): a packaged repository reproduced without a clean install is not a success —
+            # a sub-package can be green on PYTHONPATH and missing from the installed copy (GA10 W1, F4)
+            installed = {run.repo for run in (results["install"].runs if "install" in results else [])}
+            for repo in sorted(tested):
+                if results and repo not in installed and self.vcs.packaged(repo, tested[repo]):
+                    evidence["notes"].append(f"{repo}: packaged, reproduced without a clean install (not_install_checked)")
+                    worse("partial", "measurement", "not_install_checked")
         # R11 and crossings
         for r in reports:
             head = r["head"]

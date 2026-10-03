@@ -7,7 +7,8 @@ Shape (``schema: ga-config/1``)::
       "hub": {"name", "repo", "session_id", "guidance", "session_guidance",
               "worker_head", "worker_tail", "wake"},
       "integration_branch": "...",
-      "repos": {"<name>": {"path", "remote", "src", "test": [...], "env", "package", "extras", "url", "slug", "push"}},
+      "repos": {"<name>": {"path", "remote", "src", "test": [...], "env", "package", "extras", "url", "slug", "push",
+                           "expected_skipped": {"count", "why"}}},
       "sessions": {"<name>": {"prefix", "tag", "branch", "branches", "repos", "channel",
                               "session_id", "first_directive"}},
       "ownership": [{"repo", "path", "session"}],        # first match wins
@@ -53,6 +54,9 @@ class Repo:
     # False: the integration branch is moved only in the hub's local repository and never pushed to the remote
     # (e.g. a real GitHub repository whose branches the hub must not write)
     push: bool = True
+    # tests the repository is known to skip, with why (METHOD rev 9 §3.3): exactly that many skips do not lower the
+    # floor; more, or no reason, and the skips are a floor as before. {"count": 2, "why": "..."}
+    expected_skipped: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -209,6 +213,11 @@ def problems_of(raw: Any) -> list[Problem]:
     for name, r in repos.items():
         if isinstance(r, dict) and "push" in r and not isinstance(r["push"], bool):
             bad(f"$.repos.{name}.push", "must be true or false")
+        if isinstance(r, dict) and "expected_skipped" in r:
+            es = r["expected_skipped"]
+            if (not isinstance(es, dict) or set(es) - {"count", "why"} or isinstance(es.get("count"), bool)
+                    or not isinstance(es.get("count"), int) or es["count"] < 0 or not isinstance(es.get("why", ""), str)):
+                bad(f"$.repos.{name}.expected_skipped", "must be {\"count\": <int >= 0>, \"why\": <text>}")
     budget = raw.get("budget", {})
     if not isinstance(budget, dict) or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in budget.values()):
         bad("$.budget", "must map names to non-negative numbers")

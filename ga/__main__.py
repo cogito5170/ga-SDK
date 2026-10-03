@@ -39,7 +39,7 @@ def _read(path: str) -> str:
 
 def _hub(args) -> Hub:
     cfg = gacfg.load(args.config)
-    ga_dir = Path(args.ga_dir) if args.ga_dir else Path(args.config).resolve().parent / ".ga"
+    ga_dir = Path(args.ga_dir).resolve() if args.ga_dir else Path(args.config).resolve().parent / ".ga"
     return Hub(cfg, ga_dir=ga_dir, channel=FileMailbox(ga_dir / "mailbox"), vcs=GitVcs(cfg, ga_dir),
                judge=make_judge(cfg, ga_dir), runner=make_runner(cfg, ga_dir))
 
@@ -115,7 +115,7 @@ def cmd_setup(args) -> int:
 
 def cmd_post(args) -> int:
     cfg = gacfg.load(args.config)
-    ga_dir = Path(args.ga_dir) if args.ga_dir else Path(args.config).resolve().parent / ".ga"
+    ga_dir = Path(args.ga_dir).resolve() if args.ga_dir else Path(args.config).resolve().parent / ".ga"
     text = _read(args.file)
     try:
         head, _, notes = parse_post(text, "report/1")
@@ -176,7 +176,7 @@ def cmd_check(args) -> int:
 
 def cmd_render(args) -> int:
     cfg = gacfg.load(args.config)
-    ga_dir = Path(args.ga_dir) if args.ga_dir else Path(args.config).resolve().parent / ".ga"
+    ga_dir = Path(args.ga_dir).resolve() if args.ga_dir else Path(args.config).resolve().parent / ".ga"
     store = RecordStore(ga_dir / "records")
     for name in store.write_rendered(store.root, {r: s.slug for r, s in cfg.repos.items() if s.slug}):
         print(name)
