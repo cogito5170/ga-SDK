@@ -4,7 +4,9 @@ The fake Gemini CLI (tests/fake_gemini.py) speaks the 0.62.0 stream-json shapes 
 mismatch, crash and max-turns turns replay recorded fixtures (tests/fixtures/gemini/*.jsonl).
 D1 a per-minute quota error mid-plan -> one status block, the state file, tool steps not held, the model step resumed
 with --resume, zero failed steps; a served-model mismatch is a failed turn. D2 kill while parked, then --resume.
-D3 the fixture run. D5 the daily quota: reset time, requests left today, one probe at reset, no loop, maxAttempts 1.
+D3 the fixture run. D5 the daily quota: reset time, requests left today, one probe at reset, no loop, maxAttempts 1
+written. D6 (rev 3) the in-turn status line, the rpm from config, max_parallel. No test claims that maxAttempts 1 bounds
+the preview model's retries: its policy allows 10 inside one turn (BD-232).
 """
 import io
 import json
@@ -155,7 +157,8 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual((c1["resume"], c2["resume"]), (None, "s-1"))
         self.assertNotEqual(c1["pid"], c2["pid"])  # S4: one short-lived process per turn
         own = self.box.dir / "st" / "gemini-cli-settings.json"
-        self.assertEqual({(c["settings"], c["max_attempts"]) for c in (c1, c2)}, {(str(own), 1)})  # the CLI fails fast
+        # written and handed over; it binds models outside the preview chain only (BD-232)
+        self.assertEqual({(c["settings"], c["max_attempts"]) for c in (c1, c2)}, {(str(own), 1)})
 
     def test_private_settings_keep_the_system_settings_in_force(self):
         sysf = Path(tempfile.mkdtemp()) / "system.json"
@@ -500,6 +503,52 @@ class DailyQuotaTest(RunTask, unittest.TestCase):
         self.assertEqual(G.next_reset(start, "America/Los_Angeles", "00:00"), start + 54_000)
         self.assertEqual(G.next_reset(start + 54_000, "America/Los_Angeles", "00:00"), start + 54_000 + 86_400)
         self.assertEqual(G.next_reset(start, "UTC", "00:00") % 86_400, 0)
+
+
+@needs_k12
+class InTurnStatusTest(RunTask, unittest.TestCase):
+    """D6 (S7): a turn running longer than turn_status_s gets one line per interval; a short turn none."""
+
+    def test_a_long_turn_gets_a_line_per_interval(self):
+        box, sup, ok, clock, out, snaps = self.run_task([{"plan": plan(), "sleep": 1.6}], turn_status_s=0.5)
+        self.assertTrue(ok, out)
+        lines = [x for x in out.splitlines() if x.startswith("[ga gemini] turn T1.m1 running")]
+        self.assertTrue(2 <= len(lines) <= 4, lines)  # at about 0.5, 1.0 and 1.5 s
+        self.assertIn("the CLI may be retrying a quota error inside the turn · done 0 · running 1 · parked 0", lines[0])
+        waits = [r for r in box.log() if r["event"] == "turn_wait"]
+        self.assertEqual(len(waits), len(lines))
+        self.assertTrue(all(0.4 <= b["seconds"] - a["seconds"] <= 0.9 for a, b in zip(waits, waits[1:])), waits)
+
+    def test_a_short_turn_gets_none(self):
+        box, sup, ok, clock, out, snaps = self.run_task([{"plan": plan()}], turn_status_s=0.5)
+        self.assertTrue(ok, out)
+        self.assertNotIn("running", out.replace("running 0", ""))
+        self.assertFalse([r for r in box.log() if r["event"] == "turn_wait"])
+
+    def test_the_default_interval_is_20_s(self):
+        self.assertEqual(G.GeminiConfig(root=Path(".")).turn_status_s, 20.0)
+
+
+@needs_k12
+class ConfigToSchedulerTest(RunTask, unittest.TestCase):
+    def test_the_rpm_comes_from_the_config(self):
+        box, sup, ok, *_ = self.run_task([{"plan": plan()}], budget={"rpm": 7})
+        self.assertEqual(sup.sched.gov.budgets[MODEL].rpm, 7)
+        f = box.dir / "minimal.json"
+        f.write_text(json.dumps({"schema": G.CONFIG_SCHEMA}))
+        self.assertEqual(G.load_config(f).budget, G.DEFAULT_BUDGET)  # below the server limit, so 429s are rare
+        self.assertEqual(G.DEFAULT_BUDGET, {"rpm": 5})
+
+    def test_max_parallel_reaches_a_scheduler_that_takes_it(self):
+        from rlo.scheduler import Scheduler
+        import inspect
+        box, sup, ok, *_ = self.run_task([{"plan": plan()}], max_parallel=3)
+        self.assertTrue(ok)
+        if "max_parallel" in inspect.signature(Scheduler).parameters:  # K12 rev 3
+            self.assertEqual(sup.sched.max_parallel, 3)
+        else:  # K12 rev 2 (the pin until rev 3 is integrated): accepted, pending
+            self.assertEqual([r["max_parallel"] for r in box.log() if r["event"] == "max_parallel_pending"], [3])
+        self.assertTrue(G.config_problems({"schema": G.CONFIG_SCHEMA, "max_parallel": 0}))
 
 
 @needs_k12
