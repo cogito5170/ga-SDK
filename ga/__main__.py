@@ -234,6 +234,11 @@ def cmd_render(args) -> int:
     return 0
 
 
+def cmd_gemini(args) -> int:
+    from . import gemini  # rlo is imported only when a task runs
+    return gemini.main(args)
+
+
 RLO_CLI = "ga.rlo.cli"
 
 
@@ -296,6 +301,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to", required=True); p.add_argument("--kind", required=True, choices=["directive", "report", "verdict", "question", "ack"])
     p.add_argument("--ref", required=True); p.add_argument("--id"); p.set_defaults(fn=cmd_notify)
     p = sub.add_parser("render"); p.set_defaults(fn=cmd_render)
+    p = sub.add_parser("gemini", help="Gemini supervisor: fixed model, closed step list, wait-and-resume (CMD-GA21)")
+    p.add_argument("prompt", nargs="*"); p.add_argument("--resume", action="store_true")
+    p.add_argument("--config", dest="gemini_config", default="ga-gemini.json"); p.set_defaults(fn=cmd_gemini)
     sub.add_parser("rlo", add_help=False, help="rlo Autonomy commands (ga.rlo, owned by GR)")  # listed here, run above
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:

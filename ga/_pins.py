@@ -11,10 +11,10 @@ from __future__ import annotations
 
 # name -> (distribution, extras, repository URL, commit sha)
 PINS = {
-    "rlo": ("rlo-sdk", ("sensor",), "https://github.com/cogito5170/rlo-SDK", "3323f88741c198f453370936c481c00fbd26d398"),
+    "rlo": ("rlo-sdk", ("sensor",), "https://github.com/cogito5170/rlo-SDK", "250a88e56a74d2776688d34ec732cbd0f4244ba0"),
 }
-# the version the pinned commit carries (rlo-SDK pyproject at that sha)
-VERSIONS = {"rlo-sdk": "0.6.0"}
+# the version the pinned commit carries (rlo-SDK pyproject at that sha; K12, branch claude/peaceful-maxwell-i9vqpx, for ga gemini)
+VERSIONS = {"rlo-sdk": "0.7.0"}
 
 
 def requirement(pin: tuple) -> str:

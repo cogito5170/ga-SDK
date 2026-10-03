@@ -21,7 +21,7 @@ import ga.__main__ as gamain
 from ga import _pins
 
 ROOT = Path(__file__).resolve().parents[1]
-RLO_REQ = "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@3323f88741c198f453370936c481c00fbd26d398"
+RLO_REQ = "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@250a88e56a74d2776688d34ec732cbd0f4244ba0"
 
 
 def _canon(name: str) -> str:
@@ -57,7 +57,7 @@ class PinTest(unittest.TestCase):
         self.assertEqual(_pins.requirements(), [RLO_REQ])
         dist, extras, url, sha = _pins.PINS["rlo"]
         self.assertRegex(sha, r"^[0-9a-f]{40}$")
-        self.assertEqual(_pins.VERSIONS, {"rlo-sdk": "0.6.0"})
+        self.assertEqual(_pins.VERSIONS, {"rlo-sdk": "0.7.0"})
 
     def test_pyproject_says_what_the_pins_say(self):
         self.assertEqual(sorted(map(req, pyproject_dependencies())), sorted(map(req, _pins.requirements())))
