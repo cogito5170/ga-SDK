@@ -318,3 +318,9 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
   - marking read only after printing; scan; the guard event;
   - an end-to-end run through `bash -c` with a minimal environment.
 
+## 29. Google secrets in R6 (CMD-GA24, BD-254)
+
+- `rules.SECRET_PATTERNS` adds `AIza…{35}` (Google / Gemini API key), `ya29.…` (OAuth access token), `1//…` (OAuth refresh token), `GOCSPX-…` (OAuth client secret) and the JSON field form `"access_token" | "refresh_token" | "client_secret": "<16+>"`.
+- They reach every user of the list: R6 (hub: outgoing directives and integration diffs; `ga check`; `ga post`) and `ga mail` (refused on send, flagged on read). `tests/test_secrets.py` has a test per place, fakes assembled at runtime, and a no-false-positive check over every tracked text file and a form that only names `GEMINI_API_KEY`.
+- That repository-wide check found one old hit: GA15's `tests/test_github_remote.py` held a fake token as a literal (`TOKEN = "fake-token-…"`), caught by the existing `token = '…'` pattern. It is now assembled at runtime.
+

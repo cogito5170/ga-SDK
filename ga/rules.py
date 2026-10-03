@@ -23,6 +23,13 @@ SECRET_PATTERNS = [
     r"xox[abposr]-[A-Za-z0-9-]{10,}",
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
     r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][A-Za-z0-9_\-/+]{16,}['\"]",
+    # Google (CMD-GA24, BD-254): the only secrets this project holds are GEMINI_API_KEY and the Google OAuth tokens that
+    # agy / Gemini CLI sign-in stores
+    r"AIza[0-9A-Za-z_-]{35}",                     # Google / Gemini API key
+    r"ya29\.[0-9A-Za-z_-]{20,}",                   # OAuth access token
+    r"1//[0-9A-Za-z_-]{30,}",                      # OAuth refresh token
+    r"GOCSPX-[0-9A-Za-z_-]{20,}",                  # OAuth client secret
+    r'"(access_token|refresh_token|client_secret)"\s*:\s*"[^"]{16,}"',  # the same, as JSON fields
 ]
 
 REQUEST_RE = re.compile(r"요청\s*:\s*([^\s,·:]+)")
