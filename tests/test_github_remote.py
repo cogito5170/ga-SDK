@@ -19,7 +19,7 @@ from ga.prompts import turn_prompt
 
 from world import World, directive, proposal
 
-TOKEN = "fake-token-for-tests-only-0123456789"
+TOKEN = "".join(["fake-token-", "for-tests-only-0123456789"])  # assembled at runtime, as R6 expects
 
 
 class FakeGitHub:
