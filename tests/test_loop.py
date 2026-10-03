@@ -407,3 +407,67 @@ class CrossingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RejectedReportFloorTest(unittest.TestCase):
+    """METHOD rev 8 §3.3 (BD-144, CMD-GA9): every report of a round refused by the forms and nothing integrated
+    makes the machine floor 'insufficient' (cause requirement) — GA8 round 1, where it stayed 'success'."""
+
+    def setUp(self):
+        self.w = World()
+        self.addCleanup(self.w.close)
+        self.w.hub.send(directive("CMD-A1", "A"))
+        self.w.hub.send(directive("CMD-B1", "B"))
+        self.start = self.w.integ("alpha")
+
+    def short_sha_report(self, session, repo, sha):
+        # GA8 round 1: the claimed sha has 4 characters; report/1 wants 7-40
+        head = {"schema": "report/1", "from": session, "handled": [{"id": f"CMD-{session}1", "rev_seen": 1, "status": "done"}],
+                "commits": [{"repo": repo, "branch": self.w.cfg.sessions[session].branch_for(repo), "sha": sha[:4]}]}
+        self.w.mail.post(session, session, dump_text(head, "## Result\n했다\n"))
+
+    def test_ga8_round1_shape_is_insufficient_requirement(self):
+        w = self.w
+        sha = w.work("A", "alpha", {"x.txt": "1\n"})
+        self.short_sha_report("A", "alpha", sha)
+        w.proposals.append(proposal("success", "wait", "판정자는 성공이라 한다"))
+        res = w.hub.tick()
+        self.assertEqual(res.integrated, {})
+        self.assertEqual(w.integ("alpha"), self.start)
+        self.assertEqual((res.verdict["class"], res.verdict["cause"]), ("insufficient", "requirement"))
+        self.assertTrue(any("refused by the forms" in n for n in res.verdict["evidence"]["notes"]))
+        self.assertTrue(any("judge proposed success" in n for n in res.verdict["evidence"]["notes"]))
+
+    def test_post_of_a_form_a_session_may_not_use_counts_too(self):
+        w = self.w
+        w.mail.post("A", "A", dump_text({"schema": "verdict/1", "class": "success", "evidence": {"heads": {}, "tests": {}},
+                                         "claims_vs_evidence": [], "next": {"choice": "wait", "reason": "x"}}))
+        res = w.hub.tick()
+        self.assertEqual((res.verdict["class"], res.verdict["cause"]), ("insufficient", "requirement"))
+
+    def test_a_good_report_with_integration_lifts_the_floor(self):
+        w = self.w
+        self.short_sha_report("A", "alpha", w.work("A", "alpha", {"x.txt": "1\n"}))
+        sha_b = w.work("B", "beta", {"b.txt": "1\n"})
+        w.report("B", [("CMD-B1", 1, "done")], [("beta", sha_b)])
+        res = w.hub.tick()
+        self.assertEqual(res.integrated, {"beta": sha_b})
+        self.assertEqual(res.verdict["class"], "success")
+        self.assertFalse(any("refused by the forms" in n for n in res.verdict["evidence"]["notes"]))
+
+    def test_a_good_report_without_integration_lifts_it_too(self):
+        # "보고가 모두 거절" fails: one report was taken, even though it claims no commit
+        w = self.w
+        self.short_sha_report("A", "alpha", w.work("A", "alpha", {"x.txt": "1\n"}))
+        w.report("B", [("CMD-B1", 1, "paused")], body="## Blocker\n못 했다\n")
+        res = w.hub.tick()
+        self.assertEqual(res.integrated, {})
+        self.assertNotEqual(res.verdict.get("cause"), "requirement")
+        self.assertFalse(any("refused by the forms" in n for n in res.verdict["evidence"]["notes"]))
+
+    def test_judge_may_still_go_stricter(self):
+        w = self.w
+        self.short_sha_report("A", "alpha", w.work("A", "alpha", {"x.txt": "1\n"}))
+        w.proposals.append(proposal("blocked", "ask_user", "더 엄하게", cause="environment"))
+        res = w.hub.tick()
+        self.assertEqual((res.verdict["class"], res.verdict["cause"]), ("blocked", "environment"))

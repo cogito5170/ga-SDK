@@ -194,3 +194,4 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - `isolation: "remote"`: 허브는 세션 checkout 을 만들지 않고, 원격을 fetch 해 세션 브랜치를 읽는다. `Repo.push: false` 면 통합 브랜치를 로컬에서만 ff 한다. 세션 쪽 R3 는 플랫폼의 몫이다(README 표).
 - 실제 한 바퀴의 중계 스크립트는 `examples/verify/ga8_real.py` 다(init · send · tick). 허브는 로컬에서 돌고, 에이전트가 글과 세션을 MCP 도구로 나른다.
 
+- 기계 바닥 하나를 더했다(CMD-GA9, METHOD rev 8 §3.3, BD-144): 그 회차의 세션 글이 모두 형식에서 거절되고(report/1 · exchange/1 이 아니거나 세션이 쓸 수 없는 꼴) 받은 보고 0 · 통합 0 이면 `insufficient`(원인 requirement). 근거 notes 에 거절 수가 남는다. 받은 보고가 하나라도 있으면 걸리지 않는다.

@@ -268,7 +268,7 @@ class Hub:
                     res.findings += rules.r1_post(self.cfg, name, p.author)
         for repo in self.cfg.repos:
             self.vcs.fetch(repo)
-        reports, exchanges, notices = self._parse_posts(new_posts)
+        reports, exchanges, notices, rejected = self._parse_posts(new_posts)
         # R1b: a change is integrated only as far as a report claims it under a directive sent to that session.
         # Commits nobody claims are not new work for the hub (the report is still to come) and are never integrated.
         claims: dict[tuple[str, str], str] = {}
@@ -353,7 +353,7 @@ class Hub:
         # ---------------------------------------------------------- 3 reproduce
         notices += [self._exchange_note(x) for x in exchanges]
         if pending is None:
-            evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st)
+            evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st, rejected=rejected)
             pending = {
                 "posts": [p.id for p in new_posts],
                 "reports": [{"post": r["post"].__dict__, "head": r["head"], "body": r["body"]} for r in reports],
@@ -503,14 +503,17 @@ class Hub:
 
     # ================================================================== helpers
 
-    def _parse_posts(self, posts: list[Post]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
-        """Split new posts into reports (report/1) and exchanges (exchange/1, §3.5). Anything else is a notice."""
+    def _parse_posts(self, posts: list[Post]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], int]:
+        """Split new posts into reports (report/1) and exchanges (exchange/1, §3.5). Anything else is a notice.
+        The last value counts the posts refused by the forms (no valid report/1 or exchange/1 in them)."""
         reports, exchanges, notices = [], [], []
+        rejected = 0
         for p in posts:
             try:
                 head, body, notes = parse_post(p.text)
             except FormError as e:
                 notices.append(f"post {p.id} by {p.author} is not a report/1 or exchange/1: {e}")
+                rejected += 1
                 continue
             if head["schema"] == "exchange/1":
                 if head["from"] != p.channel:
@@ -519,12 +522,13 @@ class Hub:
                 continue
             if head["schema"] != "report/1":
                 notices.append(f"post {p.id} by {p.author}: a session may post report/1 or exchange/1, not {head['schema']}")
+                rejected += 1
                 continue
             if head["from"] != p.channel:
                 notices.append(f"post {p.id}: report from {head['from']} in {p.channel}'s channel")
             reports.append({"post": p, "head": head, "body": body})
             notices += [f"post {p.id}: {n}" for n in notes]
-        return reports, exchanges, notices
+        return reports, exchanges, notices, rejected
 
     @staticmethod
     def _exchange_note(x: dict[str, Any]) -> str:
@@ -534,7 +538,7 @@ class Hub:
             note += f" · proposal {h['proposal']}"
         return note
 
-    def _reproduce(self, heads, integrated, reports, findings, st):
+    def _reproduce(self, heads, integrated, reports, findings, st, rejected: int = 0):
         tested = {r: heads[r] for r in heads if self.cfg.repos[r].test or self.cfg.repos[r].package}
         evidence: dict[str, Any] = {"heads": dict(sorted(heads.items())), "tests": {}, "notes": []}
         machine: dict[str, Any] | None = None
@@ -544,6 +548,11 @@ class Hub:
             if machine is None or CLASS_RANK[cls] > CLASS_RANK[machine["class"]]:
                 machine = {"class": cls, "cause": cause, **({"subclass": sub} if sub else {})}
 
+        if rejected and not reports and not integrated:
+            # METHOD rev 8 §3.3 (BD-144): every report of the round was refused by the forms and nothing was
+            # integrated — a fact the machine proves, so it is a floor, not a notice only (GA8 round 1)
+            evidence["notes"].append(f"all {rejected} session post(s) of the round refused by the forms; nothing integrated")
+            worse("insufficient", "requirement")
         for p in hard(findings):
             if p.rule in ("R1b", "R2", "R3", "R4", "R6"):
                 worse("blocked", {"R1b": "requirement", "R2": "requirement", "R3": "environment", "R4": "implementation", "R6": "implementation"}[p.rule])
