@@ -22,7 +22,7 @@ from .adapters.venv import VenvBundle
 from .config import Config
 from .forms import FormError, Problem, canonical_json, dump_text, hard, load, parse_post, parse_sections
 from .gates import Gate, detect, question_for
-from .prompts import turn_prompt
+from .prompts import post_allow, turn_prompt
 from .records import RecordStore
 
 CLASS_RANK = {"blocked": 4, "failure": 3, "insufficient": 2, "partial": 1}
@@ -197,7 +197,7 @@ class Hub:
         Empty in worktree isolation: a worktree keeps its git data inside the hub's repository, so it cannot work
         with that repository read-only — that mode has no structural R3 (see README)."""
         if self.cfg.isolation != "clone":
-            return {}
+            return {"allow": post_allow(self.cfg, session)}
         protect = [self.cfg.base_dir, self.ga]
         for r in self.cfg.repos:
             protect.append(self.vcs.repo_dir(r))
@@ -210,7 +210,7 @@ class Hub:
             (Path(root) / session).mkdir(parents=True, exist_ok=True)
             writable.append(Path(root) / session)
         (self.ga / "worktrees" / session).mkdir(parents=True, exist_ok=True)
-        return {"protect": [str(p) for p in protect], "writable": [str(p) for p in writable]}
+        return {"protect": [str(p) for p in protect], "writable": [str(p) for p in writable], "allow": post_allow(self.cfg, session)}
 
     def _prepare_worktrees(self, session: str) -> Path:
         s = self.cfg.sessions[session]

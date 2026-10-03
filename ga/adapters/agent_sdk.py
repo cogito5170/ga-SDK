@@ -112,7 +112,7 @@ class AgentSDKRunner:
             "cwd": str(req.workdir),
             "cli_path": str(cli_path),
             "permission_mode": self.permission_mode,
-            "allowed_tools": self.allowed_tools,
+            "allowed_tools": self.allowed_tools + list(req.permissions.get("allow", [])),
             "disallowed_tools": self.disallowed_tools,
             "setting_sources": [],  # no user / project / local settings files: only what ga passes
         }

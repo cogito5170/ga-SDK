@@ -33,6 +33,10 @@ DEFAULT_ALLOWED = (
     "Read", "Write", "Edit", "Glob", "Grep",
     "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
     "Bash(git push origin:*)",
+    # harmless or read-only commands a turn reaches for first; refusing them made ordinary turns give up
+    # quietly (GA5 rev 2 B, GA6 run 1 A — CMD-GA7). Writes stay inside the sandbox; the guard still runs.
+    "Bash(git -C:*)", "Bash(git rev-parse:*)", "Bash(git show:*)", "Bash(git branch:*)",
+    "Bash(ls:*)", "Bash(pwd)", "Bash(cat:*)", "Bash(head:*)", "Bash(wc:*)", "Bash(mkdir:*)", "Bash(cd:*)",
 )
 # best effort: the pre-push hook is client side, so keep the turn away from the switches that skip it
 DEFAULT_DISALLOWED = ("Bash(git push --no-verify:*)", "Bash(git config:*)", "Bash(git -c:*)", "Bash(git commit --no-verify:*)")
@@ -109,8 +113,9 @@ class HeadlessRunner:
         argv = [self.executable, "-p", "--output-format", "json", "--permission-mode", self.permission_mode]
         if self.model:
             argv += ["--model", self.model]
-        if self.allowed_tools:
-            argv += ["--allowedTools", ",".join(self.allowed_tools)]
+        allowed = self.allowed_tools + list(req.permissions.get("allow", []))
+        if allowed:
+            argv += ["--allowedTools", ",".join(allowed)]
         if self.disallowed_tools:
             argv += ["--disallowedTools", ",".join(self.disallowed_tools)]
         cap = req.budget.get("max_budget_usd", self.max_budget_usd) if req.budget else self.max_budget_usd
