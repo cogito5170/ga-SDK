@@ -144,7 +144,11 @@ class GitHubChannelTest(FakeGitHubCase):
         self.gh.comments[1].append({"id": 5, "body": "그냥 글", "user": {"login": "someone"}, "created_at": ""})
         self.assertEqual([(p.author, p.text) for p in self.channel().read("A")], [("someone", "그냥 글")])
         self.assertEqual(split_author(with_author("x\n", "B.2"), "me"), ("B.2", "x\n"))
-        self.assertEqual(split_author("<!-- ga-author: A --> 가운데\n", "me")[0], "me")  # only a trailing marker counts
+        self.assertEqual(split_author("<!-- ga-author: A --> 가운데\n", "me")[0], "me")  # a marker shares no line
+        # a footer appended by the platform after the marker keeps the author; the last marker wins
+        a, t = split_author("```ga\n{}\n```\n<!-- ga-author: A -->\n\n<!-- ga-author: B -->\n\n---\n_footer_\n", "me")
+        self.assertEqual(a, "B")
+        self.assertTrue(t.startswith("```ga\n{}\n```\n<!-- ga-author: A -->") and t.endswith("---\n_footer_\n"))
 
     def test_rate_limits(self):
         ch = self.channel()

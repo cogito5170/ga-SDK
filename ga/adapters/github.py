@@ -3,7 +3,9 @@
 Standard library only (urllib). The token is read from an environment variable at each request and never
 stored, logged or written into a post. Because every comment may come from the same GitHub account (the
 person runs hub and sessions), the ga author travels in the text as a trailing marker line
-``<!-- ga-author: <name> -->``; without it, the GitHub login is the author.
+``<!-- ga-author: <name> -->`` on its own line (the last such line counts; a footer may follow it); without it,
+the GitHub login is the author. The marker is a claim, like the login: in a one-account setup it is what tells
+hub and sessions apart, not a proof of who wrote the comment.
 
 Post ids are the comment ids zero-padded to 20 digits, so they sort in posting order like the mailbox's.
 Reading follows ``Link: rel="next"`` pages. A rate limit (429, or 403 with ``X-RateLimit-Remaining: 0``)
@@ -23,7 +25,7 @@ from typing import Any, Callable
 
 from .base import Post
 
-MARKER_RE = re.compile(r"\n?<!-- ga-author: ([A-Za-z0-9._-]+) -->\s*\Z")
+MARKER_RE = re.compile(r"^<!-- ga-author: ([A-Za-z0-9._-]+) -->[ \t]*$", re.M)
 NEXT_RE = re.compile(r'<([^>]+)>;\s*rel="next"')
 
 
@@ -44,10 +46,14 @@ def with_author(text: str, author: str) -> str:
 
 
 def split_author(body: str, login: str) -> tuple[str, str]:
-    m = MARKER_RE.search(body)
-    if not m:
+    """(author, text): the last marker line names the author and is taken out. It need not be the very last line —
+    a platform may append its own footer after it."""
+    marks = list(MARKER_RE.finditer(body))
+    if not marks:
         return login, body
-    return m.group(1), body[: m.start()].rstrip("\n") + "\n"
+    m = marks[-1]
+    before, after = body[: m.start()].rstrip("\n"), body[m.end():].strip("\n")
+    return m.group(1), before + "\n" + (after + "\n" if after else "")
 
 
 class GitHubIssueChannel:
