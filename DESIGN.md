@@ -184,3 +184,13 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
   - 래퍼는 Runner 의 `_wrappers/` 에 있다. 이곳은 샌드박스가 보호하고, 턴마다 다시 쓴다.
 - 턴 진단 라벨 `turns[].diag = {committed, posts, reports_ok, claims_known}` (GA5 rev 2 의 F8 꼴을 막는다).
   - 턴 시작 때 세션 머리와 지시 글 id 를 기록한다. 끝을 아는 Runner 는 턴 직후에, 그 밖의 Runner 는 세션이 글을 올린 tick 에서 계산한다.
+
+## 16. GitHub 이슈 Channel · 원격 세션 Runner (CMD-GA8)
+
+- `ga/adapters/github.py`: `GitHubIssueChannel` 은 이슈 댓글 API 만 쓴다(목록 · 만들기). 글 id 는 댓글 id 를 20 자리로 채운 것이라 우편함처럼 올린 순서로 정렬된다.
+  - 한 계정이 허브와 세션을 다 쓸 수 있으므로 작성자를 댓글의 마지막 `<!-- ga-author: X -->` 줄로 나른다. 그 줄 뒤에 플랫폼이 꼬리말을 붙여도 된다. 이 줄은 주장이다(로그인도 같은 계정이면 마찬가지다).
+  - 시험은 가짜 HTTP 서버(`tests/test_github_remote.py`)로 모든 길을 돈다: 쓰기 · 읽기 · 페이지 넘김 · 페이지 중간의 속도 제한 · 401/404/422/500 · 닿지 않음 · 토큰 없음.
+- `RemoteSessionRunner(send)`: 같은 Runner 인터페이스. `send(request) -> {"session_id"}` 는 원격 세션을 만들거나 깨울 힘이 있는 쪽이 준다. 라이브러리 안에서 부를 공개 API 가 없기 때문이다(막힘, 대안 = 콜백).
+- `isolation: "remote"`: 허브는 세션 checkout 을 만들지 않고, 원격을 fetch 해 세션 브랜치를 읽는다. `Repo.push: false` 면 통합 브랜치를 로컬에서만 ff 한다. 세션 쪽 R3 는 플랫폼의 몫이다(README 표).
+- 실제 한 바퀴의 중계 스크립트는 `examples/verify/ga8_real.py` 다(init · send · tick). 허브는 로컬에서 돌고, 에이전트가 글과 세션을 MCP 도구로 나른다.
+

@@ -8,7 +8,7 @@ script relays: the hub's Channel is a ``CallbackChannel`` over files, its Runner
     ga8_real.py send --work W        # hub posts CMD-A1 -> W/relay/out/A/*.md, turn -> W/outbox/A/*.json
       (agent: post the .md as a comment on issue N; create the remote session with the .json prompt and
        write its id to W/outbox/A/session_id; when it has reported, write the issue's comments to
-       W/relay/in/A.json as [{"id", "body", "login", "created_at"}])
+       W/relay/in/A.json as the issue_read get_comments result: [{"id", "body", "user": {"login"}, "created_at"}])
     ga8_real.py tick --work W --out results.json   # hub reads, fetches the remote, integrates locally
 
 Only numbers and labels go into the results file. The integration branch is never pushed (``push: false``).
@@ -44,8 +44,12 @@ def relay_channel(work: Path) -> CallbackChannel:
     def post(channel: str, author: str, text: str) -> Post:
         d = out / channel
         d.mkdir(parents=True, exist_ok=True)
-        pid = f"{time.time_ns():020d}"
-        (d / f"{pid}.md").write_text(with_author(text, author), encoding="utf-8")
+        # the real id is known only after the agent posts it; until then the post stands just after the last post
+        # the hub has seen on that channel, so "posts after the directive" (turn diag) stays right
+        f = inn / f"{channel}.json"
+        rows = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+        pid = f"{max([int(c['id']) for c in rows] or [0]):020d}"
+        (d / f"{time.time_ns():020d}.md").write_text(with_author(text, author), encoding="utf-8")
         return Post(pid, channel, author, "", text)
 
     def read(channel: str, after: str | None) -> list[Post]:
@@ -56,7 +60,7 @@ def relay_channel(work: Path) -> CallbackChannel:
             pid = f"{int(c['id']):020d}"
             if after is not None and pid <= after:
                 continue
-            author, text = split_author(c["body"], c.get("login", "?"))
+            author, text = split_author(c["body"], c.get("login") or (c.get("user") or {}).get("login", "?"))
             posts.append(Post(pid, channel, author, c.get("created_at", ""), text))
         return sorted(posts, key=lambda p: p.id)
 
@@ -67,7 +71,7 @@ def hub(work: Path) -> Hub:
     cfg = gacfg.load(work / "ga.json")
     vcs = GitVcs(cfg, work / ".ga")
 
-    def judge(ctx):  # scripted: the machine class is the floor either way; no model turn is spent on judging
+    def judge(ctx):  # proposes the lowest class, so the verdict is the machine floor alone; no model turn spent
         return {"verdict": {"schema": "verdict/1", "class": "success", "evidence": {"heads": {}, "tests": {}},
                             "claims_vs_evidence": [], "next": {"choice": "wait", "reason": "GA8 시연 한 바퀴"}},
                 "summary": "GA8 시연", "directive": None}
@@ -106,18 +110,18 @@ def cmd_init(a) -> None:
 def cmd_send(a) -> None:
     work = Path(a.work)
     h = hub(work)
-    d = {"schema": "directive/1", "id": "CMD-A1", "rev": 1, "to": "A",
+    d = {"schema": "directive/1", "id": "CMD-A1", "rev": a.rev, "to": "A",
          "goal": "원격 세션이 ga-SDK 에 examples/remote/ga8_hello.txt 한 줄을 남기고 보고한다",
          "why": "GA8 원격 Runner 시연 (짧은 정상 일)", "scope": "examples/remote/ga8_hello.txt 하나",
          "done_when": "파일이 자기 브랜치에 커밋 · push 되고 report/1 이 통로에 올라온다"}
     branch = h.cfg.sessions["A"].branch_for("sdk")
-    body = ("## 할 일\n"
+    body = (("## 고친 까닭\n" + a.note + "\n\n" if a.note else "") + "## 할 일\n"
             "1. `examples/remote/ga8_hello.txt` 파일을 만들고 내용은 `ga8 remote ok` 한 줄.\n"
             f"2. 커밋하고 브랜치 `{branch}` 로 push 한다.\n"
             "3. 통로 이슈에 댓글 하나로 보고한다. 맨 앞은 아래 머리(<SHA> 는 네 커밋), 뒤에 `## Result` 한 줄, "
             "마지막 줄은 `<!-- ga-author: A -->`.\n"
             "```ga\n" + json.dumps({"schema": "report/1", "from": "A",
-                                    "handled": [{"id": "CMD-A1", "rev_seen": 1, "status": "done"}],
+                                    "handled": [{"id": "CMD-A1", "rev_seen": a.rev, "status": "done"}],
                                     "commits": [{"repo": "sdk", "branch": branch, "sha": "<SHA>"}]}, ensure_ascii=False)
             + "\n```\n")
     post, findings, gates = h.send(d, body)
@@ -140,6 +144,10 @@ def cmd_tick(a) -> None:
         "verdict": (res.verdict or {}).get("class"),
         "cause": (res.verdict or {}).get("cause"),
         "findings": sorted({f"{p.rule}:{p.strength}" for p in res.findings if p.rule}),
+        "rounds": [{k: r.get(k) for k in ("n", "verdict", "directives")} | {"notices": len(r.get("notices", [])),
+                    "rejected_posts": sum("is not a report/1" in x for x in r.get("notices", [])),
+                    "integrated_repos": [x["repo"] for x in r.get("repos", [])]}
+                   for r in (json.loads(f.read_text(encoding="utf-8")) for f in sorted((work / ".ga" / "records" / "rounds").glob("*.json")))],
         "gates": [g.get("number", g.get("gate", "?")) for g in res.gates],
         "quiet": res.quiet,
     }
@@ -159,6 +167,8 @@ def main() -> int:
     p.add_argument("--base", required=True)
     p = sub.add_parser("send")
     p.add_argument("--work", required=True)
+    p.add_argument("--rev", type=int, default=1)
+    p.add_argument("--note", default="")
     p = sub.add_parser("tick")
     p.add_argument("--work", required=True)
     p.add_argument("--out", required=True)

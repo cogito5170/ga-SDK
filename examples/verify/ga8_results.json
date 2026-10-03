@@ -1,0 +1,108 @@
+{
+  "turns": [
+    {
+      "session": "A",
+      "directive": "CMD-A1",
+      "runner": "remote",
+      "ended": null,
+      "error": "",
+      "cost": null,
+      "diag": {
+        "claims_known": null,
+        "committed": true,
+        "posts": 0,
+        "reports_ok": 0
+      },
+      "session_id_recorded": false
+    },
+    {
+      "session": "A",
+      "directive": "CMD-A1",
+      "runner": "remote",
+      "ended": null,
+      "error": "",
+      "cost": null,
+      "diag": {
+        "claims_known": true,
+        "committed": false,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "session_id_recorded": true
+    }
+  ],
+  "spent": {
+    "cost_unknown_runs": 2,
+    "runs": 2,
+    "runs:A": 2
+  },
+  "integrated": [
+    "sdk"
+  ],
+  "integ_moved": true,
+  "remote_integ_untouched": "checked: ls-remote shows no ga8-integ on origin (hub pushes 0)",
+  "verdict": "success",
+  "cause": null,
+  "findings": [],
+  "rounds": [
+    {
+      "n": 1,
+      "verdict": "success",
+      "directives": [],
+      "notices": 1,
+      "rejected_posts": 1,
+      "integrated_repos": []
+    },
+    {
+      "n": 2,
+      "verdict": "success",
+      "directives": [
+        "CMD-A1"
+      ],
+      "notices": 0,
+      "rejected_posts": 0,
+      "integrated_repos": [
+        "sdk"
+      ]
+    }
+  ],
+  "gates": [],
+  "quiet": false,
+  "file_ok": true,
+  "channel_real": {
+    "repo": "cogito5170/ga-SDK",
+    "issue": 1,
+    "comments": 4,
+    "by_marker": {
+      "hub": 2,
+      "A": 2
+    },
+    "login_distinct": 1,
+    "ga_heads_parsed": 4,
+    "reports_rejected_by_form": 1,
+    "relay": "agent via GitHub MCP (issue_read get_comments / add_issue_comment); the library did not call GitHub"
+  },
+  "remote_sessions": {
+    "created": 1,
+    "limit": 3,
+    "archived": 1,
+    "model": "haiku",
+    "turns": 2,
+    "cost_usd_platform": 0.1374791,
+    "cost_in_hub_state": null,
+    "relay": "agent via remote-session MCP (create_session / send_message / archive_session)"
+  },
+  "claude_p_runs": 0,
+  "llm_judge_runs": 0,
+  "hub_pushes_to_remote": 0,
+  "notes": [
+    "round 1: the session's report gave a 4-char sha; report/1 rejects it (7-40), nothing integrated; the scripted judge defers to the machine floor, which does not count a rejected report, so round 1 reads success",
+    "turn 1 diag posts 0: the relay gave the hub's post a provisional id that sorted after real comment ids; fixed before turn 2",
+    "turn 1 session id not recorded: OutboxCallback read it before the agent created the session; recorded from turn 2"
+  ],
+  "round2_tests_at_integrated_head": {
+    "passed": 139,
+    "failed": 0,
+    "skipped": 0
+  }
+}

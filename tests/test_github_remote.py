@@ -19,7 +19,7 @@ from ga.prompts import turn_prompt
 
 from world import World, directive, proposal
 
-TOKEN = "ghp_fake_token_for_tests_only_0123456789"
+TOKEN = "fake-token-for-tests-only-0123456789"
 
 
 class FakeGitHub:
