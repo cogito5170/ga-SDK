@@ -21,7 +21,9 @@ import ga.__main__ as gamain
 from ga import _pins
 
 ROOT = Path(__file__).resolve().parents[1]
-RLO_REQ = "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@250a88e56a74d2776688d34ec732cbd0f4244ba0"
+# the URL text is a contract (pip refuses two spellings of one source); the sha and version live only in ga/_pins.py
+# and pyproject.toml, so a pin bump touches those two files and no test (BD-230)
+RLO_URL = "https://github.com/cogito5170/rlo-SDK"
 
 
 def _canon(name: str) -> str:
@@ -53,11 +55,13 @@ def pyproject_dependencies() -> list[str]:
 
 
 class PinTest(unittest.TestCase):
-    def test_the_pin_is_rlo_sdk_sensor_at_the_directives_sha(self):
-        self.assertEqual(_pins.requirements(), [RLO_REQ])
+    def test_the_pin_is_rlo_sdk_sensor_at_a_full_sha(self):
         dist, extras, url, sha = _pins.PINS["rlo"]
+        self.assertEqual((dist, extras, url), ("rlo-sdk", ("sensor",), RLO_URL))
         self.assertRegex(sha, r"^[0-9a-f]{40}$")
-        self.assertEqual(_pins.VERSIONS, {"rlo-sdk": "0.7.0"})
+        self.assertEqual(_pins.requirements(), [f"rlo-sdk[sensor] @ git+{RLO_URL}@{sha}"])
+        self.assertEqual(set(_pins.VERSIONS), {"rlo-sdk"})
+        self.assertRegex(_pins.VERSIONS["rlo-sdk"], r"^\d+\.\d+\.\d+$")
 
     def test_pyproject_says_what_the_pins_say(self):
         self.assertEqual(sorted(map(req, pyproject_dependencies())), sorted(map(req, _pins.requirements())))
