@@ -324,3 +324,26 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - They reach every user of the list: R6 (hub: outgoing directives and integration diffs; `ga check`; `ga post`) and `ga mail` (refused on send, flagged on read). `tests/test_secrets.py` has a test per place, fakes assembled at runtime, and a no-false-positive check over every tracked text file and a form that only names `GEMINI_API_KEY`.
 - That repository-wide check found one old hit: GA15's `tests/test_github_remote.py` held a fake token as a literal (`TOKEN = "fake-token-…"`), caught by the existing `token = '…'` pattern. It is now assembled at runtime.
 
+## 30. `ga gemini --host agy` (CMD-GA23, BD-234/255)
+
+- **`ga/adapters/agy_cli.py`** (stdlib). Facts carry baseline's labels (baseline#12 5971559909): V verified, A assumption, U unknown.
+  - `AgyCLI.run_turn` runs `agy -p … --output-format stream-json --model <pin>` in the workspace, stdin closed, with the in-turn callback of GA21.
+  - `parse_output` reads one JSON value or JSONL, at any depth:
+    - `model` (A: a string, or an object with `display_name` / `name` / `id`) gives the served model;
+    - `denied_actions` (V; entry shape U) gives labels;
+    - text comes from deltas, or else the last whole answer.
+  - Plain lines: `AGY_ERROR` (V); quota words with it (A) mean a quota stop; "AI credits" (V) means credits.
+  - Order of judgement: credits → `AgyQuota("credits")`; quota → `AgyQuota("quota")`; exit ≠ 0 or `AGY_ERROR` → `agy_error`; no served model → `served_model_unknown`; another model → `served_model_mismatch`.
+  - `resumes = False` (U: `--resume`), so the supervisor sends the protocol and task in every prompt.
+  - `usage()` runs `agy -p /usage` (V: no quota spent). `parse_usage` is lenient (U): per line, a family (gemini, or claude_gpt), a percent (`used` is turned into remaining), the window (`weekly` or `5-hour`), and a reset `YYYY-MM-DD HH:MM[:SS]` with a zone abbreviation from a small table, or an ISO offset. An unknown zone gives no reset.
+- **`ga/gemini.py`:**
+  - The config adds `host` (`gemini_cli` | `agy`; `ga gemini --host` overrides it) and `agy` {model, cli, usage_floor_pct, window, reset_fallback_s, usage_every_s}.
+  - `cfg.active_model` is the one model of the host. The state, Governor and logs use `Supervisor.model`.
+  - `AgyQuota` holds the family's reading. `check()` gives the wait before a model step; it probes when the reading is older than `usage_every_s` or a held reset has come. Under the floor it holds until agy's reset (or `reset_fallback_s` when none is readable).
+  - `spent()` is called after a quota or credits stop: it probes and holds until the reset.
+  - `agy_governor` is rlo's Governor with `try_acquire` gated by `check()` and `wait_s` raised to the hold, so the scheduler sleeps exactly until the reset. The error body carries the same wait, so after a restart the K12 state keeps it.
+  - The status block for agy shows family, window, share left, floor, reset and "one probe then". The probe at the reset is logged like the daily one.
+  - `denied` is printed and logged (count, labels).
+- An unreadable `/usage` does not block: the reading is logged as unknown, and a quota stop still holds for the fallback.
+- **Tests:** `tests/test_agy.py` on `tests/fake_agy.py` (assumed shapes), 14 tests. 14/14 GA23 mutations killed; the GA21 set re-run gives 37/38, the one equivalent survivor as before.
+

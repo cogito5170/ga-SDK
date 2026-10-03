@@ -354,7 +354,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("render"); p.set_defaults(fn=cmd_render)
     p = sub.add_parser("gemini", help="Gemini supervisor: fixed model, closed step list, wait-and-resume (CMD-GA21)")
     p.add_argument("prompt", nargs="*"); p.add_argument("--resume", action="store_true")
-    p.add_argument("--config", dest="gemini_config", default="ga-gemini.json"); p.set_defaults(fn=cmd_gemini)
+    p.add_argument("--config", dest="gemini_config", default="ga-gemini.json")
+    p.add_argument("--host", choices=["gemini_cli", "agy"], help="the CLI that runs model steps (default: the config's)")
+    p.set_defaults(fn=cmd_gemini)
     p = sub.add_parser("mail", help="ga forms between sessions through a git mailbox branch (CMD-GA22)")
     msub = p.add_subparsers(dest="mail_cmd", required=True)
     for name in ("send", "read", "scan"):
