@@ -91,7 +91,7 @@ class JudgeInHubTest(unittest.TestCase):
         self.addCleanup(stub.close)
         w = World()
         self.addCleanup(w.close)
-        w.hub.judge = LLMJudge(stub.dir / "jhome", executable=stub.exe, model="haiku", extra_env={"GA_STUB_DIR": str(stub.dir)})
+        w.permit_judge(LLMJudge(stub.dir / "jhome", executable=stub.exe, model="haiku", extra_env={"GA_STUB_DIR": str(stub.dir)}))
         w.hub.send(directive("CMD-A1", "A"))
         w.paste("A")
         return w, stub

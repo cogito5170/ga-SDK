@@ -159,7 +159,10 @@ def cmd_review(args) -> int:
 def cmd_permit(args) -> int:
     """METHOD rev 13 §4c: the person permits a Runner that opens model turns, with its scope (decision/1 by user)."""
     budget = {k: float(v) if "." in v else int(v) for k, v in (x.split("=", 1) for x in args.budget or [])}
-    d = _hub(args).permit(args.runner, model=args.model, sandbox=args.sandbox, budget=budget or None,
+    if not args.judge_only and not args.runner:
+        print("--runner or --judge-only is required", file=sys.stderr)
+        return 2
+    d = _hub(args).permit("manual" if args.judge_only else args.runner, model=args.model, sandbox=args.sandbox, budget=budget or None,
                           measurement_calls=args.measurement_calls, note=args.note or "")
     print(d["id"])
     print(f'설정에 넣는다: "runner": {{..., "permission": "{d["id"]}"}}', file=sys.stderr)
@@ -222,7 +225,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--class", dest="cls", required=True); p.add_argument("--cause"); p.add_argument("--why", required=True)
     p.set_defaults(fn=cmd_review)
     p = sub.add_parser("permit", help="the person permits a model-turn Runner, with its scope (decision/1)")
-    p.add_argument("--runner", required=True, choices=["headless", "agent_sdk", "remote"]); p.add_argument("--model")
+    p.add_argument("--runner", choices=["headless", "agent_sdk", "remote"]); p.add_argument("--model")
+    p.add_argument("--judge-only", dest="judge_only", action="store_true", help="permit the LLM Judge alone (manual Runner hub)")
     p.add_argument("--sandbox", choices=["auto", "require", "off"]); p.add_argument("--budget", action="append", help="name=number")
     p.add_argument("--measurement-calls", dest="measurement_calls", action="store_true"); p.add_argument("--note")
     p.set_defaults(fn=cmd_permit)

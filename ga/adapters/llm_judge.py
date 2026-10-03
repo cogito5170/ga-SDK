@@ -103,6 +103,7 @@ def extract(data: dict[str, Any]) -> dict[str, Any] | None:
 
 
 class LLMJudge:
+    calls_model = True  # METHOD rev 14 §4c 6: needs the person's permission for measurement calls
     def __init__(
         self,
         home: str | Path,
