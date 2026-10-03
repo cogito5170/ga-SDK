@@ -1,0 +1,130 @@
+{
+  "summary": {
+    "interventions": 6,
+    "not_needed": 4,
+    "conditional_on_judge": 1,
+    "still_needed": 1
+  },
+  "rows": [
+    {
+      "n": 1,
+      "kind": "cli_bug",
+      "needed_now": false,
+      "why": "ga_dir is resolved (F4, CMD-GA11)"
+    },
+    {
+      "n": 2,
+      "kind": "directive_authoring",
+      "needed_now": false,
+      "hub_sent": [
+        "CMD-A1",
+        "CMD-B1"
+      ],
+      "why": "the hub drafts rev+1 for both sessions from the R1b notes (rev 10); the turn prompt now asks for commits (F2), which would likely have avoided round 1 itself — not replayable without a model"
+    },
+    {
+      "n": 3,
+      "kind": "gate_answer",
+      "needed_now": false,
+      "replay": [
+        {
+          "judge": "ask_user",
+          "integrated": [
+            "alpha"
+          ],
+          "hub_sent": [
+            "CMD-B1"
+          ],
+          "gates": 0,
+          "verdict": [
+            "blocked",
+            "dependency"
+          ],
+          "note": true
+        },
+        {
+          "judge": "wait",
+          "integrated": [
+            "alpha"
+          ],
+          "hub_sent": [
+            "CMD-B1"
+          ],
+          "gates": 0,
+          "verdict": [
+            "partial",
+            "requirement"
+          ]
+        }
+      ],
+      "why": "R4 raises no gate (rev 9); the recorded ask_user named no §6 gate, so it is a note, not a question (rev 11)"
+    },
+    {
+      "n": 4,
+      "kind": "directive_authoring",
+      "needed_now": false,
+      "replay": {
+        "judge": "ask_user",
+        "integrated": [
+          "alpha"
+        ],
+        "hub_sent": [
+          "CMD-B1"
+        ],
+        "gates": 0,
+        "verdict": [
+          "blocked",
+          "dependency"
+        ],
+        "note": true
+      },
+      "why": "R4 non-ff: the hub sends CMD-B1 rev 2 by itself (rev 9), even when the Judge asks the user"
+    },
+    {
+      "n": 5,
+      "kind": "config",
+      "needed_now": true,
+      "why": "turning Bundle (b) on and declaring the known skips is configuration; no rule can do it"
+    },
+    {
+      "n": 6,
+      "kind": "directive_authoring",
+      "needed_now": "conditional",
+      "replay": [
+        {
+          "judge": "refine",
+          "review": "RV-1",
+          "amends": {
+            "round": 1,
+            "from": "success",
+            "to": "partial"
+          },
+          "hub_sent": [
+            "CMD-A1"
+          ],
+          "verdict": [
+            "partial",
+            "implementation"
+          ],
+          "wait_notice": false
+        },
+        {
+          "judge": "wait",
+          "review": "RV-1",
+          "amends": {
+            "round": 1,
+            "from": "success",
+            "to": "partial"
+          },
+          "hub_sent": [],
+          "verdict": [
+            "partial",
+            "implementation"
+          ],
+          "wait_notice": true
+        }
+      ],
+      "why": "`ga review` takes the rejection in (one command, not a directive); the hub drafts from it when the Judge says refine or verify without a draft; if the Judge says wait, a soft notice says so (rev 11) and the operator still writes the directive"
+    }
+  ]
+}

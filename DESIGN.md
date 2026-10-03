@@ -214,3 +214,11 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - `VenvBundle.build_tools` → `BundleResult.tools` → 근거 note.
 - `examples/verify/ga12_replay.py`: GA10–11 운영자 개입 6 번을 고친 ga 로 다시 만든다. 3 번은 필요 없고, 2 번은 Judge 의 선택에 달렸고, 1 번(설정)은 남는다.
 
+## 19. ask_user 의 근거 · 바깥 판정 뒤 wait (CMD-GA13, METHOD rev 11)
+
+- `gates.ask_basis(proposal)`: 제안의 `gate` 가 1..7 정수일 때만 그 번호. `detect` 는 그때만 Judge 의 ask_user 를 그 번호의 게이트로 만든다(예전에는 늘 게이트 5).
+  - 허브는 근거 없는 ask_user 를 soft 알림으로 남기고 회차의 다음을 wait 로 적는다(R10 과 맞물림). Judge 의 verdict 파일에는 Judge 가 낸 ask_user 가 그대로 남는다.
+  - LLM Judge 의 프롬프트에 일곱 게이트와 `"gate"` 칸을 넣었다. 응답의 `gate` 는 1..7 일 때만 제안에 실린다.
+- 바깥 판정 뒤 wait: 그 회차에 쓰인 리뷰마다, 그 sha 를 통합한 세션에 열린 지시가 없으면(이 회차에 보낸 지시도 열린 지시다) 알림.
+- 재생(`examples/verify/ga13_replay.json`): 개입 6 번 가운데 필요 없음 4 · Judge 에 달림 1 · 남음 1.
+

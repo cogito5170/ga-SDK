@@ -89,6 +89,12 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
   - 커밋했지만 보고에서 주장하지 않은 세션은 근거 note 에 `R1b: … claims no commit` 으로 남는다.
 - **설치 환경:** (b) 의 근거 note 에 `bundle (install): built with python · pip · setuptools · wheel` 판이 남는다.
 
+## Judge 의 ask_user (METHOD rev 11)
+
+- Judge 의 ask_user 는 §6 게이트 일곱 가운데 하나를 `"gate": 1..7` 로 댈 때만 질문(게이트)이 된다. 근거가 없거나 일곱 밖이면 회차 알림으로 남고, 그 회차의 다음은 wait 다. 근거가 있으면 반드시 멈춘다. 게이트를 끄는 설정은 없다.
+  - LLM Judge 가 모형을 쓸 수 없을 때 내는 대체 판정(ask_user)도 근거가 없으니 알림이다. 그 회차는 기계의 클래스로 기록된다.
+- 열린 바깥 판정(`review/1`)이 있는데 Judge 가 wait 를 내고, 그 sha 를 낸 세션에 열린 지시도 없으면 soft 알림을 남긴다. 판정은 바꾸지 않는다.
+
 ## 시험
 
 ```sh

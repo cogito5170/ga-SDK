@@ -1,4 +1,5 @@
-"""CMD-GA12 (4): replay the six operator interventions of GA10–GA11 against the fixed ga (METHOD rev 9 + rev 10),
+"""CMD-GA12 (4) · CMD-GA13 (3): replay the six operator interventions of GA10–GA11 against the fixed ga
+(METHOD rev 9 + rev 10 + rev 11),
 without any model run. Each situation is rebuilt in the hermetic test world with the same shape (who committed,
 what the reports claimed, what the Judge proposed); the Judge is the recorded proposal, scripted.
 
@@ -81,6 +82,8 @@ def i3_i4_round2_not_ff(judge_next: str) -> dict:
         res = w.hub.tick()
         out = {"judge": judge_next, "integrated": sorted(res.integrated), "hub_sent": res.sent, "gates": len(res.gates),
                "verdict": [res.verdict["class"], res.verdict.get("cause")]}
+        if judge_next == "ask_user":
+            out["note"] = any("names no §6 gate" in str(p) for p in res.findings)
     finally:
         w.close()
     return out
@@ -100,7 +103,8 @@ def i6_outside_rejection(judge_next: str) -> dict:
         rv = w.hub.review("baseline", "alpha", sha, "partial", "깨끗한 설치에 하위 패키지가 없다", cause="implementation")
         res = w.hub.tick()
         out = {"judge": judge_next, "review": rv["id"], "amends": rv.get("amends"), "hub_sent": res.sent,
-               "verdict": [res.verdict["class"], res.verdict.get("cause")]}
+               "verdict": [res.verdict["class"], res.verdict.get("cause")],
+               "wait_notice": any("followed by wait" in str(p) for p in res.findings)}
     finally:
         w.close()
     return out
@@ -115,15 +119,16 @@ def main() -> int:
     rows = [
         {"n": 1, "kind": "cli_bug", **i1_relative_ga_dir()},
         {"n": 2, "kind": "directive_authoring", **i2_round1_unclaimed()},
-        {"n": 3, "kind": "gate_answer", "needed_now": "conditional", "replay": [r34_ask, r34_wait],
-         "why": "R4 itself raises no gate any more; a gate comes only if the Judge still says ask_user (as recorded)"},
+        {"n": 3, "kind": "gate_answer", "needed_now": r34_ask["gates"] > 0, "replay": [r34_ask, r34_wait],
+         "why": "R4 raises no gate (rev 9); the recorded ask_user named no §6 gate, so it is a note, not a question (rev 11)"},
         {"n": 4, "kind": "directive_authoring", "needed_now": r34_ask["hub_sent"] != ["CMD-B1"], "replay": r34_ask,
          "why": "R4 non-ff: the hub sends CMD-B1 rev 2 by itself (rev 9), even when the Judge asks the user"},
         {"n": 5, "kind": "config", "needed_now": True,
          "why": "turning Bundle (b) on and declaring the known skips is configuration; no rule can do it"},
         {"n": 6, "kind": "directive_authoring", "needed_now": "conditional", "replay": [r6_refine, r6_wait],
          "why": "`ga review` takes the rejection in (one command, not a directive); the hub drafts from it when the Judge "
-                "says refine or verify without a draft; if the Judge says wait, the operator still writes the directive"},
+                "says refine or verify without a draft; if the Judge says wait, a soft notice says so (rev 11) and the "
+                "operator still writes the directive"},
     ]
     summary = {
         "interventions": 6,

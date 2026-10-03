@@ -50,6 +50,12 @@ class Gate:
         return GATE_TITLES[self.number]
 
 
+def ask_basis(proposal: dict[str, Any] | None) -> int | None:
+    """The §6 gate (1..7) a Judge's ask_user names as its ground, or None (no ground, or not one of the seven)."""
+    g = (proposal or {}).get("gate")
+    return g if isinstance(g, int) and not isinstance(g, bool) and 1 <= g <= 7 else None
+
+
 def detect(
     cfg: Config,
     *,
@@ -97,8 +103,11 @@ def detect(
     oqs = OQ_RE.findall(sections.get("Request", "") + "\n" + sections.get("Deviation", ""))
     if oqs:
         gates.append(Gate(5, "asks for the value of " + ", ".join(dict.fromkeys(oqs)), list(dict.fromkeys(oqs)), session))
-    if action == "choose_design" or (proposal.get("next") == "ask_user" and not gates):
+    if action == "choose_design":
         gates.append(Gate(5, proposal.get("reason", "design fork"), session=session))
+    elif proposal.get("next") == "ask_user" and not gates and ask_basis(proposal) is not None:
+        # METHOD rev 11 (BD-148): a Judge's ask_user is a gate only when it names one of the seven §6 gates
+        gates.append(Gate(ask_basis(proposal), proposal.get("reason", "the Judge asks"), session=session))
 
     # 6 — budget, secrets, credentials
     for p in findings or []:

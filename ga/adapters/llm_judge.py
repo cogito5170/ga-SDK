@@ -30,12 +30,15 @@ SYSTEM = """너는 허브의 판정 보조다. 작업 세션의 보고와 허브
 - insufficient: 판정할 정보가 모자란다.
 cause (success 가 아니면 하나): implementation(구현) · requirement(요구사항) · dependency(의존성) · measurement(측정) · environment(환경) · hub_directive(허브의 지시 자체가 틀렸거나 서로 어긋남 — 허브도 틀린다).
 next.choice: continue · refine · verify · handoff · change_direction · wait · ask_user. 할 일이 없으면 wait. 단계 마감 · PR · 태그 · 기준선 변경 · 예산 · 비밀값 · 새 저장소는 정하지 말고 ask_user.
+ask_user 일 때는 "gate" 에 근거가 되는 사용자 게이트 번호를 적는다(근거가 없으면 ask_user 는 질문이 되지 않고 알림만 남는다):
+1 단계 마감 · PR · 기본 브랜치 합치기 · 태그 / 2 기준선 수준 변경 · 계약 동결 · 판 올림 / 3 앞선 사용자 결정과 부딪힘 / 4 소유가 겹치거나 소유표를 바꿔야 함 / 5 열린 질문의 값 · 설계 갈림 / 6 예산 초과 · 비밀값 · 자격 증명 / 7 새 저장소 · 새 세션.
+허브가 이미 기계적으로 하는 일(ff 가 아닌 세션에 rev+1 보내기 등)은 묻지 않는다.
 
 규칙: 계획("하겠다")과 결과("했고 측정됐다")를 섞지 않는다. 증거가 보고의 주장과 다르면 증거를 따른다. 기계가 정한 class(machine_class)가 있으면 그보다 너그럽게 판정하지 않는다.
 다음 지시 초안은 정말 필요할 때만 쓰고, 쓰면 id · rev · to · goal · why · scope · done_when 을 모두 채운다(방법은 쓰지 않는다).
 
 출력은 JSON 객체 하나뿐이다. 다른 글을 쓰지 않는다:
-{"class": "...", "subclass": null, "cause": null, "next": {"choice": "...", "reason": "한 줄"}, "summary": "한 줄", "claims_vs_evidence": ["..."], "directive": null}"""
+{"class": "...", "subclass": null, "cause": null, "next": {"choice": "...", "reason": "한 줄"}, "gate": null, "summary": "한 줄", "claims_vs_evidence": ["..."], "directive": null}"""
 
 SCHEMA = {
     "type": "object",
@@ -179,6 +182,9 @@ class LLMJudge:
             return dict(self.fallback(ctx, "reply does not check as verdict/1: " + "; ".join(p.message for p in problems[:3])), judge=rec)
         rec["valid"] = True
         out = {"verdict": verdict, "summary": obj.get("summary") or verdict["next"]["reason"], "directive": None, "judge": rec}
+        g = obj.get("gate")
+        if isinstance(g, int) and not isinstance(g, bool) and 1 <= g <= 7:
+            out["gate"] = g  # the §6 ground of an ask_user (METHOD rev 11); anything else is no ground
         draft = obj.get("directive")
         if isinstance(draft, dict):
             draft = dict(draft, schema="directive/1")

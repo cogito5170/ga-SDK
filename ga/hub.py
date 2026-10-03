@@ -540,7 +540,7 @@ class Hub:
             self._mark_handled(st, r["head"])
         # the judge's own "ask_user" is a gate only when nothing else already stops this round (one question, not two)
         gates += detect(self.cfg, proposal={"action": proposal.get("action"), "next": None if gates else verdict["next"]["choice"],
-                                            "reason": verdict["next"]["reason"]},
+                                            "reason": verdict["next"]["reason"], "gate": proposal.get("gate")},
                         findings=findings, user_decision=self._is_user_decision)
         gates = [g for g in gates if g.number not in approved]
 
@@ -578,6 +578,20 @@ class Hub:
 
         open_work = sum(1 for d in st["directives"].values() if d["status"] == "open")
         choice = "ask_user" if gates else verdict["next"]["choice"]
+        if choice == "ask_user" and not gates:
+            # METHOD rev 11 (BD-148): no §6 ground named — a note, not a question; nothing is waiting on a person
+            send_findings.append(Problem("next", f"the Judge's ask_user names no §6 gate ({proposal.get('gate')!r}): "
+                                                 f"noted, not asked — {verdict['next']['reason']}", "soft", None))
+            choice = "wait"
+        if choice == "wait":
+            # METHOD rev 11 (BD-148): an open outside verdict followed by wait, with no directive taking it up
+            for rv in reviews:
+                who = st.get("integrated_by", {}).get(rv["sha"], {})
+                # a directive sent this round is open too
+                taken = any(d.get("to") == who.get("session") and d["status"] == "open" for d in st["directives"].values())
+                if not taken:
+                    send_findings.append(Problem(f"review {rv['id']}", f"outside verdict {rv['class']} on {rv['repo']}@{rv['sha'][:7]} "
+                                                 "is followed by wait and no directive takes it up", "soft", None))
         send_findings += rules.r10_wait(self.cfg, open_work, choice)
 
         # ---------------------------------------------------------- questions
