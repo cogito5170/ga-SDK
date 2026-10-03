@@ -1,0 +1,136 @@
+{
+  "schema": "ga-config/1",
+  "hub": {
+    "name": "hub",
+    "repo": "cogito5170/baseline",
+    "guidance": "G.md",
+    "session_guidance": "SG.md",
+    "post_command": "/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/asdk/bin/python -m ga --config /tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/ga.json --ga-dir /tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/.ga post --channel {session} --from {session} <보고 파일>"
+  },
+  "integration_branch": "claude/ga-trial-k9",
+  "repos": {
+    "rlo": {
+      "path": "/home/user/rlo-sdk",
+      "remote": "origin",
+      "push": true,
+      "slug": "cogito5170/rlo-SDK",
+      "test": [
+        "/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/py/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-t",
+        "."
+      ],
+      "env": {
+        "PYTHONPATH": ".:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/DC:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/MS:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/Sensor:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/Telemetry:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/action:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/guard:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/health"
+      }
+    }
+  },
+  "sessions": {
+    "W1": {
+      "prefix": "WA",
+      "tag": "W1",
+      "branch": "w1-suggest-model",
+      "repos": [
+        "rlo"
+      ],
+      "channel": "mailbox:W1"
+    },
+    "W2": {
+      "prefix": "WB",
+      "tag": "W2",
+      "branch": "w2-parallel-calls",
+      "repos": [
+        "rlo"
+      ],
+      "channel": "mailbox:W2"
+    }
+  },
+  "ownership": [
+    {
+      "repo": "rlo",
+      "path": "rlo/suggest_model*",
+      "session": "W1"
+    },
+    {
+      "repo": "rlo",
+      "path": "tests/test_suggest_model*",
+      "session": "W1"
+    },
+    {
+      "repo": "rlo",
+      "path": "tests/data/suggest*",
+      "session": "W1"
+    },
+    {
+      "repo": "rlo",
+      "path": "rlo/parallel_calls*",
+      "session": "W2"
+    },
+    {
+      "repo": "rlo",
+      "path": "tests/test_parallel_calls*",
+      "session": "W2"
+    },
+    {
+      "repo": "rlo",
+      "path": "tests/data/parallel*",
+      "session": "W2"
+    }
+  ],
+  "budget": {
+    "runs": 8
+  },
+  "runner": {
+    "kind": "agent_sdk",
+    "model": "haiku",
+    "timeout": 900,
+    "max_budget_usd": 1.0,
+    "sandbox": "require",
+    "allowed_tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push origin:*)",
+      "Bash(git -C:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(ls:*)",
+      "Bash(pwd)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(mkdir:*)",
+      "Bash(cd:*)",
+      "Bash(/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/bin/rlo-test:*)",
+      "Bash(/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/bin/rlo-run:*)"
+    ],
+    "extra_env": {
+      "PYTHONPATH": "/home/user/ga-SDK",
+      "GIT_AUTHOR_NAME": "ga-trial",
+      "GIT_AUTHOR_EMAIL": "ga-trial@local",
+      "GIT_COMMITTER_NAME": "ga-trial",
+      "GIT_COMMITTER_EMAIL": "ga-trial@local",
+      "GIT_CONFIG_NOSYSTEM": "1"
+    }
+  },
+  "judge": {
+    "kind": "llm",
+    "model": "haiku",
+    "max_runs": 4,
+    "timeout": 300,
+    "max_budget_usd": 0.5
+  },
+  "isolation": "clone"
+}

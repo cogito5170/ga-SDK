@@ -1,0 +1,204 @@
+{
+  "directive": "CMD-GA10",
+  "model": "haiku",
+  "runner": "agent_sdk (sandbox require, guard on, clone isolation)",
+  "judge": "llm (haiku)",
+  "rlo_base": "c6b2f95",
+  "integration_branch": "claude/ga-trial-k9",
+  "final_head": "6c33b855766702f4df9cc292cf2b07c89a8d72ec",
+  "runs": {
+    "turns": 5,
+    "judge": 3,
+    "total": 8,
+    "limit": 12
+  },
+  "cost_usd": 2.5859,
+  "turns": [
+    {
+      "session": "W1",
+      "directive": "CMD-WA1",
+      "rev": 1,
+      "error": "",
+      "cost": 0.6109501999999997,
+      "seconds": 323.026,
+      "sandboxed": true,
+      "diag": {
+        "claims_known": null,
+        "committed": true,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "labels": "num_turns 68 · stop end_turn · denied Bash(find),Bash(cd),Bash(git),Bash(cat),Bash(/tmp/claude-0/-home-),Bash(python3)",
+      "resumed": false
+    },
+    {
+      "session": "W2",
+      "directive": "CMD-WB1",
+      "rev": 1,
+      "error": "",
+      "cost": 0.345116,
+      "seconds": 180.419,
+      "sandboxed": true,
+      "diag": {
+        "claims_known": null,
+        "committed": true,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "labels": "num_turns 51 · stop end_turn · denied Bash(cd),Bash(cd),Bash(cat),Bash(cd),Bash(python),Bash(cat),Bash(git)",
+      "resumed": false
+    },
+    {
+      "session": "W1",
+      "directive": "CMD-WA1",
+      "rev": 2,
+      "error": "",
+      "cost": 0.6752175999999996,
+      "seconds": 23.871,
+      "sandboxed": true,
+      "diag": {
+        "claims_known": true,
+        "committed": false,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "labels": "num_turns 6 · stop end_turn · denied -",
+      "resumed": true
+    },
+    {
+      "session": "W2",
+      "directive": "CMD-WB1",
+      "rev": 2,
+      "error": "",
+      "cost": 0.3875663,
+      "seconds": 17.331,
+      "sandboxed": true,
+      "diag": {
+        "claims_known": true,
+        "committed": false,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "labels": "num_turns 5 · stop end_turn · denied -",
+      "resumed": true
+    },
+    {
+      "session": "W2",
+      "directive": "CMD-WB1",
+      "rev": 3,
+      "error": "",
+      "cost": 0.4467824999999999,
+      "seconds": 27.76,
+      "sandboxed": true,
+      "diag": {
+        "claims_known": true,
+        "committed": true,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "labels": "num_turns 7 · stop end_turn · denied -",
+      "resumed": true
+    }
+  ],
+  "rounds": [
+    {
+      "n": 1,
+      "verdict": "partial",
+      "cause": "measurement",
+      "subclass": null,
+      "next": "verify",
+      "integrated": [],
+      "tests": {
+        "failed": 0,
+        "passed": 63,
+        "skipped": 2
+      },
+      "directives": [
+        "CMD-WA1"
+      ],
+      "notices": 1
+    },
+    {
+      "n": 2,
+      "verdict": "blocked",
+      "cause": "dependency",
+      "subclass": null,
+      "next": "ask_user",
+      "integrated": [
+        "af701a2"
+      ],
+      "tests": {
+        "failed": 0,
+        "passed": 81,
+        "skipped": 2
+      },
+      "directives": [
+        "CMD-WA1",
+        "CMD-WB1"
+      ],
+      "notices": 2
+    },
+    {
+      "n": 3,
+      "verdict": "partial",
+      "cause": "measurement",
+      "subclass": "skipped",
+      "next": "wait",
+      "integrated": [
+        "6c33b85"
+      ],
+      "tests": {
+        "failed": 0,
+        "passed": 93,
+        "skipped": 2
+      },
+      "directives": [
+        "CMD-WB1"
+      ],
+      "notices": 2
+    }
+  ],
+  "directives": {
+    "CMD-WA1": {
+      "rev": 2,
+      "status": "done"
+    },
+    "CMD-WB1": {
+      "rev": 3,
+      "status": "done"
+    }
+  },
+  "gates": [
+    {
+      "id": "Q-2-1",
+      "gate": 5,
+      "answer": "제안대로 정한다"
+    }
+  ],
+  "interventions": [
+    {
+      "n": 1,
+      "kind": "cli_bug",
+      "what": "relative --ga-dir breaks session clone (nested path); .ga cleared before any turn, resent with absolute --ga-dir",
+      "runs_spent": 0
+    },
+    {
+      "n": 2,
+      "kind": "directive_authoring",
+      "what": "round 1: both reports valid but no commits claimed (W2 also handled []); judge chose verify without a draft directive; operator wrote rev 2 of CMD-WA1 and CMD-WB1 (re-report with commits, report template given)",
+      "runs_spent": 0
+    },
+    {
+      "n": 3,
+      "kind": "gate_answer",
+      "what": "Q-2-1 gate 5 raised for a routine R4 non-ff; answered 제안대로 정한다 with a note",
+      "runs_spent": 0
+    },
+    {
+      "n": 4,
+      "kind": "directive_authoring",
+      "what": "judge ask_user without a draft; operator wrote CMD-WB1 rev 3 (merge integration branch, re-report)",
+      "runs_spent": 0
+    }
+  ]
+}

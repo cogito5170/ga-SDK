@@ -1,0 +1,5 @@
+#!/bin/sh
+# run one module of an rlo checkout: rlo-run <rlo checkout> <module> [args]
+cd "${1:-.}" || exit 2
+shift
+PYTHONPATH=".:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/DC:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/MS:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/Sensor:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/Telemetry:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/action:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/guard:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/health" exec /tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/py/bin/python -m "$@"

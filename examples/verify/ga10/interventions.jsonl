@@ -1,0 +1,4 @@
+{"n":1,"kind":"cli_bug","what":"relative --ga-dir breaks session clone (nested path); .ga cleared before any turn, resent with absolute --ga-dir","runs_spent":0}
+{"n":2,"kind":"directive_authoring","what":"round 1: both reports valid but no commits claimed (W2 also handled []); judge chose verify without a draft directive; operator wrote rev 2 of CMD-WA1 and CMD-WB1 (re-report with commits, report template given)","runs_spent":0}
+{"n":3,"kind":"gate_answer","what":"Q-2-1 gate 5 raised for a routine R4 non-ff; answered 제안대로 정한다 with a note","runs_spent":0}
+{"n":4,"kind":"directive_authoring","what":"judge ask_user without a draft; operator wrote CMD-WB1 rev 3 (merge integration branch, re-report)","runs_spent":0}

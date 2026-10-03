@@ -1,0 +1,6 @@
+#!/bin/sh
+# rlo-SDK tests the way baseline runs them: sibling checkouts at the pinned shas on PYTHONPATH (no install metadata).
+# usage: rlo-test <rlo checkout> [unittest args]
+cd "${1:-.}" || exit 2
+[ $# -gt 0 ] && shift
+PYTHONPATH=".:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/DC:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/MS:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/Sensor:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/Telemetry:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/action:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/guard:/tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/sibs/health" exec /tmp/claude-0/-home-user/8972da1e-25e6-5b19-9db6-e0a1d29ae15e/scratchpad/k9hub/env/py/bin/python -m unittest discover -s tests -t . "$@"
