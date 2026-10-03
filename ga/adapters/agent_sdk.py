@@ -162,7 +162,23 @@ class AgentSDKRunner:
         cost = float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None
         error = f"is_error:{getattr(result, 'subtype', '?')}" if getattr(result, "is_error", False) else ""
         return TurnResult(ended=True, session_id=getattr(result, "session_id", None), cost=cost, error=error, seconds=secs,
-                          note=f"num_turns {getattr(result, 'num_turns', '?')}", sandboxed=sandboxed)
+                          note=result_labels(result), sandboxed=sandboxed)
+
+
+def result_labels(result: Any) -> str:
+    """Labels from a ResultMessage, never content: model turns, why it stopped, which tools the permission
+    system refused (names only; for Bash the first word of the command)."""
+    denied = []
+    for d in getattr(result, "permission_denials", None) or []:
+        name = d.get("tool_name") if isinstance(d, dict) else getattr(d, "tool_name", None)
+        inp = d.get("tool_input") if isinstance(d, dict) else getattr(d, "tool_input", None)
+        if name == "Bash" and isinstance(inp, dict) and isinstance(inp.get("command"), str) and inp["command"].split():
+            name = f"Bash({inp['command'].split()[0][:20]})"
+        denied.append(str(name))
+    parts = [f"num_turns {getattr(result, 'num_turns', '?')}",
+             f"stop {getattr(result, 'stop_reason', None) or getattr(result, 'terminal_reason', None) or '-'}",
+             f"denied {','.join(denied) or '-'}"]
+    return " · ".join(parts)
 
 
 def fake_sdk(results: list[Any], record: list[dict] | None = None) -> SimpleNamespace:

@@ -68,6 +68,13 @@ class AgentSDKPathsTest(unittest.TestCase):
         sdk.query = empty
         self.assertEqual(runner(self.stub, sdk).run_turn(TurnRequest("A", "x", self.work)).error, "no_result")
 
+    def test_result_labels_name_denied_tools_without_content(self):
+        res, _, _ = self.turn([dict(OK, permission_denials=[{"tool_name": "Bash", "tool_input": {"command": "mkdir -p alpha/notes secret"}},
+                                                           {"tool_name": "Write", "tool_input": {"file_path": "/x"}}],
+                                    stop_reason="end_turn")])
+        self.assertEqual(res.note, "num_turns 3 · stop end_turn · denied Bash(mkdir),Write")
+        self.assertNotIn("secret", res.note)
+
     def test_sdk_not_installed(self):
         real = agent_sdk.load_sdk
         agent_sdk.load_sdk = lambda: None

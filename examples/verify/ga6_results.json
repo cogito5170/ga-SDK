@@ -1,0 +1,85 @@
+{
+  "model": "haiku",
+  "executable": "claude",
+  "sandbox_available": true,
+  "sdk_installed": true,
+  "turns": [
+    {
+      "session": "A",
+      "directive": "CMD-A1",
+      "runner": "agent_sdk",
+      "error": "",
+      "cost": 0.0458283,
+      "seconds": 23.412,
+      "sandboxed": true,
+      "diag": {
+        "claims_known": true,
+        "committed": true,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "labels": "num_turns 11 · stop end_turn · denied Bash(cd),Bash(ls)"
+    },
+    {
+      "session": "B",
+      "directive": "CMD-B1",
+      "runner": "agent_sdk",
+      "error": "",
+      "cost": 0.040259800000000005,
+      "seconds": 25.792,
+      "sandboxed": true,
+      "diag": {
+        "claims_known": true,
+        "committed": true,
+        "posts": 1,
+        "reports_ok": 1
+      },
+      "labels": "num_turns 9 · stop end_turn · denied -"
+    }
+  ],
+  "guard": {
+    "A": {
+      "calls": 10,
+      "denied": []
+    },
+    "B": {
+      "calls": 8,
+      "denied": []
+    }
+  },
+  "reports_received": 2,
+  "integrated": [
+    "alpha",
+    "beta"
+  ],
+  "verdict": "success",
+  "alpha_integ_moved": true,
+  "alpha_file_ok": true,
+  "beta_integ_moved": true,
+  "beta_file_ok": true,
+  "diagnostics": {
+    "A": {
+      "commits_in_clone": 1,
+      "hub_pulled_branch": true,
+      "session_posts": 1,
+      "report_file_left_in_dir": true,
+      "report_file_parses": true,
+      "report_claims": 1,
+      "claimed_sha_known_to_hub": true,
+      "guard_rules_seen": []
+    },
+    "B": {
+      "commits_in_clone": 1,
+      "hub_pulled_branch": true,
+      "session_posts": 1,
+      "report_file_left_in_dir": true,
+      "report_file_parses": true,
+      "report_claims": 1,
+      "claimed_sha_known_to_hub": true,
+      "guard_rules_seen": []
+    }
+  },
+  "round_notices": [],
+  "runs": 2,
+  "cost_total_usd": 0.086088
+}

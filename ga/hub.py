@@ -139,7 +139,7 @@ class Hub:
             "session": to, "directive": directive["id"], "rev": directive["rev"], "runner": getattr(self.runner, "kind", "?"),
             "ended": result.ended, "error": result.error, "cost": result.cost, "seconds": result.seconds,
             "resumed": resume, "session_id": result.session_id, "sandboxed": result.sandboxed,
-            "start": start, "post": post.id,
+            "start": start, "post": post.id, "labels": result.note[:200],
         })
         if result.ended:  # the runner knows the turn is over: label it now (GA5 rev 2 lost a cause for want of this)
             st["turns"][-1]["diag"] = self._turn_diag(st["turns"][-1])
