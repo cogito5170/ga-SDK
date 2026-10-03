@@ -415,7 +415,8 @@ class Hub:
         answered = [qid for qid, q in st["questions"].items() if q["status"] == "answered" and not q.get("processed")]
         pending = st.get("pending")
         reviews = [v["doc"] for v in st.get("reviews", {}).values() if v["status"] == "open"]
-        if not new_posts and not candidates and not answered and not pending and not reviews and not hard(res.findings):
+        retry = st.get("judge_retry")
+        if not new_posts and not candidates and not answered and not pending and not reviews and not retry and not hard(res.findings):
             res.quiet = True
             return res  # R9: nothing new, nothing written
 
@@ -454,6 +455,10 @@ class Hub:
 
         # ---------------------------------------------------------- 3 reproduce
         notices += [self._exchange_note(x) for x in exchanges]
+        if pending is None and retry and not new_posts and not candidates and not answered and not reviews:
+            # METHOD rev 12 (BD-151): the Judge failed last round — call it once more on that round's evidence
+            pending = dict(retry["pending"], retry_of=retry["round"])
+            pending["notices"] = list(pending.get("notices", [])) + [f"retry of round {retry['round']}: the Judge failed there"]
         if pending is None:
             evidence, mclass = self._reproduce(heads, integrated, reports, res.findings, st, rejected=rejected, reviews=reviews)
             for r in reports:  # a commit the session made but its report did not claim (GA10 round 1)
@@ -508,14 +513,25 @@ class Hub:
         ctx.answers = [dict(st["questions"][q], id=q) for q in answered]
         ctx.exchanges = [x["head"] for x in pending.get("exchanges", [])]
         ctx.reviews = reviews
+        jb = self.cfg.budget.get("judge_runs")
+        budget_out = bool(pending.get("retry_of") and isinstance(jb, (int, float)) and st["spent"].get("judge_runs", 0) >= jb)
         try:
-            proposal = self.judge.propose(ctx)
+            if budget_out:  # METHOD rev 12: a retry only within the budget — not called, the machine's class stands
+                m = pending["machine"] or {}
+                v = {"schema": "verdict/1", "class": m.get("class", "insufficient"), "evidence": pending["evidence"],
+                     "claims_vs_evidence": [], "next": {"choice": "wait", "reason": "judge budget exhausted"}}
+                if v["class"] != "success":
+                    v["cause"] = m.get("cause", "measurement")
+                proposal = {"verdict": v, "summary": "판정 보조 예산이 다 됐다", "directive": None, "judge_failed": "judge budget exhausted"}
+            else:
+                proposal = self.judge.propose(ctx)
         except NeedJudgement as e:
             st["pending"] = pending
             self.save_state(st)
             res.waiting_for = str(e.request_path)
             res.writes = self._writes + (1 if e.wrote else 0)
             return res
+        judge_failed = proposal.get("judge_failed")
         jrec = proposal.get("judge")
         if isinstance(jrec, dict) and "cost" in jrec:  # an LLM judge call: numbers only
             st.setdefault("judge_calls", []).append(dict(jrec, round=n))
@@ -538,6 +554,23 @@ class Hub:
         for r in all_reports:
             gates += detect(self.cfg, report=r["head"], body=r["body"], findings=[], user_decision=self._is_user_decision)
             self._mark_handled(st, r["head"])
+        if pending.get("retry_of"):  # the reports were already gated in the round that failed
+            gates = []
+        retry_note = ""
+        if judge_failed or budget_out:
+            fails = st.get("judge_failures", 0) + 1
+            st["judge_failures"] = fails
+            why = judge_failed or "judge budget exhausted"
+            if fails >= 2 or budget_out:
+                # METHOD rev 12: the Judge failed two rounds in a row — a person has to know (gate 6, budget · credentials)
+                gates.append(Gate(6, f"the Judge failed {fails} rounds in a row: {why}"))
+                st["judge_retry"] = None
+            else:
+                st["judge_retry"] = {"round": n, "pending": {k: v for k, v in pending.items() if k != "retry_of"}}
+                retry_note = f"the Judge failed ({why}): judged on the machine's class; the next tick calls it once more"
+        else:
+            st["judge_failures"] = 0
+            st["judge_retry"] = None
         # the judge's own "ask_user" is a gate only when nothing else already stops this round (one question, not two)
         gates += detect(self.cfg, proposal={"action": proposal.get("action"), "next": None if gates else verdict["next"]["choice"],
                                             "reason": verdict["next"]["reason"], "gate": proposal.get("gate")},
@@ -637,7 +670,7 @@ class Hub:
             "verdict": verdict["class"],
             "summary": proposal.get("summary") or verdict["next"]["reason"],
             "next": choice,
-            "notices": [str(p) for p in all_findings] + pending["notices"] + list(pending["evidence"].get("notes", [])) + drafted,
+            "notices": [str(p) for p in all_findings] + pending["notices"] + list(pending["evidence"].get("notes", [])) + drafted + ([retry_note] if retry_note else []),
         }
         if decisions:
             round_doc["decisions"] = decisions

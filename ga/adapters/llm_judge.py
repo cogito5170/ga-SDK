@@ -156,7 +156,8 @@ class LLMJudge:
                    "next": {"choice": "ask_user", "reason": f"LLM 판정을 쓸 수 없음: {why}"}}
         if cls != "success":
             verdict["cause"] = "measurement"
-        return {"verdict": verdict, "summary": f"판정 보조 실패({why}) — 사람에게 묻는다", "directive": None, "judge": {"fallback": why}}
+        return {"verdict": verdict, "summary": f"판정 보조 실패({why}) — 기계 클래스로 판정, 다음 tick 에 다시 부른다",
+                "directive": None, "judge": {"fallback": why}, "judge_failed": why}
 
     def propose(self, ctx: JudgeContext) -> dict[str, Any]:
         if self.max_runs is not None and len(self.calls) >= self.max_runs:

@@ -222,3 +222,10 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - 바깥 판정 뒤 wait: 그 회차에 쓰인 리뷰마다, 그 sha 를 통합한 세션에 열린 지시가 없으면(이 회차에 보낸 지시도 열린 지시다) 알림.
 - 재생(`examples/verify/ga13_replay.json`): 개입 6 번 가운데 필요 없음 4 · Judge 에 달림 1 · 남음 1.
 
+## 20. Judge 실패 회차 (CMD-GA14, METHOD rev 12)
+
+- `LLMJudge.fallback` 이 `judge_failed` 를 싣는다. 허브는 그것으로 실패를 센다(`state.judge_failures`, 연속 수).
+- 실패 1: 기계 클래스로 판정(대체 판정의 클래스). `state.judge_retry = {round, pending}` 을 남긴다. 다음 tick 은 새것이 없어도 회차를 돌며 그 증거로 Judge 를 다시 부른다. 그 회차의 보고 게이트는 다시 묻지 않는다. 기록은 새 회차(append-only)이고 알림 "retry of round n" 이 붙는다.
+- 실패 2(연속) 또는 다시 부를 예산이 없음(`budget.judge_runs`): 게이트 6. 재시도는 지운다.
+- 성공 한 번이면 `judge_failures = 0`, 재시도는 지운다.
+
