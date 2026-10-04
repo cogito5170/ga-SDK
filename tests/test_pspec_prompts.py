@@ -338,6 +338,13 @@ class CheckAgreementTest(unittest.TestCase):
             with self.subTest(plan=p):
                 self.assertEqual(bool(G.check_plan(p, RUN_TOOLS)), bool(G.spec_check(p, RUN_TOOLS)))
 
+    def test_a_trailing_newline_id_is_known_to_differ_after_k16(self):
+        # check_plan's ^...$ with re.match accepts "a\n"; K16 P2 checks ids with fullmatch. check_plan decides (a
+        # proposal to make it fullmatch is baseline's call); the runtime logs this as check_disagree
+        p = {"schema": S, "steps": [{"id": "a\n", "tool": "noop"}]}
+        self.assertEqual(G.check_plan(p, RUN_TOOLS), [])
+        self.assertEqual(G.spec_check(p, RUN_TOOLS) == [], rlo_version() == "0.9.0")
+
     def test_the_self_reference_case_is_the_one_on_0_9_0(self):
         p = CASES_17[SELF_REFERENCE]
         self.assertEqual(G.check_plan(p, RUN_TOOLS), ["steps[0].after"])  # the authority rejects it

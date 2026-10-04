@@ -416,7 +416,7 @@ _TAG = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)  # rlo.pspec's tag pattern
 
 
 def stray_tags(spec: Any) -> list[str]:
-    """Sections whose literal text holds a ``{{`` or ``{%`` that is not a whole tag. rlo-sdk 0.9.0 reads a text piece
+    """Sections whose literal text holds a ``{{`` or ``{%`` that is not a whole tag. rlo-sdk 0.9.0 / 0.9.1 read a text piece
     that starts with one as a tag and drops its last two characters (``{{ ask }x`` renders as ``{{ ask }}``), so ga
     refuses such a spec rather than send what it did not say. ga's prompts hold no literal ``{{`` or ``{%``."""
     return [name for name, body in spec.sections.items() if "{{" in _TAG.sub("", body) or "{%" in _TAG.sub("", body)]
