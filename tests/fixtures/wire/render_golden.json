@@ -1,0 +1,144 @@
+{
+ "directive/2": {
+  "en": "Directive CMD-GA19 rev 1 to GA, after [\"CMD-GA18\"]\nGoal: Implement METHOD rev 17 (na rule) and two requests from ga_rlo (GR1): guard state labels in turn evidence, and a clear error from ga prompt.\nWhy: BD-177: GA18 proposal on na; GR1 requests 1 and 2 (baseline#15) block ga_rlo G2 from putting rlo Sensor state into ga's own turn evidence.\nScope:\n- S1: na rule: an items entry with state na and a non-empty evidence list is excluded from the partial-success floor; na with empty evidence counts as not met.\n- S2: guard_summary accepts state lines from an operator guard record, e.g. {\"kind\":\"state\",\"labels\":{name: value}}, and puts them in turns[].guards[].state (labels and values only, no raw text).\n- S3: ga prompt without hub.guidance or session_guidance fails with a clear config error (exit 2, names the missing key), not a KeyError traceback.\n- S4: README and DESIGN notes for S1-S3. No real runs.\nDone when:\n- D1: Tests for S1: na with reason excluded, na without reason counted, existing rev16 floors unchanged.\n- D2: Tests for S2: state lines land in turns[].guards[].state; mixed guard and state lines counted correctly; no raw text stored.\n- D3: Test for S3: missing guidance gives exit 2 and the key name.\n- D4: Mutations for S1-S3 are all killed; full suite green on 3.10-3.13.\nBudget: {\"claude_p_runs\": 0}\n",
+  "id": 5967418764,
+  "ko": "지시 CMD-GA19 판 1 → GA · 앞선 지시 [\"CMD-GA18\"]\n목표: Implement METHOD rev 17 (na rule) and two requests from ga_rlo (GR1): guard state labels in turn evidence, and a clear error from ga prompt.\n까닭: BD-177: GA18 proposal on na; GR1 requests 1 and 2 (baseline#15) block ga_rlo G2 from putting rlo Sensor state into ga's own turn evidence.\n범위:\n- S1: na rule: an items entry with state na and a non-empty evidence list is excluded from the partial-success floor; na with empty evidence counts as not met.\n- S2: guard_summary accepts state lines from an operator guard record, e.g. {\"kind\":\"state\",\"labels\":{name: value}}, and puts them in turns[].guards[].state (labels and values only, no raw text).\n- S3: ga prompt without hub.guidance or session_guidance fails with a clear config error (exit 2, names the missing key), not a KeyError traceback.\n- S4: README and DESIGN notes for S1-S3. No real runs.\n끝난 조건:\n- D1: Tests for S1: na with reason excluded, na without reason counted, existing rev16 floors unchanged.\n- D2: Tests for S2: state lines land in turns[].guards[].state; mixed guard and state lines counted correctly; no raw text stored.\n- D3: Test for S3: missing guidance gives exit 2 and the key name.\n- D4: Mutations for S1-S3 are all killed; full suite green on 3.10-3.13.\n예산: {\"claude_p_runs\": 0}\n"
+ },
+ "full_directive": {
+  "en": "Directive CMD-W2 rev 2 to W, superseding CMD-W2 rev 1, after [\"CMD-W1\"]\nGoal: g\nWhy: y\nChanges in this revision:\n- edit S1: t\n- drop D2\nRefs:\n- r1\nBudget: {\"claude_p_runs\": 0}\nChange size: interface\nContradicts: [\"BD-1\"]\nNote: n\n",
+  "head": {
+   "after": [
+    "CMD-W1"
+   ],
+   "budget": {
+    "claude_p_runs": 0
+   },
+   "change_size": "interface",
+   "changes": [
+    {
+     "item": "S1",
+     "op": "edit",
+     "text": "t"
+    },
+    {
+     "item": "D2",
+     "op": "drop"
+    }
+   ],
+   "contradicts": [
+    "BD-1"
+   ],
+   "goal": "g",
+   "id": "CMD-W2",
+   "note": "n",
+   "refs": [
+    "r1"
+   ],
+   "rev": 2,
+   "schema": "directive/2",
+   "supersedes": {
+    "id": "CMD-W2",
+    "rev": 1
+   },
+   "to": "W",
+   "why": "y"
+  },
+  "ko": "지시 CMD-W2 판 2 → W (CMD-W2 판 1 를 대신함) · 앞선 지시 [\"CMD-W1\"]\n목표: g\n까닭: y\n이 판에서 바뀐 것:\n- edit S1: t\n- drop D2\n참고:\n- r1\n예산: {\"claude_p_runs\": 0}\n바뀜 크기: interface\n어긋나는 결정: [\"BD-1\"]\n메모: n\n"
+ },
+ "full_notify": {
+  "en": "To W: a report on CMD-W1 at https://x/y#1\nNote: n\n",
+  "head": {
+   "id": "CMD-W1",
+   "kind": "report",
+   "note": "n",
+   "ref": "https://x/y#1",
+   "schema": "notify/1",
+   "to": "W"
+  },
+  "ko": "W 에게: report (CMD-W1) · https://x/y#1\n메모: n\n"
+ },
+ "full_report": {
+  "en": "Report from W.\nHandled:\n- CMD-W1 rev 2: paused (waits on X)\nCommits:\n- r b 0123456\nTests: 3 passed, 1 failed, 0 skipped\nItems:\n- D1 met\n  - verified: a\n- D2 blocked\nResults:\n- n: 3 u [1, 5] (e)\nBlockers:\n- dependency: w (gate 2)\nDeviations:\n- dv\nProposals:\n- pp\nNeeds: [\"budget\"]\nExchanges: [\"#1\"]\nChange size: component\nNote: a note\n",
+  "head": {
+   "blockers": [
+    {
+     "gate": 2,
+     "kind": "dependency",
+     "what": "w"
+    }
+   ],
+   "change_size": "component",
+   "commits": [
+    {
+     "branch": "b",
+     "repo": "r",
+     "sha": "0123456789abcdef"
+    }
+   ],
+   "deviations": [
+    "dv"
+   ],
+   "exchanges": [
+    "#1"
+   ],
+   "from": "W",
+   "handled": [
+    {
+     "id": "CMD-W1",
+     "reason": "waits on X",
+     "rev_seen": 2,
+     "status": "paused"
+    }
+   ],
+   "items": [
+    {
+     "evidence": [
+      "verified: a"
+     ],
+     "id": "D1",
+     "state": "met"
+    },
+    {
+     "id": "D2",
+     "state": "blocked"
+    }
+   ],
+   "needs": [
+    "budget"
+   ],
+   "note": "a note",
+   "proposals": [
+    "pp"
+   ],
+   "results": [
+    {
+     "ci": [
+      1,
+      5
+     ],
+     "evidence": "e",
+     "name": "n",
+     "unit": "u",
+     "value": 3
+    }
+   ],
+   "schema": "report/2",
+   "tests": {
+    "failed": 1,
+    "passed": 3,
+    "skipped": 0
+   }
+  },
+  "ko": "보고: W\n처리한 지시:\n- CMD-W1 판 2: paused (waits on X)\n커밋:\n- r b 0123456\n시험: 통과 3 · 실패 1 · 건너뜀 0\n항목:\n- D1 met\n  - verified: a\n- D2 blocked\n결과:\n- n: 3 u [1, 5] (e)\n막힘:\n- dependency: w (관문 2)\n벗어남:\n- dv\n제안:\n- pp\n필요: [\"budget\"]\n주고받음: [\"#1\"]\n바뀜 크기: component\n메모: a note\n"
+ },
+ "report/2": {
+  "en": "Report from GA.\nHandled:\n- CMD-GA18 rev 1: done\nCommits:\n- ga-SDK claude/amazing-johnson-ijp9md a782cab\nTests: 240 passed, 0 failed, 0 skipped\nItems:\n- D1 met\n  - tests/test_rev16.py FormsTest\n- D2 met\n  - tests/test_rev16.py ChangesTest\n- D3 met\n  - tests/test_rev16.py MachineRulesTest\n- D4 met\n  - tests/test_rev16.py VersionOneStillRunsTest\n  - 기존 220 시험 초록\n- D5 met\n  - 변이 26/26\n- D6 met\n  - examples/v2/CMD-GA18.directive2.md\nResults:\n- tests: 240 (python3.10-3.13 unittest)\n- mutations_killed: 26 of 26 (tests/test_rev16.py)\nDeviations:\n- report/2 의 items 를 빠뜨린 보고는 R7 hard 를 '그 글을 받지 않음'(rev 8 거절 경로)으로 구현했다\n- state na 도 'met 이 아닌 항목' 으로 센다(§3.6 글 그대로)\nProposals:\n- METHOD: na 를 부분 성공 바닥에서 뺄지 정해 달라(future)\nChange size: interface\n",
+  "id": 5967393332,
+  "ko": "보고: GA\n처리한 지시:\n- CMD-GA18 판 1: done\n커밋:\n- ga-SDK claude/amazing-johnson-ijp9md a782cab\n시험: 통과 240 · 실패 0 · 건너뜀 0\n항목:\n- D1 met\n  - tests/test_rev16.py FormsTest\n- D2 met\n  - tests/test_rev16.py ChangesTest\n- D3 met\n  - tests/test_rev16.py MachineRulesTest\n- D4 met\n  - tests/test_rev16.py VersionOneStillRunsTest\n  - 기존 220 시험 초록\n- D5 met\n  - 변이 26/26\n- D6 met\n  - examples/v2/CMD-GA18.directive2.md\n결과:\n- tests: 240 (python3.10-3.13 unittest)\n- mutations_killed: 26 of 26 (tests/test_rev16.py)\n벗어남:\n- report/2 의 items 를 빠뜨린 보고는 R7 hard 를 '그 글을 받지 않음'(rev 8 거절 경로)으로 구현했다\n- state na 도 'met 이 아닌 항목' 으로 센다(§3.6 글 그대로)\n제안:\n- METHOD: na 를 부분 성공 바닥에서 뺄지 정해 달라(future)\n바뀜 크기: interface\n"
+ },
+ "verdict/1": {
+  "en": "Verdict: success, round 230\nNext: continue, CMD-K18 (BD-300): model-neutral and pluggable rlo; installing the hook on sessions stays the user's call\nHeads: {\"rlo-SDK\": \"d190d95\"}\nTests rlo-SDK: 258 passed, 0 failed, 0 skipped\nNotes:\n- ga check on the report: clean\n- clean venv rlo-sdk[sensor] @ d190d95: 0.10.0, pip check clean\n- fresh clone, PYTHONDONTWRITEBYTECODE=1: 258 OK\n- baseline mutation 1, hard boundary ctx < hard -> <=: caught (test_stages)\n- baseline mutation 2, <synthetic> filter removed: caught\n- integration branch claude/gracious-meitner-vp49xe fast-forwarded and pushed at d190d95\nClaims against evidence:\n- 14/14 targeted mutations: not re-run; baseline's 2 own mutations agree\n- replay -63.7% on the first 448 calls matches baseline's -63.6%\n- deviation (a) deny-only, P1: accepted (BD-299); baseline prototype and CONTEXT_BUDGET section 2 now emit no allow\n- deviation (b) any guard output wins, the budget adds only its note: accepted\n- deviation (c) stricter checkpoint test (no |, $(, redirects; exact state path): accepted, it closes prototype holes\n- P2 install-hook --budget-* flags: goes into CMD-K18 S5\nReport: https://github.com/cogito5170/baseline/issues/11#issuecomment-5981869577\n",
+  "id": 5981928448,
+  "ko": "판정: success · 회차 230\n다음: continue · CMD-K18 (BD-300): model-neutral and pluggable rlo; installing the hook on sessions stays the user's call\n머리: {\"rlo-SDK\": \"d190d95\"}\n시험 rlo-SDK: 통과 258 · 실패 0 · 건너뜀 0\n메모:\n- ga check on the report: clean\n- clean venv rlo-sdk[sensor] @ d190d95: 0.10.0, pip check clean\n- fresh clone, PYTHONDONTWRITEBYTECODE=1: 258 OK\n- baseline mutation 1, hard boundary ctx < hard -> <=: caught (test_stages)\n- baseline mutation 2, <synthetic> filter removed: caught\n- integration branch claude/gracious-meitner-vp49xe fast-forwarded and pushed at d190d95\n주장과 근거:\n- 14/14 targeted mutations: not re-run; baseline's 2 own mutations agree\n- replay -63.7% on the first 448 calls matches baseline's -63.6%\n- deviation (a) deny-only, P1: accepted (BD-299); baseline prototype and CONTEXT_BUDGET section 2 now emit no allow\n- deviation (b) any guard output wins, the budget adds only its note: accepted\n- deviation (c) stricter checkpoint test (no |, $(, redirects; exact state path): accepted, it closes prototype holes\n- P2 install-hook --budget-* flags: goes into CMD-K18 S5\n보고: https://github.com/cogito5170/baseline/issues/11#issuecomment-5981869577\n"
+ }
+}

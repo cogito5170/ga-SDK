@@ -1,0 +1,78 @@
+# report/2 (METHOD rev 16 §3.6) as prompt-spec/1 (CMD-GA27 S2/S3); see directive2.pspec. results[].value is a number or
+# a string in ga.forms; pspec has neither a number nor a union type, so it is declared int (the common case).
+spec report/2
+goal A session's closed report on the directives it handled: items met or not, results, blockers.
+in from : State @runtime once
+in handled : State @runtime once
+in commits : Observation @observed once
+in tests : Measurement @observed once
+in change_size : Opinion @model once
+in needs : DecisionContext @model once
+in exchanges : Observation @runtime once
+in items : Evidence @observed once
+in results : Measurement @observed once
+in blockers : Observation @observed once
+in deviations : Observation @observed once
+in proposals : Opinion @model once
+in note : Opinion @model once
+out report/2
+  schema : "report/2"
+  from : str+
+  handled : [{id: str+, rev_seen: int, status: str+, reason?: str+ | null}]
+  commits? : [{repo: str+, branch: str+, sha: str+}] | null
+  tests? : {passed: int, failed: int, skipped: int, errors?: int} | null
+  change_size? : str+ | null
+  needs? : [str+] | null
+  exchanges? : [str+] | null
+  items : [{id: str+, state: str+, evidence?: [str+] | null}]
+  results? : [{name: str+, value: int, unit?: str+ | null, ci?: [int] | null, evidence?: str+ | null}] | null
+  blockers? : [{kind: str+, what: str+, gate?: int | null}] | null
+  deviations? : [str+] | null
+  proposals? : [str+] | null
+  note? : str+ | null
+--- en
+Report from {{ from }}.
+Handled:
+{% for h in handled %}- {{ h.id }} rev {{ h.rev_seen|json }}: {{ h.status }}{% if h.reason %} ({{ h.reason }}){% end %}
+{% end %}{% if commits %}Commits:
+{% for c in commits %}- {{ c.repo }} {{ c.branch }} {{ c.sha|cap:7 }}
+{% end %}{% end %}{% if tests %}Tests: {{ tests.passed }} passed, {{ tests.failed }} failed, {{ tests.skipped }} skipped
+{% end %}Items:
+{% for i in items %}- {{ i.id }} {{ i.state }}
+{% if i.evidence %}{% for e in i.evidence %}  - {{ e }}
+{% end %}{% end %}{% end %}{% if results %}Results:
+{% for r in results %}- {{ r.name }}: {{ r.value }}{% if r.unit %} {{ r.unit }}{% end %}{% if r.ci %} {{ r.ci|json }}{% end %}{% if r.evidence %} ({{ r.evidence }}){% end %}
+{% end %}{% end %}{% if blockers %}Blockers:
+{% for b in blockers %}- {{ b.kind }}: {{ b.what }}{% if b.gate %} (gate {{ b.gate }}){% end %}
+{% end %}{% end %}{% if deviations %}Deviations:
+{% for d in deviations %}- {{ d }}
+{% end %}{% end %}{% if proposals %}Proposals:
+{% for p in proposals %}- {{ p }}
+{% end %}{% end %}{% if needs %}Needs: {{ needs|json }}
+{% end %}{% if exchanges %}Exchanges: {{ exchanges|json }}
+{% end %}{% if change_size %}Change size: {{ change_size }}
+{% end %}{% if note %}Note: {{ note }}
+{% end %}
+--- ko
+보고: {{ from }}
+처리한 지시:
+{% for h in handled %}- {{ h.id }} 판 {{ h.rev_seen|json }}: {{ h.status }}{% if h.reason %} ({{ h.reason }}){% end %}
+{% end %}{% if commits %}커밋:
+{% for c in commits %}- {{ c.repo }} {{ c.branch }} {{ c.sha|cap:7 }}
+{% end %}{% end %}{% if tests %}시험: 통과 {{ tests.passed }} · 실패 {{ tests.failed }} · 건너뜀 {{ tests.skipped }}
+{% end %}항목:
+{% for i in items %}- {{ i.id }} {{ i.state }}
+{% if i.evidence %}{% for e in i.evidence %}  - {{ e }}
+{% end %}{% end %}{% end %}{% if results %}결과:
+{% for r in results %}- {{ r.name }}: {{ r.value }}{% if r.unit %} {{ r.unit }}{% end %}{% if r.ci %} {{ r.ci|json }}{% end %}{% if r.evidence %} ({{ r.evidence }}){% end %}
+{% end %}{% end %}{% if blockers %}막힘:
+{% for b in blockers %}- {{ b.kind }}: {{ b.what }}{% if b.gate %} (관문 {{ b.gate }}){% end %}
+{% end %}{% end %}{% if deviations %}벗어남:
+{% for d in deviations %}- {{ d }}
+{% end %}{% end %}{% if proposals %}제안:
+{% for p in proposals %}- {{ p }}
+{% end %}{% end %}{% if needs %}필요: {{ needs|json }}
+{% end %}{% if exchanges %}주고받음: {{ exchanges|json }}
+{% end %}{% if change_size %}바뀜 크기: {{ change_size }}
+{% end %}{% if note %}메모: {{ note }}
+{% end %}

@@ -22,4 +22,4 @@ ga = "ga.__main__:main"
 include = ["ga*"]
 
 [tool.setuptools.package-data]
-ga = ["specs/*.pspec"]  # ga gemini's prompt spec (CMD-GA26)
+ga = ["specs/*.pspec", "specs/forms/*.pspec"]  # ga gemini's prompt spec (GA26), the form specs (GA27)

@@ -1,0 +1,47 @@
+# verdict/1 (METHOD §3.3) as prompt-spec/1 (CMD-GA27 S2/S3); see directive2.pspec.
+spec verdict/1
+goal A hub's closed verdict on a report: the class, its cause, the evidence and the next step.
+in class : Opinion @operator once
+in subclass : Opinion @operator once
+in cause : Opinion @operator once
+in evidence : Evidence @observed once
+in claims_vs_evidence : Evidence @operator once
+in next : DecisionContext @operator once
+in report_ref : Evidence @operator once
+in round : State @runtime once
+in note : Opinion @operator once
+out verdict/1
+  schema : "verdict/1"
+  class : str+
+  subclass? : str+ | null
+  cause? : str+ | null
+  evidence : {heads: {}, tests: {}, notes?: [str+] | null}
+  claims_vs_evidence : [str+]
+  next : {choice: str+, reason: str+}
+  report_ref? : str+ | null
+  round? : int | null
+  note? : str+ | null
+--- en
+Verdict: {{ class }}{% if subclass %} ({{ subclass }}){% end %}{% if cause %}, cause {{ cause }}{% end %}{% if round %}, round {{ round }}{% end %}
+Next: {{ next.choice }}, {{ next.reason }}
+Heads: {{ evidence.heads|json }}
+{% for t in evidence.tests %}Tests {{ t.key }}: {{ t.passed }} passed, {{ t.failed }} failed, {{ t.skipped }} skipped
+{% end %}{% if evidence.notes %}Notes:
+{% for n in evidence.notes %}- {{ n }}
+{% end %}{% end %}Claims against evidence:
+{% for c in claims_vs_evidence %}- {{ c }}
+{% end %}{% if report_ref %}Report: {{ report_ref }}
+{% end %}{% if note %}Note: {{ note }}
+{% end %}
+--- ko
+판정: {{ class }}{% if subclass %} ({{ subclass }}){% end %}{% if cause %} · 원인 {{ cause }}{% end %}{% if round %} · 회차 {{ round }}{% end %}
+다음: {{ next.choice }} · {{ next.reason }}
+머리: {{ evidence.heads|json }}
+{% for t in evidence.tests %}시험 {{ t.key }}: 통과 {{ t.passed }} · 실패 {{ t.failed }} · 건너뜀 {{ t.skipped }}
+{% end %}{% if evidence.notes %}메모:
+{% for n in evidence.notes %}- {{ n }}
+{% end %}{% end %}주장과 근거:
+{% for c in claims_vs_evidence %}- {{ c }}
+{% end %}{% if report_ref %}보고: {{ report_ref }}
+{% end %}{% if note %}메모: {{ note }}
+{% end %}

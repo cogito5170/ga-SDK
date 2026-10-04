@@ -1,0 +1,24 @@
+# notify/1 (METHOD rev 16 §3.6) as prompt-spec/1 (CMD-GA27 S2/S3); see directive2.pspec. A notify carries only kind
+# and ref (S4): the receiver reads the message itself through `ga inbox`.
+spec notify/1
+goal Wake a session: a message of this kind is at this ref.
+in to : DecisionContext @runtime once
+in kind : DecisionContext @runtime once
+in ref : Evidence @runtime once
+in id : DecisionContext @runtime once
+in note : Opinion @runtime once
+out notify/1
+  schema : "notify/1"
+  to : str+
+  kind : str+
+  ref : str+
+  id? : str+ | null
+  note? : str+ | null
+--- en
+To {{ to }}: a {{ kind }}{% if id %} on {{ id }}{% end %} at {{ ref }}
+{% if note %}Note: {{ note }}
+{% end %}
+--- ko
+{{ to }} 에게: {{ kind }}{% if id %} ({{ id }}){% end %} · {{ ref }}
+{% if note %}메모: {{ note }}
+{% end %}

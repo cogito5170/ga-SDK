@@ -231,6 +231,20 @@ ga's Gemini prompts come from one spec, `ga/specs/gemini-plan.pspec` (prompt-spe
 ga gemini --token-report tests/fixtures/pspec/conversation_hero8.json   # offline: tokens per turn, verbatim vs compact
 ```
 
+## Messages: one compact head, prose on demand, one read path (CMD-GA27)
+
+A posted directive, report, verdict or notify is one ```ga block of minified JSON plus the footer: no prose (`ga check` says `wire:prose` / `wire:pretty`, soft). A human note goes in `note` (at most 280 characters).
+
+```
+ga notify --to baseline --kind report --ref <comment url> --wire   # the posted notify
+ga render report.md --lang ko                                      # prose for people, from ga/specs/forms; no model call
+ga inbox github:cogito5170/baseline#12 --repo .                    # only what is new since the cursor, heads only
+ga inbox mail:GA --repo .                                          # the same for ga mail
+ga wire-report tests/fixtures/wire/channels.json                   # offline: bytes now vs the wire form
+```
+
+`ga inbox` keeps its cursor in the git dir (never pushed) and moves it only after its output is written. Read a notified message through `ga inbox`, not the notify body and the issue both.
+
 ## 시험
 
 ```sh

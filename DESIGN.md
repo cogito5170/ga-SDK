@@ -372,3 +372,27 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
   - the token report against the prototype;
   - the 17 cases plus boundary ids;
   - the supervisor's mode per turn, and the beside-check log.
+
+## 32. Semantic, compact messages (CMD-GA27, BD-297/298)
+
+- **S1, the wire form:** a posted directive/2, report/2, verdict/1 or notify/1 is one ```ga block of minified JSON plus the footer line, with no prose. `forms.dump_wire` writes it, and `ga notify --wire` prints a notify in it.
+  - `forms.wire_problems` adds two soft problems to `ga check`: `wire:prose` for text outside the head (the footer aside) and `wire:pretty` for an unminified head. Other forms are not checked.
+  - A human-only note goes in `note` (at most 280 chars), now a field of all four forms.
+- **S2/S3, forms as prompt-spec/1:** `ga/specs/forms/{directive2,report2,verdict1,notify1}.pspec` (package data). Each spec's `out` declares the form, so `rlo.pspec.check` reads it (`wire.spec_check`). Its `en` and `ko` sections render it (`wire.render`, `ga render FILE|- [--lang en|ko]`), with no model call. ga.forms checks a head before it is rendered.
+  - **ga.forms stays the authority.** On the 141 historical heads of the four kinds they agree on 108. The 33 disagreements are types pspec does not have:
+    - pattern types (10: a notify `ref` that is not a URL, a report item id that is not `D<n>`);
+    - enum and pattern types together (5: notify `kind`);
+    - a number-or-string type (18: report `results[].value` or `ci` that is a float or a string).
+  - `ga render` with no FILE still renders the hub's records, as before.
+- **S4, `ga inbox <channel>`:** `ga/inbox.py`, the one read path. It prints one line per new message, `{"id","at","head"}`, where `head` is the minified ga head or null. The REST wrapper and all prose are dropped.
+  - **GitHub (`github:o/r#n` or the issue URL):** the REST comments endpoint with `since` = the cursor. GitHub's `since` is inclusive, so the cursor `{since, seen}` also keeps the ids already read at that second. The token comes from an environment variable at each request (the issue channel's `_request`), and pages follow `Link`.
+  - **mail (`mail:NAME`):** ga mail's read set.
+  - **The cursor** sits in the git dir (`ga-inbox/`), never pushed. It moves only after the output is written and flushed.
+  - **notify/1** carries kind and ref only; the receiver reads the message through inbox.
+- **S5, `ga wire-report CORPUS [--reads LOG]`:** offline, estimate = ceil(bytes / 4).
+  - **(a) The 279 comments of BD-297:** 887,116 → 537,098 bytes (−39.5%) in the S1 form.
+  - **(c) Mean bytes a writer emits:** directives 4,200 → 2,810, reports 4,007 → 1,506.
+  - **(b) Reads:** `ga inbox` delivers each message once, so its volume does not depend on the read schedule: 353,105 bytes for AO's window with 63 notifies. The "now" side of the replay runs on a modelled read log (`tests/fixtures/wire/ao_reads_model.json`, whole-issue reads); it is an upper bound, not AO's recorded reads.
+  - **The corpus** is `tests/fixtures/wire/channels.json`: the ga heads (no prose) and byte counts of baseline #11 #12 #16 #18, read through the GitHub MCP tools.
+- **Tests:** `tests/test_wire.py` (S1, S2/S3, S5) and `tests/test_inbox.py` (S4, on a fake GitHub server on localhost).
+

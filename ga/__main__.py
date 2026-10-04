@@ -28,7 +28,7 @@ from .adapters.llm_judge import LLMJudge
 from .adapters.mailbox import FileMailbox
 from .adapters.headless import HeadlessRunner
 from .adapters.runner import ManualRunner
-from .forms import FormError, Problem, deprecated, hard, parse_post, parse_text, validate
+from .forms import FormError, Problem, deprecated, hard, parse_post, parse_text, validate, wire_problems
 from .hub import Hub
 from .prompts import hub_prompt, worker_prompt
 from .records import RecordStore
@@ -201,7 +201,7 @@ def cmd_check(args) -> int:
         text = _read(f)
         try:
             head, body = parse_text(text)
-            probs = validate(head) + deprecated(head.get("schema"))
+            probs = validate(head) + deprecated(head.get("schema")) + wire_problems(text)
         except FormError as e:
             probs = e.problems
         if cfg is not None:
@@ -221,11 +221,50 @@ def cmd_notify(args) -> int:
         for p in probs:
             print(p, file=sys.stderr)
         return 2
+    if getattr(args, "wire", False):  # CMD-GA27 S1: the posted form, one minified ga block and the footer
+        from .forms import dump_wire
+        sys.stdout.write(dump_wire(doc))
+        return 0
     print(json.dumps(doc, ensure_ascii=False, separators=(",", ":")))
     return 0
 
 
+def cmd_inbox(args) -> int:
+    """ga inbox <channel> (CMD-GA27 S4): what is new since the cursor, one minified head line per message."""
+    from . import inbox
+    from .adapters.github import ChannelError
+    try:
+        n = inbox.read(args.channel, sys.stdout, repo=args.repo, remote=args.remote, token_env=args.token_env)
+    except (inbox.InboxError, ChannelError) as e:
+        print(f"ga inbox: {e}", file=sys.stderr)
+        return 2
+    if n == 0 and args.say_empty:
+        print("no new message", file=sys.stderr)
+    return 0
+
+
+def cmd_wire_report(args) -> int:
+    """CMD-GA27 S5: the offline token report on a channel corpus (and a read log, if given)."""
+    from . import wire
+    corpus = json.loads(_read(args.corpus))
+    log = json.loads(_read(args.reads)) if args.reads else None
+    out = wire.token_report(corpus, upto=args.upto, reads=log["reads"] if log else None,
+                            notify_now_bytes=(log or {}).get("notify_now_bytes", 0))
+    print(json.dumps(out, indent=1, sort_keys=True))
+    return 0
+
+
 def cmd_render(args) -> int:
+    if getattr(args, "file", None):  # CMD-GA27 S2: a form's prose, rendered locally from its spec; no model call
+        from . import wire
+        try:
+            head, _ = parse_text(_read(args.file))
+            sys.stdout.write(wire.render(head, args.lang))
+        except FormError as e:
+            for p in e.problems:
+                print(f"{args.file}: {p}", file=sys.stderr)
+            return 2
+        return 0
     cfg = gacfg.load(args.config)
     ga_dir = Path(args.ga_dir).resolve() if args.ga_dir else Path(args.config).resolve().parent / ".ga"
     store = RecordStore(ga_dir / "records")
@@ -350,8 +389,20 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("check"); p.add_argument("files", nargs="+"); p.set_defaults(fn=cmd_check)
     p = sub.add_parser("notify", help="the notify/1 line that wakes a session (METHOD rev 16)")
     p.add_argument("--to", required=True); p.add_argument("--kind", required=True, choices=["directive", "report", "verdict", "question", "ack"])
-    p.add_argument("--ref", required=True); p.add_argument("--id"); p.set_defaults(fn=cmd_notify)
-    p = sub.add_parser("render"); p.set_defaults(fn=cmd_render)
+    p.add_argument("--ref", required=True); p.add_argument("--id")
+    p.add_argument("--wire", action="store_true", help="print the posted form: one minified ga block and the footer (GA27 S1)")
+    p.set_defaults(fn=cmd_notify)
+    p = sub.add_parser("inbox", help="the one read path: new messages since the local cursor, heads only (GA27 S4)")
+    p.add_argument("channel", help="github:<owner>/<repo>#<issue>, the issue URL, or mail:<NAME>")
+    p.add_argument("--repo", default=".", help="the git repository whose git dir keeps the cursor (and, for mail:, the mailbox)")
+    p.add_argument("--remote", default="origin"); p.add_argument("--token-env", default="GITHUB_TOKEN")
+    p.add_argument("--say-empty", action="store_true"); p.set_defaults(fn=cmd_inbox)
+    p = sub.add_parser("wire-report", help="offline token report: wire bytes now vs the S1 form, reads vs ga inbox (GA27 S5)")
+    p.add_argument("corpus"); p.add_argument("--upto", type=int, default=279); p.add_argument("--reads")
+    p.set_defaults(fn=cmd_wire_report)
+    p = sub.add_parser("render", help="without FILE: the hub's records; with FILE (or -): a form's prose (GA27 S2)")
+    p.add_argument("file", nargs="?"); p.add_argument("--lang", choices=["en", "ko"], default="en")
+    p.set_defaults(fn=cmd_render)
     p = sub.add_parser("gemini", help="Gemini supervisor: fixed model, closed step list, wait-and-resume (CMD-GA21)")
     p.add_argument("prompt", nargs="*"); p.add_argument("--resume", action="store_true")
     p.add_argument("--config", dest="gemini_config", default="ga-gemini.json")

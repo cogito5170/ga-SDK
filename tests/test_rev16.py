@@ -240,7 +240,9 @@ class CliAndPromptTest(unittest.TestCase):
     def test_d6_the_directive_as_directive2_checks(self):
         f = ROOT / "examples" / "v2" / "CMD-GA18.directive2.md"
         code, out, _ = self.run_cli("--config", "/nonexistent.json", "check", str(f))
-        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(code, 0)
+        # a pre-GA27 post: pretty head plus prose, so only the soft S1 wire notes (CMD-GA27)
+        self.assertEqual(sorted(x.split("] ")[1].split(" ")[0] for x in out.splitlines()), ["wire:pretty", "wire:prose"])
         head, _ = parse_text(f.read_text(encoding="utf-8"))
         self.assertEqual(([x["id"] for x in head["scope"]], [x["id"] for x in head["done_when"]]),
                          ([f"S{i}" for i in range(1, 8)], [f"D{i}" for i in range(1, 7)]))

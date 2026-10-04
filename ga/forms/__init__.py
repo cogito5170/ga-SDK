@@ -4,8 +4,14 @@ from .core import (
     SOFT,
     FormError,
     Problem,
+    FOOTER,
+    WIRE_FORMS,
     canonical_json,
     dump_text,
+    dump_wire,
+    minify,
+    strip_footer,
+    wire_problems,
     hard,
     parse_sections,
     parse_text,
@@ -28,7 +34,8 @@ from .kinds import (
 )
 
 __all__ = [
-    "HARD", "SOFT", "FormError", "Problem", "canonical_json", "dump_text", "hard", "parse_sections",
+    "HARD", "SOFT", "FOOTER", "WIRE_FORMS", "FormError", "Problem", "canonical_json", "dump_text", "dump_wire",
+    "minify", "strip_footer", "wire_problems", "hard", "parse_sections",
     "parse_text", "soft", "CAUSES", "CHANGE_SIZES", "LABELS", "NEXT_CHOICES", "REPORT_SECTIONS", "SCHEMAS",
     "VERDICT_CLASSES", "apply_changes", "deprecated", "load", "parse_post", "report_body_notes", "validate",
 ]

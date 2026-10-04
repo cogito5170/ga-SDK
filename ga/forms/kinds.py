@@ -87,6 +87,14 @@ def _counts(v: Any) -> str | None:
     return None
 
 
+def _note(v: Any) -> str | None:
+    """A human-only note on a wire form (CMD-GA27 S1): a string of at most 280 characters."""
+    return None if isinstance(v, str) and v.strip() and len(v) <= NOTE_MAX else f"must be a string of 1-{NOTE_MAX} chars"
+
+
+NOTE_MAX = 280
+
+
 def _str_map(v: Any) -> str | None:
     if not isinstance(v, dict) or not all(isinstance(k, str) and isinstance(x, str) for k, x in v.items()):
         return "must be an object of strings"
@@ -139,6 +147,7 @@ DIRECTIVE2 = [
     Field("budget", _budget, required=False),
     Field("change_size", one_of(*CHANGE_SIZES), required=False),
     Field("contradicts", list_of(decision_id), required=False),
+    Field("note", _note, required=False),
 ]
 
 
@@ -165,6 +174,7 @@ REPORT2_ONLY = [
                                    Field("gate", is_int(1), required=False)])), required=False),
     Field("deviations", list_of(is_str), required=False),
     Field("proposals", list_of(is_str), required=False),
+    Field("note", _note, required=False),
 ]
 
 NOTIFY = [
@@ -172,6 +182,7 @@ NOTIFY = [
     Field("kind", one_of(*NOTIFY_KINDS)),
     Field("ref", matches(re.compile(r"^https?://\S+$"), "a URL")),
     Field("id", is_str, required=False),
+    Field("note", _note, required=False),
 ]
 
 REPORT = [
@@ -226,6 +237,7 @@ VERDICT = [
     Field("next", obj([Field("choice", one_of(*NEXT_CHOICES)), Field("reason", is_str)])),
     Field("report_ref", is_str, required=False),
     Field("round", is_int(1), required=False),
+    Field("note", _note, required=False),
 ]
 
 ROUND = [

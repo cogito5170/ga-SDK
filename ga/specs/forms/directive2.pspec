@@ -1,0 +1,71 @@
+# directive/2 (METHOD rev 16 §3.6) as prompt-spec/1 (CMD-GA27 S2/S3): `out` declares the form for rlo.pspec's check;
+# the en / ko sections render it for people (`ga render`). ga.forms stays the runtime authority. pspec has no enum,
+# pattern or union type, so ids, enums and cross-field rules are ga.forms' alone (the agreement test lists them).
+spec directive/2
+goal A hub's closed directive to one session: what to change, why, and when it is done.
+in id : DecisionContext @operator once
+in rev : DecisionContext @operator once
+in supersedes : DecisionContext @operator once
+in to : DecisionContext @operator once
+in goal : DecisionContext @operator once
+in why : Evidence @operator once
+in scope : DecisionContext @operator once
+in done_when : DecisionContext @operator once
+in refs : Evidence @operator once
+in changes : DecisionContext @operator once
+in after : DecisionContext @operator once
+in budget : DecisionContext @operator once
+in change_size : DecisionContext @operator once
+in contradicts : Evidence @operator once
+in note : Opinion @operator once
+out directive/2
+  schema : "directive/2"
+  id : str+
+  rev : int
+  supersedes? : {id: str+, rev: int} | null
+  to : str+
+  goal : str+
+  why : str+
+  scope? : [{id: str+, text: str+}] | null
+  done_when? : [{id: str+, text: str+}] | null
+  refs? : [str+] | null
+  changes? : [{item: str+, op: str+, text?: str+ | null}] | null
+  after? : [str+] | null
+  budget? : {} | null
+  change_size? : str+ | null
+  contradicts? : [str+] | null
+  note? : str+ | null
+--- en
+Directive {{ id }} rev {{ rev }} to {{ to }}{% if supersedes %}, superseding {{ supersedes.id }} rev {{ supersedes.rev }}{% end %}{% if after %}, after {{ after|json }}{% end %}
+Goal: {{ goal }}
+Why: {{ why }}
+{% if scope %}Scope:
+{% for s in scope %}- {{ s.id }}: {{ s.text }}
+{% end %}{% end %}{% if done_when %}Done when:
+{% for d in done_when %}- {{ d.id }}: {{ d.text }}
+{% end %}{% end %}{% if changes %}Changes in this revision:
+{% for c in changes %}- {{ c.op }} {{ c.item }}{% if c.text %}: {{ c.text }}{% end %}
+{% end %}{% end %}{% if refs %}Refs:
+{% for r in refs %}- {{ r }}
+{% end %}{% end %}{% if budget %}Budget: {{ budget|json }}
+{% end %}{% if change_size %}Change size: {{ change_size }}
+{% end %}{% if contradicts %}Contradicts: {{ contradicts|json }}
+{% end %}{% if note %}Note: {{ note }}
+{% end %}
+--- ko
+지시 {{ id }} 판 {{ rev }} → {{ to }}{% if supersedes %} ({{ supersedes.id }} 판 {{ supersedes.rev }} 를 대신함){% end %}{% if after %} · 앞선 지시 {{ after|json }}{% end %}
+목표: {{ goal }}
+까닭: {{ why }}
+{% if scope %}범위:
+{% for s in scope %}- {{ s.id }}: {{ s.text }}
+{% end %}{% end %}{% if done_when %}끝난 조건:
+{% for d in done_when %}- {{ d.id }}: {{ d.text }}
+{% end %}{% end %}{% if changes %}이 판에서 바뀐 것:
+{% for c in changes %}- {{ c.op }} {{ c.item }}{% if c.text %}: {{ c.text }}{% end %}
+{% end %}{% end %}{% if refs %}참고:
+{% for r in refs %}- {{ r }}
+{% end %}{% end %}{% if budget %}예산: {{ budget|json }}
+{% end %}{% if change_size %}바뀜 크기: {{ change_size }}
+{% end %}{% if contradicts %}어긋나는 결정: {{ contradicts|json }}
+{% end %}{% if note %}메모: {{ note }}
+{% end %}
