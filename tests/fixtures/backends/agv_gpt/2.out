@@ -1,0 +1,4 @@
+{"type": "init", "session": "s"}
+{"type": "message", "role": "assistant", "content": "```json\n{\"schema\": \"", "delta": true}
+{"type": "message", "role": "assistant", "content": "ga-plan/1\", \"steps\": [], \"next\": null, \"say\": \"5\"}\n```", "delta": true}
+{"type": "result", "status": "success", "model": "gpt-5.1", "usage": {"prompt_tokens": 1202, "completion_tokens": 40, "total_tokens": 1242, "prompt_tokens_details": {"cached_tokens": 0}}}

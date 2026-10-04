@@ -1,0 +1,4 @@
+{"type": "init", "session": "s"}
+{"type": "message", "role": "assistant", "content": "```json\n{\"schema\": \"", "delta": true}
+{"type": "message", "role": "assistant", "content": "ga-plan/1\", \"steps\": [], \"next\": null, \"say\": \"5\"}\n```", "delta": true}
+{"type": "result", "status": "success", "model": "gemini-3.8-flash-high", "usageMetadata": {"promptTokenCount": 1102, "candidatesTokenCount": 50, "totalTokenCount": 1152}}

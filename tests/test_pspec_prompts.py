@@ -99,6 +99,7 @@ class Stub:
                        "after": []} for r in results]}
 
     _rec = G.Supervisor._rec
+    _task_results = G.Supervisor._task_results
 
     def _result_text(self, sid):
         return self.texts[sid]
@@ -116,6 +117,10 @@ def runtime_prompt(d, c, mode="verbatim"):
     return G.Supervisor._prompt(stub, rec)
 
 
+def as_plan(p):
+    return {**p, "schema": G.PLAN_SCHEMA} if isinstance(p, dict) and p.get("schema") == S else p
+
+
 def spec_kills(spec_text, d, golden):
     """Problems of a spec text against the verbatim fixtures, the compact golden, the 17 check results and the header:
     an empty list means a mutant of the spec survives."""
@@ -124,7 +129,8 @@ def spec_kills(spec_text, d, golden):
     except P.SpecError:
         return ["load"]
     out = ["stray_tag"] if G.stray_tags(spec) else []  # what plan_spec() refuses
-    if (spec.name, sorted(spec.inputs), spec.out_schema) != ("gemini-plan/1", ["ask", "results", "task", "tools"], S):
+    if (spec.name, sorted(spec.inputs), spec.out_schema) != ("supervisor-plan/1", ["ask", "form", "results", "task",
+                                                                                  "tools"], G.PLAN_SCHEMA):
         out.append("header")
     want = {name: (i.term, i.basis, i.when) for name, i in G.plan_spec().inputs.items()}
     if {name: (i.term, i.basis, i.when) for name, i in spec.inputs.items()} != want or spec.goal != G.plan_spec().goal:
@@ -132,13 +138,20 @@ def spec_kills(spec_text, d, golden):
     try:
         for c, g in zip(d["cases"], golden["cases"]):
             tools, task, res, ask = inputs(d, c)
-            vals = {"tools": G.spec_tools(tools), "task": task, "results": res, "ask": ask}
+            vals = {"tools": G.spec_tools(tools), "task": task, "results": res, "ask": ask, "form": S}
             sec = "once" if c["kind"] == "protocol" else c["kind"]
             if P.compile(spec, sec, vals, "verbatim") != c["text"] or P.compile(spec, sec, vals, "compact") != g["text"]:
                 out.append(f"text:{c['kind']}")
                 break
-        base = [bool(P.check(G.plan_spec(), p, {"tools": RUN_TOOLS})) for p in CASES_17 + BOUNDARY]
-        if [bool(P.check(spec, p, {"tools": RUN_TOOLS})) for p in CASES_17 + BOUNDARY] != base:
+            # GA28 S5: a bare call's system (once) and user side (task · turn_bare) are the same text, split at "\n"
+            bare = {"first": "task", "turn_noresume": "turn_bare"}.get(c["kind"])
+            if bare and any(P.compile(spec, "once", vals, m) + "\n" + P.compile(spec, bare, vals, m)
+                            != P.compile(spec, c["kind"], vals, m) for m in ("verbatim", "compact")):
+                out.append(f"bare:{c['kind']}")
+                break
+        plans = [as_plan(p) for p in CASES_17 + BOUNDARY]  # the spec's out is ga-plan/1 (GA28): read the alias as it
+        base = [bool(P.check(G.plan_spec(), p, {"tools": RUN_TOOLS})) for p in plans]
+        if [bool(P.check(spec, p, {"tools": RUN_TOOLS})) for p in plans] != base:
             out.append("check")
     except (P.SpecError, KeyError, TypeError, AttributeError, ValueError):
         out.append("compile")
@@ -166,9 +179,14 @@ class VerbatimTest(unittest.TestCase):
             with self.subTest(**{k: v for k, v in c.items() if k != "text"}):
                 self.assertEqual(runtime_prompt(self.d, c, "verbatim"), c["text"])
 
-    def test_the_first_turn_is_verbatim_in_compact_mode_too(self):
+    def test_the_first_turn_is_compact_in_compact_mode(self):
+        # BD-304 (a): the first turn follows prompt_mode too (it was verbatim always)
+        golden = {json.dumps({k: v for k, v in g.items() if k != "text"}, sort_keys=True): g["text"]
+                  for g in load("compact_golden.json")["cases"]}
         for c in (c for c in self.d["cases"] if c["kind"] == "first"):
-            self.assertEqual(runtime_prompt(self.d, c, "compact"), c["text"])
+            key = json.dumps({k: v for k, v in c.items() if k != "text"}, sort_keys=True)
+            self.assertEqual(runtime_prompt(self.d, c, "compact"), golden[key])
+            self.assertLess(len(golden[key]), len(c["text"]))
 
     def test_a_stray_tag_is_refused(self):
         self.assertEqual(G.stray_tags(G.plan_spec()), [])
@@ -180,7 +198,7 @@ class VerbatimTest(unittest.TestCase):
     def test_about_is_handed_in_as_protocol_wrote_it(self):
         # without spec_tools the spec's {% if t.about %} row differs for a blank or colon-ended about
         tools = self.d["tools"]["edges"]
-        raw = P.compile(G.plan_spec(), "once", {"tools": tools, "task": "", "results": [], "ask": ""})
+        raw = P.compile(G.plan_spec(), "once", {"tools": tools, "task": "", "results": [], "ask": "", "form": S})
         self.assertNotEqual(raw, G.protocol(G.GeminiConfig(root=Path("."), tools=tools)))
         self.assertEqual(G.spec_tools({"a": {"about": "x: "}, "b": {"python": "m:f"}, "c": {"about": 7}}),
                          {"a": {"about": "x"}, "b": {"about": ""}, "c": {"about": "7"}})
@@ -229,10 +247,9 @@ class CompactTest(unittest.TestCase):
             self.assertEqual(len(h["per_turn"]), 8)
             self.assertEqual(h["verbatim"], verbatim, host)
             self.assertLessEqual(h["compact"], compact, host)
-            first = h["per_turn"][0]
-            # what ga sends: the first turn verbatim (S3), every follow-up compact
-            self.assertEqual(h["ga"], h["compact"] + first["verbatim"] - first["compact"], host)
-            self.assertTrue(all(t["ga"] == t["compact"] for t in h["per_turn"][1:]))
+            # what ga sends: every turn compact, the first one too since GA28 (BD-304 a)
+            self.assertEqual(h["ga"], h["compact"], host)
+            self.assertTrue(all(t["ga"] == t["compact"] for t in h["per_turn"]))
         self.assertEqual(r["answers"], {"n": 8, "check_plan_ok": 8, "spec_ok": 8, "agree": 8})
 
     def test_token_report_runs_both_checks_on_each_answer(self):
@@ -278,7 +295,7 @@ class SupervisorTest(unittest.TestCase):
         sup = G.Supervisor(G.load_config(box.cfg_path), clock=clock, sleep=clock.sleep, out=io.StringIO())
         return box, sup.start("add two and three")
 
-    def test_compact_follow_up_is_shorter_and_the_first_turn_is_the_same(self):
+    def test_compact_turns_are_shorter_the_first_one_too(self):
         from test_gemini import plan
         script = [{"plan": plan([{"id": "a", "tool": "add", "args": {"a": 2, "b": 3}}], {"prompt": "report", "after": ["a"]})},
                   {"plan": plan(say="5")}]
@@ -288,10 +305,10 @@ class SupervisorTest(unittest.TestCase):
             self.assertTrue(ok)
             lens[mode] = [c["prompt_len"] for c in box.calls()]
             turns = [r for r in box.log() if r["event"] == "turn"]
-            self.assertEqual([r["prompt_mode"] for r in turns], ["verbatim", mode])
+            self.assertEqual([r["prompt_mode"] for r in turns], [mode, mode])  # BD-304 (a)
             self.assertTrue(all(isinstance(r["prompt_est"], int) and r["prompt_est"] > 0 for r in turns))
             self.assertEqual([r.get("prompt_mode") for r in box.log() if r["event"] == "task"], [mode])
-        self.assertEqual(lens["compact"][0], lens["verbatim"][0])
+        self.assertLess(lens["compact"][0], lens["verbatim"][0])
         self.assertLess(lens["compact"][1], lens["verbatim"][1])
 
     def test_check_plan_decides_and_a_disagreement_is_logged(self):
@@ -309,18 +326,19 @@ class SupervisorTest(unittest.TestCase):
 
 @needs_pspec
 class AuthorityTest(unittest.TestCase):
-    """On rlo >= 0.9.1 (K16 P2) an id with a trailing newline is the one known disagreement: check_plan accepts it and
-    decides, the spec's check rejects it, and the runtime logs it."""
+    """An id with a trailing newline was the one known disagreement on rlo >= 0.9.1 (K16 P2). Since GA28 (BD-304 b)
+    check_plan uses fullmatch too: both refuse it, the step fails, and there is nothing to log."""
 
     run_task = SupervisorTest.run_task
 
-    def test_check_plan_accepts_and_the_spec_check_is_only_logged(self):
+    def test_a_trailing_newline_id_is_refused_by_both(self):
         from test_gemini import plan
         script = [{"plan": plan([{"id": "a\n", "tool": "add", "args": {"a": 1, "b": 1}}], None, "two")}]
         box, ok = self.run_task(script)
-        self.assertTrue(ok)  # check_plan decides
-        rows = [(r["check_plan_ok"], r["spec_ok"]) for r in box.log() if r["event"] == "check_disagree"]
-        self.assertEqual(rows, [] if rlo_version() == "0.9.0" else [(True, False)])
+        self.assertFalse(ok)  # check_plan decides: refused
+        self.assertEqual([r["ok"] for r in box.log() if r["event"] == "plan"], [False])
+        rows = [r for r in box.log() if r["event"] == "check_disagree"]
+        self.assertEqual(rows, [] if rlo_version() != "0.9.0" else rows)
 
 
 def once_resent(spec, d):
@@ -330,7 +348,7 @@ def once_resent(spec, d):
         if c["kind"] != "turn":
             continue
         tools, task, res, ask = inputs(d, c)
-        vals = {"tools": G.spec_tools(tools), "task": task, "results": res, "ask": ask}
+        vals = {"tools": G.spec_tools(tools), "task": task, "results": res, "ask": ask, "form": S}
         once = [ln for ln in P.compile(spec, "once", vals, "compact").splitlines() if ln.strip()][:2]
         text = P.compile(spec, "turn", vals, "compact")
         if any(ln in text for ln in once) or (task and task.strip() and task in text):
@@ -354,11 +372,10 @@ class CheckAgreementTest(unittest.TestCase):
             with self.subTest(plan=p):
                 self.assertEqual(bool(G.check_plan(p, RUN_TOOLS)), bool(G.spec_check(p, RUN_TOOLS)))
 
-    def test_a_trailing_newline_id_is_known_to_differ_after_k16(self):
-        # check_plan's ^...$ with re.match accepts "a\n"; K16 P2 checks ids with fullmatch. check_plan decides (a
-        # proposal to make it fullmatch is baseline's call); the runtime logs this as check_disagree
+    def test_a_trailing_newline_id_is_refused_by_both_checks(self):
+        # BD-304 (b): check_plan uses fullmatch, as K16 P2's spec check does
         p = {"schema": S, "steps": [{"id": "a\n", "tool": "noop"}]}
-        self.assertEqual(G.check_plan(p, RUN_TOOLS), [])
+        self.assertEqual(G.check_plan(p, RUN_TOOLS), ["steps[0].id"])
         self.assertEqual(G.spec_check(p, RUN_TOOLS) == [], rlo_version() == "0.9.0")
 
     def test_the_self_reference_case_is_the_one_on_0_9_0(self):

@@ -346,6 +346,11 @@ def cmd_gemini(args) -> int:
     return gemini.main(args)
 
 
+def cmd_supervise(args) -> int:
+    from . import gemini  # the loop lives there; rlo is imported only when a task runs
+    return gemini.supervise_main(args)
+
+
 RLO_CLI = "ga.rlo.cli"
 
 
@@ -437,6 +442,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--token-report", metavar="CONVERSATION",
                    help="offline: tokens per turn, verbatim against compact, for a labelled conversation file; no model call")
     p.set_defaults(fn=cmd_gemini)
+    p = sub.add_parser("supervise", help="the supervisor loop on any backend plugin (ga.backends; CMD-GA28)")
+    p.add_argument("prompt", nargs="*"); p.add_argument("--resume", action="store_true")
+    p.add_argument("--config", default="ga-supervise.json", help="a ga-supervise/1 config (a ga-gemini/1 one also runs)")
+    p.add_argument("--backend", help="the ga.backends plugin (default: the config's): agv, gemini_cli, claude_cli, "
+                                     "codex_cli, openai_http, anthropic_http, or an installed plugin")
+    p.add_argument("--prompt-mode", choices=["compact", "verbatim"], help="default: the config's, else compact")
+    p.add_argument("--list-backends", action="store_true", help="the backends that loaded, those that did not, and "
+                                                                "each one's fixed overhead")
+    p.add_argument("--token-report", metavar="CONVERSATION",
+                   help="offline: tokens per turn per host and per backend (fixed overhead, pspec prompt, provider usage)")
+    p.set_defaults(fn=cmd_supervise)
     p = sub.add_parser("mail", help="ga forms between sessions through a git mailbox branch (CMD-GA22)")
     msub = p.add_subparsers(dest="mail_cmd", required=True)
     for name in ("send", "read", "scan"):

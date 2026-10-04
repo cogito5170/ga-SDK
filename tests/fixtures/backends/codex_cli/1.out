@@ -1,0 +1,4 @@
+{"type": "thread.started", "thread_id": "t1", "model": "gpt-5.1-codex"}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "i0", "type": "agent_message", "text": "```json\n{\"schema\": \"ga-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"add\", \"args\": {\"a\": 2, \"b\": 3}}], \"next\": {\"prompt\": \"report the sum\", \"after\": [\"a\"]}, \"say\": \"adding\"}\n```"}}
+{"type": "turn.completed", "usage": {"input_tokens": 9001, "cached_input_tokens": 4000, "output_tokens": 70}}
