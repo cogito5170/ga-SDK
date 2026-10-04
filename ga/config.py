@@ -71,6 +71,11 @@ class Session:
     channel: str = ""
     session_id: str = ""
     first_directive: str = ""
+    # CMD-GA29: "resume" continues the runner's session (--resume, the transcript accumulates); "fresh" starts every
+    # turn anew from a context pack (ga/ctxpack.py) built from files, capped at pack_max_tokens (required then)
+    context: str = "resume"
+    pack_max_tokens: int | None = None
+    state_max_tokens: int = 2000  # the state block a fresh turn leaves for the next one
 
     def branch_for(self, repo: str) -> str:
         return self.branches.get(repo, self.branch)
@@ -177,6 +182,15 @@ def problems_of(raw: Any) -> list[Problem]:
                 bad(f"$.sessions.{name}.repos", f"unknown repo {rn}")
         if name == hub.get("name"):
             bad(f"$.sessions.{name}", "a worker session cannot share the hub's name")
+        ctx = s.get("context", "resume")
+        if ctx not in ("resume", "fresh"):
+            bad(f"$.sessions.{name}.context", "must be resume or fresh")
+        for k in ("pack_max_tokens", "state_max_tokens"):
+            v = s.get(k)
+            if v is not None and (not isinstance(v, int) or isinstance(v, bool) or v <= 0):
+                bad(f"$.sessions.{name}.{k}", "must be a positive integer")
+        if ctx == "fresh" and s.get("pack_max_tokens") is None:
+            bad(f"$.sessions.{name}.pack_max_tokens", "is required with context fresh")
     owners = set(sessions) | {hub.get("name")}
     seen: dict[tuple[str, str], str] = {}
     for i, row in enumerate(raw.get("ownership", [])):

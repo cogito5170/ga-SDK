@@ -1,0 +1,11 @@
+{
+ "integration_head": "71ec21129374362f2d62b5673ae8b5ea6c2d0d60",
+ "hidden_check": false,
+ "hidden_tail": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nModuleNotFoundError: No module named 'alphapkg.stats'",
+ "suite": true,
+ "suite_tail": [
+  "OK"
+ ],
+ "readme_lists": false,
+ "passed": false
+}

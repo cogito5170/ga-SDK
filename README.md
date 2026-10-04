@@ -245,6 +245,22 @@ ga wire-report tests/fixtures/wire/channels.json                   # offline: by
 
 `ga inbox` keeps its cursor in the git dir (never pushed) and moves it only after its output is written. Read a notified message through `ga inbox`, not the notify body and the issue both.
 
+## Fresh turns with a bounded context (CMD-GA29, BD-296/303)
+
+A session set to `"context": "fresh"` (with `"pack_max_tokens"`, required) never resumes: every turn is a new
+`claude -p` (no `--resume`, no resume option in the Agent SDK, no resume id in the hub state). The prompt is a context
+pack `ctxpack/1` (`ga/ctxpack.py`) built from files in a fixed order (directive head, the session's state file
+`.ga/sessions/<s>/state.md`, inbox headers since the session's cursor, then the id-matching lines and the files named in
+`refs`), capped at `pack_max_tokens` (rlo pspec estimator, the fixed instructions included). Over the cap, parts are dropped
+from the lowest priority and the drops are recorded in the pack head; a directive head over the cap is an error (no turn).
+The turn's answer must hold a report/2 and one ```` ```state ```` block: ga checks both, posts the report, writes the state
+file and only then moves the cursor; an answer that fails the check is a failed turn (`answer:<why>`), never retried.
+Every turn's usage, served model and answer text land in `TurnResult`; each turn is a Telemetry L0 `run.end` record in
+`.ga/telemetry/<s>.jsonl`. `runner.context_budget: {soft, hard, mode}` writes the rlo 0.10.0 context-budget/1 hook
+(`ga/adapters/budget_hook.py`, shadow by default) into the fresh turn's own settings in the runner's per-session dir only.
+`runner.tools` / `runner.system_prompt` narrow the child's fixed cost. Measured: `results/ga29/table.md`
+(`examples/ga29_measure.py`).
+
 ## 시험
 
 ```sh

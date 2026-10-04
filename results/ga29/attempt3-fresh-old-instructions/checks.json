@@ -1,0 +1,11 @@
+{
+ "integration_head": "866074a652169ea914fd4633192c3d143be50f3b",
+ "hidden_check": true,
+ "hidden_tail": "ok",
+ "suite": true,
+ "suite_tail": [
+  "OK"
+ ],
+ "readme_lists": true,
+ "passed": true
+}

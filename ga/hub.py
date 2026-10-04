@@ -49,7 +49,10 @@ REFUSED_OPTIONS = [
     (DOWNGRADE, "같은 지시를 수동 Runner 로 낸다(사람이 세션에 붙여 넣는다) · 기록에 runner: manual 과 까닭"),
     ("멈춘다", "보내지 않은 채로 둔다 — 권한을 고친 뒤 다시 보낼 수 있다"),
 ]
-from .prompts import post_allow, turn_prompt
+from . import ctxpack, l0
+from .adapters.base import TurnResult
+from .ctxpack import CtxPackError
+from .prompts import fresh_instructions, post_allow, turn_prompt
 from .records import RecordStore
 
 CLASS_RANK = {"blocked": 4, "failure": 3, "insufficient": 2, "partial": 1}
@@ -275,11 +278,27 @@ class Hub:
         st["seen"].setdefault(to, None)
         workdir = self._prepare_worktrees(to)
         start = self._session_heads(to)
-        resume = st["resume"].get(to) if runner is self.runner else None
+        # CMD-GA29 S1: a fresh session keeps no resume id; its turn is fed only by the pack and the state file
+        fresh = runner is self.runner and self.cfg.sessions[to].context == "fresh"
+        if fresh:
+            st["resume"].pop(to, None)
+        resume = st["resume"].get(to) if runner is self.runner and not fresh else None
         records = runner.guard_records(to) if hasattr(runner, "guard_records") else []
         before = {name: _line_count(path) for name, path in records}
-        result = runner.run_turn(TurnRequest(to, turn_prompt(self.cfg, to, text, directive), workdir, resume,
-                                             permissions=self.sandbox_paths(to), budget=dict(directive.get("budget", {}))))
+        pack = None
+        if fresh:
+            try:
+                pack, prompt, shown = self._fresh_prompt(st, to, directive, post, workdir)
+            except CtxPackError as e:  # a head over the cap: no turn at all, and said so
+                result = TurnResult(ended=True, error=f"ctxpack:{e}"[:200], seconds=0.0)
+                st.setdefault("turns", []).append({"session": to, "directive": directive["id"], "rev": directive["rev"],
+                                                   "runner": getattr(runner, "kind", "?"), "ended": True, "error": result.error,
+                                                   "post": post.id, "context": "fresh", "sent": True, **record})
+                return result
+        else:
+            prompt = turn_prompt(self.cfg, to, text, directive)
+        result = runner.run_turn(TurnRequest(to, prompt, workdir, resume, permissions=self.sandbox_paths(to),
+                                             budget=dict(directive.get("budget", {})), fresh=fresh))
         self._writes += 1
         refused = result.error.startswith("refused")
         # numbers only: no prompt, transcript or answer text is kept
@@ -288,7 +307,15 @@ class Hub:
             "ended": result.ended, "error": result.error, "cost": result.cost, "seconds": result.seconds,
             "resumed": resume, "session_id": result.session_id, "sandboxed": result.sandboxed,
             "start": start, "post": post.id, "labels": result.note[:200], "sent": not refused, **record,
+            "usage": result.usage, "model": result.model,
         })
+        if runner is self.runner:  # S3: every turn is a Telemetry L0 record
+            run_id = f"{to}:{directive['id']}:{len(st['turns'])}"
+            l0.append(self.ga / "telemetry" / f"{to}.jsonl", l0.run_end(run_id, result, decision_ref=directive["id"]))
+            st["turns"][-1]["l0"] = run_id
+        if fresh:
+            st["turns"][-1].update(context="fresh", pack={"tokens": pack.tokens, "cap": pack.cap, "parts": pack.parts,
+                                                          "dropped": pack.dropped})
         if records:  # rev 15 §4c 7: the operator guards' verdicts in this turn — counts and labels, never the lines
             st["turns"][-1]["guards"] = [dict(guard_summary(_new_lines(path, before[name])), guard=name) for name, path in records]
         if refused:
@@ -304,9 +331,63 @@ class Hub:
             spent["cost_unknown_runs"] = spent.get("cost_unknown_runs", 0) + 1
         else:
             spent["cost"] = round(spent.get("cost", 0) + result.cost, 6)
-        if result.session_id and runner is self.runner:
+        if result.session_id and runner is self.runner and not fresh:
             st["resume"][to] = result.session_id
+        if fresh and not result.error:
+            why = self._finish_fresh(st, to, result, shown)
+            if why:  # S3: a failed turn, not silently retried
+                result.error = f"answer:{why}"[:200]
+                st["turns"][-1]["error"] = result.error
         return result
+
+    # ================================================================== fresh turns (CMD-GA29)
+
+    def state_file(self, session: str) -> Path:
+        """The fresh session's memory between turns: written by ga from the last turn's state block."""
+        return self.ga / "sessions" / session / "state.md"
+
+    def _fresh_prompt(self, st: dict[str, Any], to: str, directive: dict[str, Any], post: Post, workdir: Path):
+        """S2: the context pack for this turn + the fixed instructions. -> (pack, prompt, last post id shown)."""
+        s = self.cfg.sessions[to]
+        cur = st.setdefault("ctx", {}).setdefault(to, {}).get("cursor")
+        posts = self.channel.read(to, cur)
+        inbox = [ctxpack.header_line(p.id, p.author, p.text) for p in posts if p.id != post.id]
+        shown = posts[-1].id if posts else cur
+        sf = self.state_file(to)
+        state = sf.read_text(encoding="utf-8") if sf.exists() else None
+        roots = [workdir] + [workdir / r for r in s.repos]
+        refs = [r for r in directive.get("refs", []) if isinstance(r, str)]
+        files = []
+        for name, path in ctxpack.ref_files(refs, roots):
+            try:
+                files.append((name, path.read_text(encoding="utf-8", errors="replace")))
+            except OSError:
+                continue
+        ids = [directive["id"]] + [a for a in directive.get("after", []) if isinstance(a, str)]
+        how = fresh_instructions(self.cfg, to, directive)
+        pack = ctxpack.build(directive, cap=s.pack_max_tokens, state=state, inbox=inbox, cursor=cur, files=files, ids=ids,
+                             reserve=ctxpack.tokens("\n" + how))
+        return pack, pack.text + "\n" + how, shown
+
+    def _finish_fresh(self, st: dict[str, Any], to: str, result: Any, shown: str | None) -> str:
+        """S3: check the answer (report/2 + state), write the state file, post the report, then move the cursor.
+        Returns "" or why the turn failed. Nothing is written when the check fails; the cursor moves only after the post."""
+        s = self.cfg.sessions[to]
+        ans, why = ctxpack.parse_answer(result.answer, to, state_max_tokens=s.state_max_tokens)
+        if ans is None:
+            return why
+        leaks = hard(rules.r6_secrets(self.cfg, result.answer, f"answer of {to}"))
+        if leaks:
+            return "the answer holds a secret pattern"
+        try:
+            p = self.channel.post(to, to, ans.report)
+        except Exception as e:  # not posted: the cursor and the state file stay where they were
+            return f"post failed: {type(e).__name__}"
+        self._writes += 1
+        self._write(self.state_file(to), ans.state)
+        st.setdefault("ctx", {}).setdefault(to, {})["cursor"] = shown
+        st["turns"][-1]["report_post"] = p.id
+        return ""
 
     # ================================================================== §4c permission (METHOD rev 13)
 

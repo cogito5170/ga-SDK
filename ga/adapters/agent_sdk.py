@@ -27,7 +27,7 @@ from typing import Any, Iterable
 
 from . import sandbox
 from .base import TurnRequest, TurnResult
-from .headless import DEFAULT_ALLOWED, DEFAULT_DISALLOWED, KEEP_ENV, HeadlessRunner
+from .headless import DEFAULT_ALLOWED, DEFAULT_DISALLOWED, KEEP_ENV, HeadlessRunner, served_model, usage_of
 
 
 def load_sdk() -> Any:
@@ -58,6 +58,7 @@ class AgentSDKRunner:
         sandbox: str = "auto",
         sdk: Any = None,
         guards: Iterable[dict] = (),
+        context_budget: dict | None = None,
     ):
         self.home = Path(home)
         self.executable = executable
@@ -73,7 +74,8 @@ class AgentSDKRunner:
             raise ValueError("sandbox must be auto, require or off")
         self.sandbox = sandbox
         # the guard settings, session homes and guard log are shared with the headless runner's layout
-        self._layout = HeadlessRunner(self.home, guard=guard, sandbox="off", guards=guards)
+        self._layout = HeadlessRunner(self.home, guard=guard, sandbox="off", guards=guards,
+                                      context_budget=context_budget)
         self.guards = self._layout.guards
         self.guard = guard
 
@@ -125,10 +127,10 @@ class AgentSDKRunner:
             kw["model"] = self.model
         if isinstance(cap, (int, float)) and not isinstance(cap, bool):
             kw["max_budget_usd"] = float(cap)
-        if req.resume_id:
+        if req.resume_id and not req.fresh:  # CMD-GA29 S1: a fresh turn never resumes
             kw["resume"] = req.resume_id
-        if self.guard or self.guards:
-            kw["settings"] = str(self._layout.settings_file(req.session, sandboxed))
+        if self.guard or self.guards or (req.fresh and self._layout.context_budget):
+            kw["settings"] = str(self._layout.settings_file(req.session, sandboxed, req.fresh))
         return sdk.ClaudeAgentOptions(**kw)
 
     async def _run(self, req: TurnRequest, options: Any) -> Any:
@@ -168,8 +170,13 @@ class AgentSDKRunner:
         cost = getattr(result, "total_cost_usd", None)
         cost = float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None
         error = f"is_error:{getattr(result, 'subtype', '?')}" if getattr(result, "is_error", False) else ""
+        usage = getattr(result, "usage", None)
+        model_usage = getattr(result, "model_usage", None)
+        answer = getattr(result, "result", None)
         return TurnResult(ended=True, session_id=getattr(result, "session_id", None), cost=cost, error=error, seconds=secs,
-                          note=result_labels(result), sandboxed=sandboxed)
+                          note=result_labels(result), sandboxed=sandboxed,
+                          usage=usage_of({"usage": usage}), model=served_model({"modelUsage": model_usage}),
+                          answer=answer if isinstance(answer, str) else None)
 
 
 def result_labels(result: Any) -> str:

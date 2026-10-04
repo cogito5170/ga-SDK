@@ -31,6 +31,8 @@ class TurnRequest:
     resume_id: str | None = None
     permissions: dict[str, Any] = field(default_factory=dict)
     budget: dict[str, float] = field(default_factory=dict)
+    # CMD-GA29 S1: a fresh turn starts with no transcript behind it; a runner never resumes one (resume_id is ignored)
+    fresh: bool = False
 
 
 @dataclass
@@ -42,6 +44,11 @@ class TurnResult:
     error: str = ""  # "" = the turn ran; else e.g. "timeout", "exit 1", "bad_json", "is_error:<subtype>"
     seconds: float | None = None  # wall time of the turn when the runner measured it
     sandboxed: bool | None = None  # True: ran in the OS write sandbox; False: did not; None: the runner cannot say
+    # CMD-GA29 S3: what the runner reported (None = not reported; never filled with 0)
+    usage: dict[str, int] | None = None  # input · cache_read · cache_creation · output (tokens, the whole turn)
+    model: str | None = None  # the served model(s), from the runner's own result
+    answer: str | None = None  # the turn's final answer text (fresh mode reads its report and state from it)
+    raw: dict[str, Any] | None = None  # the runner's result JSON (numbers and ids; the answer is in ``answer``)
 
 
 class Runner(Protocol):

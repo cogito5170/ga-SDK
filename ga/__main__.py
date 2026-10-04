@@ -59,7 +59,8 @@ def make_judge(cfg, ga_dir: Path):
 
 def make_runner(cfg, ga_dir: Path):
     """config "runner": {"kind": "manual"} (default) or {"kind": "headless", "model", "timeout", "max_budget_usd",
-    "executable", "permission_mode", "allowed_tools", "disallowed_tools"}."""
+    "executable", "permission_mode", "allowed_tools", "disallowed_tools", "tools", "system_prompt",
+    "context_budget": {soft, hard, mode?} (CMD-GA29: fresh turns only)}."""
     r = dict(cfg.runner)
     kind = r.pop("kind", "manual")
     r.pop("permission", None)  # read by the hub (§4c), not a Runner argument

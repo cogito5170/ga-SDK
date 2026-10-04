@@ -1,0 +1,62 @@
+[
+ {
+  "mutation": "resume leaks into fresh (runner)",
+  "file": "ga/adapters/headless.py",
+  "killed": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutation": "resume id kept in fresh (hub)",
+  "file": "ga/hub.py",
+  "killed": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutation": "pack over the cap",
+  "file": "ga/ctxpack.py",
+  "killed": true,
+  "tail": "FAILED (failures=4)"
+ },
+ {
+  "mutation": "directive head dropped",
+  "file": "ga/ctxpack.py",
+  "killed": true,
+  "tail": "FAILED (errors=1)"
+ },
+ {
+  "mutation": "drop not recorded",
+  "file": "ga/ctxpack.py",
+  "killed": true,
+  "tail": "FAILED (failures=2)"
+ },
+ {
+  "mutation": "cursor advanced before the post",
+  "file": "ga/hub.py",
+  "killed": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutation": "usage dropped",
+  "file": "ga/adapters/headless.py",
+  "killed": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutation": "usage dropped from hub turn record",
+  "file": "ga/hub.py",
+  "killed": true,
+  "tail": "FAILED (errors=1)"
+ },
+ {
+  "mutation": "hook written to the person's ~/.claude",
+  "file": "ga/adapters/headless.py",
+  "killed": true,
+  "tail": "FAILED (failures=1)"
+ },
+ {
+  "mutation": "state file not read on the next turn",
+  "file": "ga/hub.py",
+  "killed": true,
+  "tail": "FAILED (failures=2)"
+ }
+]

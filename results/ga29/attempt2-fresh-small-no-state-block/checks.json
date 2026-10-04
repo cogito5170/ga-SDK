@@ -1,0 +1,11 @@
+{
+ "integration_head": "c92362c40259cc43816cddb73885e91d10895525",
+ "hidden_check": false,
+ "hidden_tail": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nImportError: cannot import name 'describe' from 'alphapkg.stats' (/tmp/ga29-check-rxx2x_0o/alphapkg/stats.py)",
+ "suite": true,
+ "suite_tail": [
+  "OK"
+ ],
+ "readme_lists": false,
+ "passed": false
+}
