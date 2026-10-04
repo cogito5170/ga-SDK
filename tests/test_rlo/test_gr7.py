@@ -26,6 +26,7 @@ from .test_remote import RemoteBase, guard_py
 from .world import GIT_ENV, run_cli
 
 PY = sys.executable  # a python with rlo installed stands for the venv install.sh makes
+GA_ROOT = Path(__import__("ga").__file__).resolve().parent.parent  # the ga this test imports
 GITENV = dict(GIT_ENV, GIT_CONFIG_GLOBAL=os.devnull, GIT_TERMINAL_PROMPT="0")
 
 
@@ -99,7 +100,8 @@ class MailTest(Tmp):
         bin_ = self.tmp / "bin"
         bin_.mkdir()
         ga = bin_ / "ga"  # `ga` on PATH, as `pip install ga-sdk` makes it
-        ga.write_text(f"#!/bin/sh\nexec {PY} -m ga \"$@\"\n")
+        # this test's ga, also from a source checkout where ga is not installed (GA25's note)
+        ga.write_text(f"#!/bin/sh\nPYTHONPATH={GA_ROOT}${{PYTHONPATH:+:$PYTHONPATH}} exec {PY} -m ga \"$@\"\n")
         ga.chmod(0o755)
         self.w = Worker(self.tmp, self.repo, venv(self.tmp / "venv", pin), bin_)
 
@@ -130,7 +132,7 @@ class MailTest(Tmp):
         self.assertFalse(ev.exists())  # sent, then removed: no second send of the same event
         hub = self.tmp / "hub"
         sh(self.tmp, "git", "clone", "-q", str(self.origin), str(hub))
-        p = sh(hub, PY, "-m", "ga", "mail", "read", "--repo", ".", "--as", "hub", "--json")
+        p = sh(hub, PY, "-m", "ga", "mail", "read", "--repo", ".", "--as", "hub", "--json", env={"PYTHONPATH": str(GA_ROOT)})
         [msg] = [json.loads(x) for x in p.stdout.splitlines()]
         self.assertEqual((msg["schema"], msg["valid"], msg["from"]), ("report/2", True, "W1"))
         self.assertIn("blocked by guard rlo", msg["text"])

@@ -246,6 +246,11 @@ def run_remote(work_repo: str | Path = ".", venv: str | None = None) -> tuple[bo
     checks.append(Check("remote.preset", not probs, "; ".join(probs) if probs else
                         "settings hooks · enforce · grants · no clock override · no git · plumbing · deny-report rule"))
     if not any(p.endswith(" is missing") for p in probs):  # no files, nothing to replay
+        v = remote.rlo_version(venv or sys.prefix)  # rule D's expected verdict follows it (CMD-GR9, K13)
+        checks.append(Check("remote.rlo", v is not None, (
+            f"rlo-sdk {v} replayed: rule D " + ("as K13 (unknown health only)" if remote.k13(v) else
+                                                "before K13 (stale health too)")) if v else
+            "rlo is not importable in the replay venv"))
         for name, ok, detail in remote.replay(repo, venv or sys.prefix):
             checks.append(Check(f"remote.replay.{name}", ok, detail))
     checks += person_settings(None)

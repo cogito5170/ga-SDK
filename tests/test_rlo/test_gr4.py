@@ -68,9 +68,11 @@ class ReplayMutationTest(unittest.TestCase):
         self.assertEqual(self.failed(), (0, set()))
 
     def test_w1_cases_are_replayed(self):
-        names = {c.name: c.react for c in remote.cases()}
+        names = {c.name: c.react for c in remote.cases(rlo="0.7.0")}
         self.assertEqual(names["W1 v1 model: ReadNotifications"]["kind"], "use_tool")
-        self.assertEqual(names["Bash after 2h idle"]["kind"], "refresh_read")
+        self.assertEqual(names["Bash after 2h idle"]["kind"], "refresh_read")  # before K13
+        self.assertIsNone({c.name: c.react for c in remote.cases(rlo="0.8.2")}["Bash after 2h idle"])  # K13: passes
+        self.assertEqual(names["Bash beside a call with no result"]["kind"], "wait_previous")
         self.assertEqual(names["A7 send_message without its grant"]["kind"], "report")
         self.assertEqual(names["A1 WebFetch"]["kind"], "report")
         self.assertEqual(names["W1 v1 model: ReadNotifications, denied twice before"]["attempt"], 3)

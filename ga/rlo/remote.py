@@ -365,8 +365,9 @@ def _ts(ms: float) -> str:
     return datetime.fromtimestamp(ms / 1000, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
-def transcript(steps: list[tuple], path: Path) -> None:
-    """A Claude Code transcript at real times. steps: (tool, input, ok, at unix ms[, result text])."""
+def transcript(steps: list[tuple], path: Path, pending: list[tuple] | None = None) -> None:
+    """A Claude Code transcript at real times. steps: (tool, input, ok, at unix ms[, result text]). pending: calls sent
+    together in one last assistant message, at the last step's time + 1 s, with no result yet: (tool, input, id)."""
     lines, n = [], 0
 
     def add(kind: str, at: float, **kw: Any) -> None:
@@ -383,6 +384,11 @@ def transcript(steps: list[tuple], path: Path) -> None:
         add("user", at + 500, toolUseResult={}, message={"role": "user", "content": [
             {"type": "tool_result", "tool_use_id": f"t{i}", "content": [{"type": "text", "text": text[0] if text else "x"}],
              "is_error": not ok}]})
+    if pending:
+        add("assistant", (steps[-1][3] if steps else start) + 1000, message={
+            "id": "mp", "model": "replay", "role": "assistant", "stop_reason": "tool_use",
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+            "content": [{"type": "tool_use", "id": i, "name": t, "input": inp} for t, inp, i in pending]})
     path.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
 
 
@@ -414,6 +420,7 @@ class Case:
     react: dict | None = None  # these fields of the deny's '-- react: {json}' line (rlo 0.6.0, K11; GR4 S3)
     grants: tuple | None = None  # direct calls only: grants other than the preset's
     still: bool = False  # a fail-closed deny must name the channel calls still allowed (GR7 S4)
+    pending: tuple | None = None  # a call sent in the same message as this one, with no result yet (unknown health)
 
 
 def _deny_text(rule: str, cause: str, kind: str, attempt: int, **extra: Any) -> str:
@@ -438,7 +445,31 @@ def mail_calls(conf: dict[str, Any] | None = None) -> dict[str, tuple]:
 PINNED = ("read", "scan", "send", "send event")
 
 
-def cases(conf: dict[str, Any] | None = None) -> list[Case]:
+K13 = (0, 8)  # rlo-sdk 0.8.0 (CMD-K13, BD-246 option B): rule D denies only on unknown health, not on stale health
+
+
+def k13(version: str | None) -> bool:
+    """Does this rlo-sdk version judge D as K13 does? None: the version ga pins."""
+    try:
+        return tuple(int(x) for x in (version or _pins.VERSIONS["rlo-sdk"]).split(".")[:2]) >= K13
+    except ValueError:
+        return True
+
+
+def rlo_version(venv: str | Path) -> str | None:
+    """The rlo-sdk version the replay venv runs (what decides the expected D), or None if it cannot be read."""
+    try:
+        p = subprocess.run([str(Path(venv) / "bin" / "python"), "-c", "import rlo; print(rlo.__version__)"],
+                           capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    v = p.stdout.strip()
+    return v if p.returncode == 0 and re.fullmatch(r"\d+\.\d+(\.\d+)?\S*", v) else None
+
+
+def cases(conf: dict[str, Any] | None = None, rlo: str | None = None) -> list[Case]:
+    """The replay cases. ``rlo``: the rlo-sdk version replayed (None: the pinned one) -- rule D's expectation depends on
+    it (K13)."""
     ok = [(BASH[0], BASH[1], True, 5000)]
     report = {"kind": "report", "escalate": True}
     mail = mail_calls(conf)
@@ -453,10 +484,15 @@ def cases(conf: dict[str, Any] | None = None) -> list[Case]:
     # W1 case 4 (and create_session): no substitute -> report, escalate
     out += [Case(f"A1 {t}", ok, (t, i), "A1", react=dict(report, rule="A1", cause="no_substitute")) for t, i in DENY_A1]
     gap = [(BASH[0], BASH[1], True, IDLE_MS)]
-    # W1 case 2: stale-only D -> refresh_read; after one read the call passes
-    out += [Case("Bash after 2h idle", gap, BASH, "D", hint=True,
-                 react={"kind": "refresh_read", "rule": "D", "cause": "stale", "attempt": 1, "escalate": False}),
-            Case("Bash after 2h idle, then Read", gap + [(READ[0], READ[1], True, 2000)], BASH, "pass")]
+    if k13(rlo):  # W1 case 2 under K13 (POL-1 T1): a known health value does not age into D, so idle is not a lockout
+        out += [Case("Bash after 2h idle", gap, BASH, "pass")]
+    else:  # W1 case 2 before K13: stale-only D -> refresh_read; after one read the call passes
+        out += [Case("Bash after 2h idle", gap, BASH, "D", hint=True,
+                     react={"kind": "refresh_read", "rule": "D", "cause": "stale", "attempt": 1, "escalate": False})]
+    out += [Case("Bash after 2h idle, then Read", gap + [(READ[0], READ[1], True, 2000)], BASH, "pass"),
+            # unknown health is D on every rlo: the session's first calls, sent together, have no result yet
+            Case("Bash beside a call with no result", [], BASH, "D", pending=READ,
+                 react={"kind": "wait_previous", "rule": "D", "cause": "unavailable", "attempt": 1, "escalate": False})]
     # W1 case 1: the W1 v1 model had no ReadNotifications -> A1, use_tool 'ga mail read' (GR7 S1; was issue_read)
     rn = ("ReadNotifications", {})
     use = {"kind": "use_tool", "rule": "A1", "cause": "has_substitute", "tool": "ga.mail.read"}
@@ -575,12 +611,13 @@ def replay(repo: str | Path, venv: str | Path, *, guard_rel: str = f"{GUARD_DIR}
     repo = Path(repo).resolve()
     gp = repo / Path(guard_rel).parent / "guard.py"
     conf = conf_of(gp.read_text(encoding="utf-8")) if gp.is_file() else None
+    version = rlo_version(venv)
     bash = shutil.which("bash") or "/bin/bash"
     res = []
     with tempfile.TemporaryDirectory(prefix="ga-rlo-remote-") as tmp:
         tmp = Path(tmp)
         shim = _shim(tmp, str(venv), pin_of(repo / Path(guard_rel).parent / "install.sh"))
-        for c in cases(conf):
+        for c in cases(conf, version):
             if only and c.name not in only:
                 continue
             home = tmp / f"home{len(res)}"
@@ -602,7 +639,8 @@ def replay(repo: str | Path, venv: str | Path, *, guard_rel: str = f"{GUARD_DIR}
                 v = "/dev/null/ga-rlo-no-venv"
             now = time.time() * 1000
             tpath = tmp / f"t{len(res)}.jsonl"
-            transcript([(t, i, ok, now - ago, *rest) for t, i, ok, ago, *rest in c.steps], tpath)
+            transcript([(t, i, ok, now - ago, *rest) for t, i, ok, ago, *rest in c.steps], tpath,
+                       pending=[(*c.pending, "earlier"), (*c.call, "current")] if c.pending else None)
             data = {"session_id": "replay", "transcript_path": str(tpath), "cwd": str(project),
                     "permission_mode": "default", "hook_event_name": "PreToolUse", "tool_name": c.call[0],
                     "tool_input": c.call[1], "tool_use_id": "current"}
@@ -685,6 +723,8 @@ def guard_problems(repo: Path) -> list[str]:
         return out + ["guard.py: no readable CONF line"]
     if "--now-ms" in text:
         out.append("guard.py: --now-ms (a clock override) is not allowed")
+    if "--health-ttl" in text:
+        out.append("guard.py: --health-ttl asks rlo for the pre-K13 rule D (stale health denies); K13's D is intended")
     if '"--mode", "enforce"' not in text:
         out.append("guard.py: rlo is not in --mode enforce")
     for sub in re.findall(r"""\bgit\(\s*["']([A-Za-z-]+)""", text):

@@ -152,8 +152,11 @@ class ReplayTest(RemoteBase):
             self.assertEqual(names[f"plumbing {t}"], "pass")
         self.assertEqual(names["A1 WebFetch"], "A1")
         self.assertEqual(names["A1 mcp__claude-code-remote__create_session"], "A1")
-        self.assertEqual(names["Bash after 2h idle"], "D")
         self.assertEqual(names["Bash after 2h idle, then Read"], "pass")
+        self.assertEqual(names["Bash beside a call with no result"], "D")  # unknown health: D on every rlo
+        replayed = remote.rlo_version(VENV)
+        self.assertEqual({c.name: c.want for c in remote.cases(rlo=replayed)}["Bash after 2h idle"],
+                         "pass" if remote.k13(replayed) else "D")  # K13: stale health alone is not D
 
     def test_plumbing_tool_dropped_from_the_model(self):
         p = self.repo / "ops/rlo/model.json"
@@ -167,7 +170,8 @@ class ReplayTest(RemoteBase):
     def test_shadow(self):
         self.edit("ops/rlo/guard.py", '"--mode", "enforce"', '"--mode", "shadow"')
         bad = self.doctor_failed()
-        self.assertTrue({"remote.preset", "remote.replay.A1 WebFetch", "remote.replay.Bash after 2h idle"} <= bad)
+        self.assertTrue({"remote.preset", "remote.replay.A1 WebFetch", "remote.replay.Bash beside a call with no result"}
+                        <= bad)
 
     def test_widened_grant(self):
         self.edit("ops/rlo/guard.py", '"grants":["Bash",', '"grants":["Bash","mcp__claude-code-remote__create_session",')
