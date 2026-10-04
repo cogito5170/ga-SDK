@@ -17,3 +17,9 @@ On claude/ga28-backends e124bc3. ga 0.3.0. Report: reports/CMD-GA31.md (report/2
 Thin adapters to swap when baseline sends the NET1-3 shas: L0 peer events (ga/l0.py, NET1 field list), State rules
 (state.py vs Sensor NET2 helper), peer_interaction + export source (dc.py vs DC NET3), peer_context (MS ContextPolicy).
 Report/2 head uses `paused` for the checkpoint: report/2 has no `partial` status.
+
+Next (for the integrating side): merge integration d9675d2 (GA28 + GA30, ga 0.3.0) into this branch — this session's
+permission check refused the merge. GA30 already took 0.3.0, so GA31's bump becomes 0.4.0 (ga/__init__.py,
+pyproject.toml). Check that action-contract 0.2.0 (NET5) and MS (pins 0.1.0) install together. No budget.json: the
+shadow hook was not installed (a settings change). Optional live smoke not run (0/6 claude_p runs used).
+Test status at a7f9c28: full suite 598 ok (1 skipped) in a fresh clone; tests/mutations_ga31.py 10/10 killed.
