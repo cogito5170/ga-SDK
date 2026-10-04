@@ -15,6 +15,7 @@ import re
 import time
 from typing import Any, Callable
 
+from .catalog import CATALOG
 from .base import API_VERSION, BackendError, BackendTurn, ConfigError, check_served, rate_limited
 
 Transport = Callable[[str, dict[str, str], bytes, float], tuple[int, dict[str, str], bytes]]
@@ -148,10 +149,12 @@ class _Http:
 
 
 class _OpenAIHttp(_Http):
+    catalog = CATALOG['openai_http']  # CMD-GA31 S3: what the router may pick
     name, runner, default_url = "openai_http", OpenAIRunner, "https://api.openai.com/v1"
 
 
 class _AnthropicHttp(_Http):
+    catalog = CATALOG['anthropic_http']  # CMD-GA31 S3: what the router may pick
     name, runner, default_url = "anthropic_http", AnthropicRunner, "https://api.anthropic.com"
 
 

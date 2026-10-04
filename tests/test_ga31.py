@@ -344,6 +344,16 @@ class S3Router(unittest.TestCase):
         k = "c|y|claude-mid|R2"
         self.assertEqual(r.learn[k]["tokens_per_accepted"], 50.0)
 
+    def test_every_built_in_backend_declares_a_catalog(self):
+        from ga import backends
+        for name in backends.BUILTINS:
+            with self.subTest(name):
+                es = catalog_for([name], None, backends.get)
+                self.assertTrue(es)
+                self.assertTrue(all(e["family"] in ("claude", "gpt", "gemini") for e in es))
+        r = Router(catalog_for(["claude_cli"], None, backends.get))
+        self.assertEqual(r.pick("x", {"capabilities": ["text"]}).model, "claude-haiku-4-5-20251001")
+
     def test_catalog_config_errors(self):
         b = FakeBackend("fb", [entry("claude-a", ["text"], None)])
         get = {"fb": b}.__getitem__
@@ -480,6 +490,75 @@ class S4Checkpoint(unittest.TestCase):
             self.assertEqual(res.stop, "")
 
 
+class S4HubMode(unittest.TestCase):
+    """Legacy hub mode, fresh sessions: a budget stop keeps the directive open and the next tick continues it."""
+
+    def world(self, answers, stops):
+        from test_ga29 import FreshRunner
+        from world import World as HubWorld
+
+        class StopRunner(FreshRunner):
+            def run_turn(self, req):
+                res = super().run_turn(req)
+                res.stop = stops.pop(0) if stops else ""
+                return res
+        r = StopRunner(answers)
+        w = HubWorld(runner=r)
+        w.cfg.sessions["A"].context = "fresh"
+        w.cfg.sessions["A"].pack_max_tokens = 6000
+        self.addCleanup(w.close)
+        return w, r
+
+    @staticmethod
+    def paused(state):
+        head = {"schema": "report/2", "from": "A", "handled": [{"id": "CMD-A1", "rev_seen": 1, "status": "paused"}],
+                "items": []}
+        return dump_text(head, "## Result\npaused\n") + "```state\n" + state + "\n```\n"
+
+    def test_continue_then_done(self):
+        from test_ga29 import answer as done
+        from world import directive
+        w, r = self.world([self.paused("half"), done(state="all")], [BUDGET_CHECKPOINT])
+        w.hub.send(directive("CMD-A1", "A"))
+        st = w.hub.load_state()
+        self.assertEqual(st["turns"][-1]["checkpoint"], "continue")
+        self.assertEqual(st["turns"][-1]["error"], "")
+        self.assertEqual(st["directives"]["CMD-A1"]["status"], "open")
+        w.hub.tick()
+        self.assertEqual(len(r.calls), 2)
+        self.assertTrue(r.calls[1].fresh)
+        self.assertIn("half", r.calls[1].prompt)
+        st = w.hub.load_state()
+        self.assertEqual(st["directives"]["CMD-A1"]["checkpoint"]["verdict"], "continued")
+        w.hub.tick()
+        self.assertEqual(len(r.calls), 2)
+
+    def test_no_progress_needs_judgement(self):
+        from world import directive
+        w, r = self.world([self.paused("same"), self.paused("same"), self.paused("x")],
+                          [BUDGET_CHECKPOINT, BUDGET_CHECKPOINT, BUDGET_CHECKPOINT])
+        w.hub.send(directive("CMD-A1", "A"))
+        w.hub.tick()
+        w.hub.tick()
+        st = w.hub.load_state()
+        self.assertEqual(len(r.calls), 2)
+        self.assertEqual(st["directives"]["CMD-A1"]["checkpoint"]["verdict"], "needs_judgement")
+
+    def test_a_stop_without_state_is_not_a_failed_turn(self):
+        from test_ga29 import report_text
+        from world import directive
+        w, r = self.world([report_text(), report_text(), report_text()], [BUDGET_CHECKPOINT] * 3)
+        w.hub.send(directive("CMD-A1", "A"))
+        st = w.hub.load_state()
+        self.assertEqual(st["turns"][-1]["error"], "")
+        self.assertEqual(st["turns"][-1]["checkpoint"], "continue")
+        w.hub.tick()
+        w.hub.tick()
+        st = w.hub.load_state()
+        self.assertEqual(len(r.calls), 2)
+        self.assertEqual(st["directives"]["CMD-A1"]["checkpoint"]["verdict"], "needs_judgement")
+
+
 # ====================================================================== S5
 def run_end(rid, inp, cache_read=0, calls=None):
     from ga.adapters.base import TurnResult
@@ -514,6 +593,9 @@ class S5NoCCR(unittest.TestCase):
         L0.append(w.ga / "telemetry" / "W1.jsonl", run_end("W1:CMD-W1:1", 200_000))
         code, out, _ = cli("--config", str(w.config), "usage")
         self.assertIn("ctx session:W1 W1:CMD-W1:1: context per call 200000 > 150000", out)
+        L0.append(w.ga / "telemetry" / "W1.jsonl", run_end("W1:CMD-W1:2", 100, cache_read=160_000))  # cache is context
+        code, out, _ = cli("--config", str(w.config), "usage")
+        self.assertEqual(out, "ctx session:W1 W1:CMD-W1:2: context per call 160100 > 150000\n")
 
     def test_the_loop_runs_with_the_ccr_tools_absent(self):
         """A clean env (no CCR variables, HOME elsewhere), ccr modules blocked: T1 still runs end to end."""

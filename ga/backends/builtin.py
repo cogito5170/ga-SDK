@@ -24,6 +24,7 @@ from typing import Any, Callable
 
 from ..adapters import agy_cli
 from ..adapters.gemini_cli import GeminiCLI, clean_env
+from .catalog import CATALOG
 from .base import API_VERSION, BackendError, BackendTurn, ConfigError, check_served, rate_limited
 
 
@@ -90,6 +91,7 @@ class AgvRunner(agy_cli.AgyCLI):
 
 
 class _Agv:
+    catalog = CATALOG['agv']  # CMD-GA31 S3: what the router may pick
     name, version, api = "agv", "1", API_VERSION
     options = {"cli", "usage_floor_pct", "window", "reset_fallback_s", "usage_every_s"}
     overhead = {"bare": False, "tokens": None, "source": "not measured; agy is not installed here and its docs name no "
@@ -125,6 +127,7 @@ class GeminiRunner(GeminiCLI):
 
 
 class _GeminiCli:
+    catalog = CATALOG['gemini_cli']  # CMD-GA31 S3: what the router may pick
     name, version, api = "gemini_cli", "1", API_VERSION
     overhead = {"bare": False, "tokens": 11822, "source": "measured: one 'OK' turn, baseline BD-302 "
                 "(ops/model_smoke results-2026-10-04.json)",
@@ -195,6 +198,7 @@ def parse_claude(stdout: str, code: int, model: str, seconds: float = 0.0) -> Ba
 
 
 class _ClaudeCli:
+    catalog = CATALOG['claude_cli']  # CMD-GA31 S3: what the router may pick
     name, version, api = "claude_cli", "1", API_VERSION
     overhead = {"bare": True, "tokens": {"haiku": 945, "sonnet": 1197},
                 "source": "measured: one 'OK' turn with --tools '' and --system-prompt, baseline BD-302 "
@@ -286,6 +290,7 @@ def parse_codex(stdout: str, code: int, model: str, seconds: float = 0.0) -> Bac
 
 
 class _CodexCli:
+    catalog = CATALOG['codex_cli']  # CMD-GA31 S3: what the router may pick
     name, version, api = "codex_cli", "1", API_VERSION
     overhead = {"bare": False, "tokens": None, "source": "not measured; codex is not installed here",
                 "closest": "--sandbox read-only (its shell tool and system prompt stay)"}
