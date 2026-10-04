@@ -1,0 +1,4 @@
+{"type": "init", "session": "s"}
+{"type": "message", "role": "assistant", "content": "```json\n{\"schema\": \"", "delta": true}
+{"type": "message", "role": "assistant", "content": "ga-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"add\", \"args\": {\"a\": 2, \"b\": 3}}], \"next\": {\"prompt\": \"report the sum\", \"after\": [\"a\"]}, \"say\": \"adding\"}\n```", "delta": true}
+{"type": "result", "status": "success", "model": "claude-sonnet-4-5", "usage": {"input_tokens": 1151, "output_tokens": 45, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}}

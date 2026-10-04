@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, TextIO
 
-from .adapters.gemini_cli import DEFAULT_MODEL, GeminiCLI, GeminiError
+from .adapters.gemini_cli import DEFAULT_MODEL, GeminiError
 from .forms import FormError, Problem
 
 CONFIG_SCHEMA = "ga-gemini/1"          # `ga gemini`'s config (kept: an alias form, CMD-GA28 S4)
@@ -578,6 +578,24 @@ def token_report(conv: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def provider_prompt_tokens(usage: Any, fmt: str | None) -> int | None:
+    """The prompt tokens a provider reported (cache reads included), read by Telemetry (rlo.pspec.usage_report); when
+    Telemetry cannot split the input (an otel total, a Gemini count without the cached count) the whole prompt count
+    the provider gave. None when it gave none — never 0."""
+    if not isinstance(usage, dict) or not usage or fmt is None:
+        return None
+    from rlo.pspec import usage_report
+    try:
+        n = (usage_report(usage, fmt) or {}).get("prompt_tokens")
+    except Exception:
+        n = None
+    if n is None:
+        for k in ("total_input_tokens", "input_tokens", "prompt_token_count", "promptTokenCount", "prompt_tokens"):
+            if isinstance(usage.get(k), int) and not isinstance(usage.get(k), bool):
+                return usage[k]
+    return n
+
+
 def backend_prompts(backend: Any, conv: dict[str, Any], mode: str = "compact") -> list[str]:
     """What ``ga supervise`` sends per turn on a backend (form ga-plan/1): a bare one gets ``once`` as the system prompt
     and ``task`` / ``turn_bare`` as the user message (counted together); a host that resumes gets ``first`` then
@@ -616,13 +634,15 @@ def backend_report(conv: dict[str, Any]) -> dict[str, Any]:
         texts = backend_prompts(runner, conv)
         u = rec.get(name) if isinstance(rec.get(name), dict) else {}
         usages = u.get("turns") if isinstance(u.get("turns"), list) and len(u["turns"]) == len(texts) else None
-        rep = pspec.token_report(texts, usages, u.get("format") if usages else None)
+        rep = pspec.token_report(texts)
+        prov = [provider_prompt_tokens(x, u.get("format")) for x in usages] if usages else None
         ov = dict(plug.overhead)
         out[name] = {"bare": bool(runner.bare), "resumes": bool(runner.resumes), "fixed_overhead": ov.get("tokens"),
                      "fixed_overhead_source": ov.get("source"), "closest": ov.get("closest"),
                      "pspec_prompt_tokens": rep["estimate"],
                      "per_turn": [r["estimate"] for r in rep["turns"]],
-                     "provider_prompt_tokens": rep["provider_prompt_tokens"], "usage_format": rep["usage_format"]}
+                     "provider_prompt_tokens": sum(prov) if prov and None not in prov else None,
+                     "usage_format": u.get("format") if usages else None}
     return out
 
 
@@ -647,6 +667,7 @@ class Supervisor:
         self.dir = cfg.state_path
         (self.dir / "results").mkdir(parents=True, exist_ok=True)
         self.supervise = cfg.form == SUPERVISE_SCHEMA
+        self.cmd = "ga supervise" if self.supervise else "ga gemini"  # the command named in status lines
         self.backend, self.model = cfg.backend_name, cfg.active_model
         self.host = self.backend if self.supervise else cfg.host  # ga gemini logs its host as before
         if cli is None:
@@ -701,8 +722,8 @@ class Supervisor:
             f.write(json.dumps(row, sort_keys=True) + "\n")
 
     def say(self, text: str) -> None:
-        if self.supervise:
-            text = text.replace("ga gemini", "ga supervise")
+        if self.cmd != "ga gemini":
+            text = text.replace("ga gemini", self.cmd)
         self.out.write(text.rstrip("\n") + "\n")
         self.out.flush()
 
@@ -824,13 +845,12 @@ class Supervisor:
             self.log("turn", step=sid, ok=False, reason=e.reason, model=self.model)
             raise
         self.st["session_id"] = turn.session_id or self.st.get("session_id")
-        from rlo.pspec import tokens as est, usage_report
+        from rlo.pspec import tokens as est
         usage = turn.usage if isinstance(turn.usage, dict) else {}
         fmt = getattr(turn, "usage_format", None) or ("otel" if usage else None)
-        prov = usage_report(usage, fmt) if usage and fmt else None
         self.log("turn", step=sid, ok=True, served=turn.served, model=self.model, seconds=turn.seconds,
                  tokens=usage.get("total_tokens"), input_tokens=usage.get("input_tokens"),
-                 provider_prompt_tokens=(prov or {}).get("prompt_tokens"), usage_format=fmt, bare=bare,
+                 provider_prompt_tokens=provider_prompt_tokens(usage, fmt), usage_format=fmt, bare=bare,
                  prompt_est=est(prompt) + (est(system) if system else 0), prompt_mode=self.cfg.prompt_mode)
         denied = list(getattr(turn, "denied", []) or [])
         if denied:  # agy refused tool calls inside the turn (V: denied_actions); reported, labels only
@@ -1083,6 +1103,7 @@ def _run(cfg: GeminiConfig, args: Any, cmd: str) -> int:
         cfg.prompt_mode = args.prompt_mode
     try:
         sup = Supervisor(cfg)
+        sup.cmd = cmd
     except FormError as e:
         for p in e.problems:
             print(f"config: {p}", file=sys.stderr)

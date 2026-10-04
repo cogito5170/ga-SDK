@@ -1,0 +1,1 @@
+{"id": "r2", "object": "chat.completion", "model": "gpt-5.1", "choices": [{"index": 0, "message": {"role": "assistant", "content": "```json\n{\"schema\": \"ga-plan/1\", \"steps\": [], \"next\": null, \"say\": \"5\"}\n```"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 1002, "completion_tokens": 50, "total_tokens": 1052}}

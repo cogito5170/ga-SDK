@@ -1,0 +1,3 @@
+{"type": "init", "session_id": "g1", "model": "gemini-3-flash-preview"}
+{"type": "message", "role": "assistant", "content": "```json\n{\"schema\": \"ga-plan/1\", \"steps\": [], \"next\": null, \"say\": \"5\"}\n```"}
+{"type": "result", "status": "success", "stats": {"input_tokens": 12902, "output_tokens": 60, "total_tokens": 12962, "models": {"gemini-3-flash-preview": {}}}}

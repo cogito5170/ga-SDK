@@ -20,12 +20,11 @@ import json
 import re
 import subprocess
 import time
-from pathlib import Path
 from typing import Any, Callable
 
 from ..adapters import agy_cli
 from ..adapters.gemini_cli import GeminiCLI, clean_env
-from .base import (API_VERSION, BackendError, BackendTurn, ConfigError, RateLimited, check_served, rate_limited)
+from .base import API_VERSION, BackendError, BackendTurn, ConfigError, check_served, rate_limited
 
 
 def _cli(options: dict[str, Any], default: list[str]) -> list[str]:
@@ -84,6 +83,8 @@ class AgvRunner(agy_cli.AgyCLI):
             raise BackendError("not_bare")  # agv has no system-prompt channel: the loop sends the whole prompt
         t = super().run_turn(prompt, session_id, on_wait=on_wait, wait_every_s=wait_every_s)
         usage = getattr(t, "raw_usage", None)
+        if usage is not None and self.family == "gemini":  # usageMetadata (camelCase) -> Telemetry's snake_case names
+            usage = {re.sub(r"(?<!^)([A-Z])", r"_\1", k).lower(): v for k, v in usage.items()}
         return BackendTurn(t.text, list(t.served), usage, self.usage_format if usage is not None else None, None,
                            t.seconds, t.events, list(getattr(t, "denied", []) or []))
 

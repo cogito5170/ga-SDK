@@ -261,6 +261,31 @@ Every turn's usage, served model and answer text land in `TurnResult`; each turn
 `runner.tools` / `runner.system_prompt` narrow the child's fixed cost. Measured: `results/ga29/table.md`
 (`examples/ga29_measure.py`).
 
+## `ga supervise`: the same loop on any backend (CMD-GA28, BD-300/302)
+
+    ga supervise --backend <name> --config ga-supervise.json "the task"     # --resume, --prompt-mode as ga gemini
+    ga supervise --list-backends            # what loaded (agv first), what did not, each one's fixed overhead
+    ga supervise --token-report conv.json   # offline: per host and per backend (fixed overhead, pspec tokens, usage)
+
+A backend is an entry point in the `ga.backends` group (plugin API 1, the rlo.plugins load rules: a plugin that fails to
+import, speaks another API, is misnamed or takes a used name is recorded and left out). Built-ins: `agv` (Antigravity,
+command `agy`, alias `agy`; slug `gpt-*`, `claude-*` or `gemini-*`, any other family is a config error),
+`gemini_cli`, `claude_cli` (`claude -p`), `codex_cli` (`codex exec`), `openai_http` (OpenAI-compatible, local servers
+too) and `anthropic_http` (both behind `pip install 'ga-sdk[http]'`). The config form is `ga-supervise/1`:
+`{schema, backend, model, options, tools, mcp_servers, budget?, daily?, ...}`; `options` are the backend's (`cli`,
+`key_env` for the HTTP ones — the name of the environment variable holding the key; a config holds no key). No budget
+or daily cap unless configured (BD-289). A served model other than `model` fails the turn on every backend.
+
+Plan calls are bare where the host allows it (S5): `claude_cli` runs with `--tools "" --strict-mcp-config
+--system-prompt <once>`, the HTTP backends send the protocol as the system text and no tools. agv, gemini_cli and
+codex_cli have no such switch known offline; `--list-backends` gives their fixed overhead and source (gemini_cli 11,822
+input tokens measured by baseline; agv and codex not measured).
+
+The plan form is `ga-plan/1`; `ga-gemini-plan/1` is accepted as its alias, and `ga gemini` (and its `ga-gemini/1` config,
+which `ga supervise --config` also runs) still names it, so its verbatim prompts are unchanged. The spec is
+`ga/specs/supervisor-plan.pspec`. Every turn follows `prompt_mode` (the first one too, BD-304), and `check_plan` reads
+step ids with fullmatch.
+
 ## 시험
 
 ```sh
