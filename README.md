@@ -176,7 +176,7 @@ ga gemini --config ga-gemini.json --resume                             # after a
 - **When the quota is hit**, ga prints one block and saves the state:
   ```
   [ga gemini] quota: T1.m2 parked — resumes in 7 s, at 14:52:07 (hint)
-    now:  done 5 · running 0 · parked 1 · requests left today 18/20
+    now:  done 5 · running 0 · parked 1 · requests today 2 (no daily cap)
     next: T1.m2 (model)
     saved: …/.ga-gemini/state.json — after a crash or a closed terminal: ga gemini --resume
   ```
@@ -186,10 +186,10 @@ ga gemini --config ga-gemini.json --resume                             # after a
   [ga gemini] turn T1.m2 running 40 s; the CLI may be retrying a quota error inside the turn · done 3 · running 1 · parked 0
   ```
 - **`max_parallel`** (tool steps at once, default 4) is handed to rlo's Scheduler (K12 rev 3): ready tool steps run concurrently in a pool of that size.
-- **The daily quota** (`daily`: `requests`, default 20 for the free tier, shared by every session on the key; `reset_tz`, default `America/Los_Angeles`; `reset_at`, default `00:00`). ga counts the requests it sends today (`day.json`). When none are left, or the server says `TerminalQuotaError`, the step waits for the reset instead of spending a call on a known 429:
+- **The daily quota.** By default ga sets **no daily cap**: the free tier's 20 a day is gone with billing on (CMD-GA26 S6, BD-294), and a cap is the integrating side's choice. `daily` = {`requests`, default none; `reset_tz`, default `America/Los_Angeles`; `reset_at`, default `00:00`}. ga counts the requests it sends today (`day.json`). When a configured cap is used up, or the server says `TerminalQuotaError` (with or without a cap), the step waits for the reset instead of spending a call on a known 429. The per-minute Governor (`budget`) works as before:
   ```
   [ga gemini] daily quota: T1.m3 parked — the quota resets at 00:00 America/Los_Angeles, in 15 h 0 min (at 08:00:00 here); one probe then
-    now:  done 4 · running 0 · parked 1 · requests left today 0/20
+    now:  done 4 · running 0 · parked 1 · requests left today 0 (the server's daily quota)
   ```
   At the reset ga sends that one step once (the probe). If it hits the quota again, it waits for the next reset; it never retries in a loop. Tool steps keep running meanwhile. ga counts only its own requests; other sessions on the key are why the server's word wins.
 - **On disk** (`state_dir`): `state.json` (session id, steps, done, parked), `results/<step>.json` (full tool results), `log.jsonl` (labels and numbers only) and `ledger.jsonl` (rlo's rows). In memory, each result is capped at `result_cap` characters. No Node process lives for the whole session.

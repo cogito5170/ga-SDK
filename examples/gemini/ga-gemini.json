@@ -3,7 +3,7 @@
   "model": "gemini-3-flash-preview",
   "cli": ["gemini"],
   "budget": {"rpm": 5},
-  "daily": {"requests": 20, "reset_tz": "America/Los_Angeles", "reset_at": "00:00"},
+  "daily": {"reset_tz": "America/Los_Angeles", "reset_at": "00:00"},
   "tools": {
     "issue_read": {"mcp": "github", "tool": "issue_read", "about": "read one GitHub issue or its comments"},
     "add_issue_comment": {"mcp": "github", "tool": "add_issue_comment", "about": "post one comment"}

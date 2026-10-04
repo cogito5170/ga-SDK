@@ -290,7 +290,7 @@ class SupervisorTest(RunTask, unittest.TestCase):
         self.assertEqual(out.count("[ga gemini] quota:"), 1)
         self.assertIn("[ga gemini] quota: T1.m2 parked — resumes in 7 s", out)
         self.assertIn("(hint)", out)
-        self.assertIn("  now:  done 5 · running 0 · parked 1 · requests left today 18/20", out)  # m1, a, b, c, e
+        self.assertIn("  now:  done 5 · running 0 · parked 1 · requests today 2 (no daily cap)", out)  # m1, a, b, c, e
         self.assertIn("  next: T1.m2 (model)", out)
         self.assertIn("ga gemini --resume", out)
         # the state file at the park: parked m2 until park + 7 s, the tool steps done
@@ -312,7 +312,7 @@ class SupervisorTest(RunTask, unittest.TestCase):
         park = next(r for r in log if r["event"] == "park")
         tools_before = [r for r in log if r["event"] == "tool" and r["at"] <= park["at"]]
         self.assertEqual(len(tools_before), 4)  # e too: a tool step is never held behind a parked model step
-        self.assertEqual((park["resumes_in_s"], park["source"], park["left_today"]), (7.0, "hint", 18))
+        self.assertEqual((park["resumes_in_s"], park["source"], park["left_today"]), (7.0, "hint", None))  # no cap (S6)
         self.assertEqual(next(r for r in log if r["event"] == "resume")["waited_s"], 7.0)
         self.assertTrue(all(r["served"] == [MODEL] for r in log if r["event"] == "turn" and r["ok"]))
         end = log[-1]
@@ -433,7 +433,7 @@ class FixtureRunTest(RunTask, unittest.TestCase):
         self.assertIn("[ga gemini] daily quota: T1.m3 parked — the quota resets at 00:00 America/Los_Angeles, in 15 h 0 min",
                       out)
         self.assertIn("one probe then", out)
-        self.assertIn("requests left today 0/20", out)
+        self.assertIn("requests left today 0 (the server's daily quota)", out)  # no cap configured (S6)
         self.assertEqual(out.count("[ga gemini] daily quota reset: one probe (T1.m3)"), 1)
         log = box.log()
         self.assertEqual([r["source"] for r in log if r["event"] == "park"], ["hint", "daily reset"])
@@ -497,6 +497,36 @@ class DailyQuotaTest(RunTask, unittest.TestCase):
         self.assertIn("daily quota: T1.m3 parked", shown)
         self.assertIn("requests left today 0/2", shown)
         self.assertEqual(sorted(st["done"]), ["T1.m1", "T1.m2"])  # m3 waited for the reset without a call
+
+    def test_no_config_no_daily_cap_the_21st_request_goes_out(self):
+        """CMD-GA26 S6 / D4 (BD-294): billing is on; with no `daily` config ga refuses no request for a daily cap.
+        The per-minute Governor still spaces them (budget rpm 10 in the Box)."""
+        script = [{"plan": plan(next_={"prompt": str(i)})} for i in range(21)] + [{"plan": plan(say="done")}]
+        box, sup, ok, clock, out, snaps = self.run_task(script, max_model_steps=25)
+        self.assertTrue(ok, out)
+        self.assertEqual(len(box.calls()), 22)  # the 21st and 22nd requests of the day went out
+        self.assertNotIn("daily quota", out)
+        self.assertEqual([r["source"] for r in box.log() if r["event"] == "park"], ["window", "window"])
+        self.assertTrue(clock.sleeps and all(0 < d <= 60 for d in clock.sleeps))  # the minute window, never a day
+        self.assertLess(clock() - FakeClock.START, 3 * 60 + 1)
+        day = json.loads((box.dir / ".ga-gemini" / "day.json").read_text())
+        self.assertEqual((day["used"], day["limit"], day["spent"]), (22, None, False))
+
+    def test_day_count_without_and_with_a_cap(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, d)
+        now = FakeClock.START
+        free = G.DayCount(d / "free.json", G.DAILY_DEFAULT)
+        for _ in range(21):
+            free.add(now)
+        self.assertIsNone(free.left(now))
+        free.exhaust(now)  # the server's TerminalQuotaError still parks until the reset
+        self.assertEqual(free.left(now), 0)
+        self.assertIsNone(free.left(now + 54_000))  # a new day
+        capped = G.DayCount(d / "capped.json", {**G.DAILY_DEFAULT, "requests": 20})
+        for _ in range(20):
+            capped.add(now)
+        self.assertEqual(capped.left(now), 0)
 
     def test_next_reset(self):
         start = FakeClock.START

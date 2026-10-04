@@ -38,9 +38,11 @@ MODEL_STEP = "gemini"  # the one model step name in the step table
 STEP_ID = re.compile(r"^[A-Za-z0-9_-]{1,12}$")
 TOOL_NAME = re.compile(r"^[A-Za-z0-9_.:+-]{1,40}$")  # a step-table name is a label (rlo LABEL)
 MAX_PLAN_STEPS = 16
-# the free tier of gemini-3-flash-preview: 20 requests a day, shared by every session on the key (GMG6); Google documents
+# the daily request cap is the integrating side's (BD-289): none unless `daily.requests` is configured — the 20 a day
+# of the free tier is gone with billing on (CMD-GA26 S6, BD-294). reset_tz / reset_at say when a day ends: for a
+# configured cap, and for the server's own daily quota (TerminalQuotaError), which ga still waits out; Google documents
 # per-day limits as resetting at midnight Pacific
-DAILY_DEFAULT = {"requests": 20, "reset_tz": "America/Los_Angeles", "reset_at": "00:00"}
+DAILY_DEFAULT = {"requests": None, "reset_tz": "America/Los_Angeles", "reset_at": "00:00"}
 # requests per minute the Governor allows by default: meant to sit below the server's per-minute limit, so the CLI rarely
 # meets a 429 it would retry inside the turn (BD-232). The free tier's exact minute limit for gemini-3-flash-preview is
 # not known here — an assumption; set budget.rpm in ga-gemini.json to your key's limit minus a margin.
@@ -170,8 +172,9 @@ def config_problems(raw: Any) -> list[Problem]:
         bad("$.daily", "must be {requests?, reset_tz?, reset_at?}")
     else:
         d = {**DAILY_DEFAULT, **d}
-        if not (isinstance(d["requests"], int) and not isinstance(d["requests"], bool) and d["requests"] >= 1):
-            bad("$.daily.requests", "must be an integer >= 1")
+        if d["requests"] is not None and not (isinstance(d["requests"], int) and not isinstance(d["requests"], bool)
+                                              and d["requests"] >= 1):
+            bad("$.daily.requests", "must be an integer >= 1, or absent for no daily cap")
         if not (isinstance(d["reset_at"], str) and re.match(r"^([01]\d|2[0-3]):[0-5]\d$", d["reset_at"])):
             bad("$.daily.reset_at", "must be HH:MM")
         try:
@@ -214,24 +217,29 @@ def next_reset(now: float, tz: str, at: str) -> float:
 
 
 class DayCount:
-    """Requests sent today (this ga's count, on disk), against the daily limit; a new day starts at the reset."""
+    """Requests sent today (this ga's count, on disk), against the configured daily cap if there is one (none by
+    default, S6); a new day starts at the reset. ``spent``: the server said today's quota is spent."""
 
     def __init__(self, path: Path, daily: dict[str, Any]):
-        self.path, self.limit, self.tz, self.at = path, int(daily["requests"]), daily["reset_tz"], daily["reset_at"]
+        cap = daily.get("requests")
+        self.path, self.limit, self.tz, self.at = path, None if cap is None else int(cap), daily["reset_tz"], daily["reset_at"]
         d = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-        self.used, self.reset = int(d.get("used", 0)), float(d.get("reset_at", 0.0))
+        self.used, self.reset, self.spent = int(d.get("used", 0)), float(d.get("reset_at", 0.0)), bool(d.get("spent"))
 
     def _roll(self, now: float) -> None:
         if now >= self.reset:
-            self.used, self.reset = 0, next_reset(now, self.tz, self.at)
+            self.used, self.reset, self.spent = 0, next_reset(now, self.tz, self.at), False
             self._save()
 
     def _save(self) -> None:
-        _atomic_write(self.path, {"used": self.used, "reset_at": self.reset, "limit": self.limit})
+        _atomic_write(self.path, {"used": self.used, "reset_at": self.reset, "limit": self.limit, "spent": self.spent})
 
-    def left(self, now: float) -> int:
+    def left(self, now: float) -> int | None:
+        """Requests left today: 0 once the server said the day is spent, None when no cap is configured."""
         self._roll(now)
-        return max(0, self.limit - self.used)
+        if self.spent:
+            return 0
+        return None if self.limit is None else max(0, self.limit - self.used)
 
     def reset_at(self, now: float) -> float:
         self._roll(now)
@@ -245,7 +253,7 @@ class DayCount:
     def exhaust(self, now: float) -> None:
         """The server says the day is spent (TerminalQuotaError): nothing is left until the reset, whatever ga counted."""
         self._roll(now)
-        self.used = max(self.used, self.limit)
+        self.spent = True
         self._save()
 
 
@@ -258,7 +266,8 @@ def daily_governor(cfg: GeminiConfig, clock: Callable[[], float], day: DayCount,
         def wait_s(self, est_tokens: int = 0, model: str | None = None, calls: int = 1) -> float:
             w = super().wait_s(est_tokens, model, calls)
             now = self.clock()
-            return max(w, day.reset_at(now) - now) if day.left(now) < calls else w
+            left = day.left(now)
+            return max(w, day.reset_at(now) - now) if left is not None and left < calls else w
 
         def try_acquire(self, est_tokens: int = 0, model: str | None = None) -> Any:
             g = super().try_acquire(est_tokens, model)
@@ -775,8 +784,11 @@ class Supervisor:
             self.say("\n".join([
                 head,
                 f"  now:  done {len(st['done'])} · running {len(st['running'] or [])} · parked {len(parked)} · "
-                + (f"requests left today {left}/{limit}" if left is not None else
-                   f"agy share left {'unknown' if st.get('share_pct') is None else format(st['share_pct'], 'g') + '%'}"),
+                + (f"agy share left {'unknown' if st.get('share_pct') is None else format(st['share_pct'], 'g') + '%'}"
+                   if self.agy_quota is not None else
+                   f"requests today {self.day.used} (no daily cap)" if left is None else
+                   f"requests left today {left}/{limit}" if limit is not None else
+                   "requests left today 0 (the server's daily quota)"),
                 f"  next: {nxt}",
                 f"  saved: {self.state_file} — after a crash or a closed terminal: ga gemini --resume",
             ]))
