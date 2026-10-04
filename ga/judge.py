@@ -322,7 +322,8 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
     # a private bare copy that holds the sha on a ref, so pip and the clone can reach it without touching the repo
     src = work / "src.git"
     git(work, "init", "--bare", "--quiet", "-b", "judge", str(src), check=True)
-    git(repo, "push", "--quiet", str(src), f"{sha}:refs/heads/judge", check=True)
+    git(src, "fetch", "--quiet", str(repo), sha, check=True)  # a fetch (not a push) also works from a shallow repo
+    git(src, "update-ref", "refs/heads/judge", sha, check=True)
 
     # (3) empty venv, install, pip list, pip check
     vdir = work / "venv"
