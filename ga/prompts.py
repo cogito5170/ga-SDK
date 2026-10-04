@@ -175,3 +175,37 @@ def hub_prompt(cfg: Config) -> str:
         "\n".join(owners),
     ]
     return "\n".join(parts) + "\n"
+
+
+def fresh_instructions(cfg: Config, session: str, directive: dict | None = None) -> str:
+    """The fixed part of a fresh turn's prompt (CMD-GA29): how to work and what the final answer must hold. The
+    context pack (ga/ctxpack.py) goes before it. English and short: it is read on every turn."""
+    import json
+
+    s = cfg.sessions[session]
+    repos = ", ".join(f"./{r} (branch {s.branch_for(r)})" for r in s.repos) or "-"
+    done = directive.get("done_when") if directive and isinstance(directive.get("done_when"), list) else []
+    head = {"schema": "report/2", "from": session,
+            "handled": [{"id": directive["id"] if directive else "<id>", "rev_seen": directive["rev"] if directive else 1,
+                         "status": "done"}],
+            "commits": [{"repo": r, "branch": s.branch_for(r), "sha": "<SHA>"} for r in s.repos],
+            "items": [{"id": x["id"], "state": "met", "evidence": ["<sha or path>"]} for x in done]}
+    push = "Do not push; the hub fetches your branch." if cfg.isolation == "clone" else "Push only your own branch."
+    return "\n".join([
+        f"## How to work ({cfg.hub_name} -> {s.tag})",
+        "- The pack above is all you get: there is no earlier conversation. Read only the files you need, in parts.",
+        f"- The current directory is your workspace. Repositories: {repos}. Use `git -C <repo> ...`. {push}",
+        "- If a command is refused, find another way; do not repeat it.",
+        "- Do not post anything. Your final answer is the report: the hub checks it, posts it and keeps your state block.",
+        "",
+        "## Final answer (required, even when blocked)",
+        "1. A report/2 post: a ```ga block with this head filled in (`<SHA>` = the 40-hex commit sha; drop repos you "
+        "did not commit to; status `paused` if not finished; one item per done_when id: met | unmet | blocked | na), "
+        "then a short body with `## Result` (and `## Blocker` if any).",
+        "```ga",
+        json.dumps(head, ensure_ascii=False),
+        "```",
+        "2. One ```state block: what is done, what is next, and anything the next turn must know (it has no other memory). "
+        f"At most {s.state_max_tokens * 4} bytes.",
+        "",
+    ])
