@@ -380,6 +380,14 @@ class S3Router(unittest.TestCase):
         self.assertEqual([e for e in b if e["type"] == "peer.message.sent"], [])
         self.assertEqual(w.read("B", "router.json")["tier"], {"observe:image.img1.description": "R1"})
 
+    def test_a_failing_job_is_bounded(self):
+        w = World(self)
+        w.backends["fake_vision"].serve_as = "claude-other"  # every observation turn fails
+        w.rounds(6)
+        self.assertEqual(len(w.backends["fake_vision"].calls), 3)
+        st = w.read("B", "state.json")
+        self.assertEqual([r["status"] for r in st["requests"].values()], ["needs_judgement"])
+
     def test_a_failed_check_escalates_the_node(self):
         w = World(self)
         w.network["nodes"]["A"]["task"]["check"] = [sys.executable, "-c", "import sys; sys.exit(1)"]

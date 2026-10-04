@@ -38,6 +38,7 @@ from .router import ConfigError, NoRoute, Router, catalog_for
 from .state import State
 
 NODES = "nodes"
+ATTEMPTS = 3  # turns per job when the node sets no runs budget
 PEER_LOG_MAX = 50
 
 
@@ -257,10 +258,22 @@ class Node:
         self.run["seq"] += 1
         return self.run["seq"]
 
+    def _limit(self) -> int:
+        return int((self.n.get("budget") or {}).get("runs") or ATTEMPTS)
+
     def _job(self, st: State, run: dict, decisions: list) -> dict | None:
         for jid, c in sorted(run["cont"].items()):  # S4: an open checkpoint continues first
             if c.get("status") == "open" and c.get("pending"):
                 return dict(c["job"])
+        for d in decisions:  # a job that failed `limit` times is not tried again: needs_judgement, said in the State
+            if d.action == "observe" and run["runs"].get(f"observe:{d.ref}", 0) >= self._limit():
+                if d.msg_id:
+                    st.requests[d.msg_id]["status"] = "needs_judgement"
+        decisions = [d for d in decisions if not (d.action == "observe" and d.msg_id
+                                                  and st.requests[d.msg_id]["status"] != "open")
+                     and not (d.action == "observe" and run["runs"].get(f"observe:{d.ref}", 0) >= self._limit())]
+        if self.task and self.task["id"] not in st.done and run["runs"].get(self.task["id"], 0) >= self._limit():
+            st.done[self.task["id"]] = {"status": "needs_judgement", "verified": False}
         for d in decisions:
             if d.action == "observe" and d.peer:
                 return {"kind": "observe", "id": f"observe:{d.ref}", "ref": d.ref, "for": d.peer, "re": d.msg_id}
@@ -389,6 +402,8 @@ class Node:
             result["outcome"] = f"checkpoint:{verdict}"
             if verdict in ("needs_judgement", "budget") and job["kind"] == "task":
                 st.done[job["id"]] = {"status": verdict, "verified": False}
+            elif verdict in ("needs_judgement", "budget") and job.get("re") in st.requests:
+                st.requests[job["re"]]["status"] = verdict
             return result
         run["cont"].pop(job["id"], None)
         if ans is None:
