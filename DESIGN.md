@@ -269,7 +269,7 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 
 ## 26. One ga: the rlo pin and the `ga.rlo` seam (CMD-GA20, GA_UNIFIED U2, BD-206)
 
-- **Pins.** `ga/_pins.py` `PINS` is the source: `rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@…` (rlo 0.6.0 `3323f88` in GA20; K12 rev 2's `250a88e`, rlo 0.7.0, in GA21; K12 rev 3's `3d2e7d0`, rlo 0.7.0, after GA21 rev 3 (BD-247); `c491e96`, rlo 0.8.2 (K13's deadlock fix, K14's bounded window and incremental feed), since CMD-GA25 rev 2 (BD-268, BD-278), GA21). `pyproject.toml` `[project] dependencies` must match it by meaning (name, extras, URL, marker; spacing and name case do not count). The URL text is part of the pin: pip refuses two spellings of a URL for one distribution, so anything else that pins rlo-sdk next to ga-sdk must use the same text. `tests/test_unified.py` also checks, where ga-sdk is installed, the Requires-Dist, rlo-sdk's version and the commit pip fetched (`direct_url.json`).
+- **Pins.** `ga/_pins.py` `PINS` is the source: `rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@…` (rlo 0.6.0 `3323f88` in GA20; K12 rev 2's `250a88e`, rlo 0.7.0, in GA21; K12 rev 3's `3d2e7d0`, rlo 0.7.0, after GA21 rev 3 (BD-247); `c491e96`, rlo 0.8.2 (K13's deadlock fix, K14's bounded window and incremental feed), in CMD-GA25 rev 2 (BD-268, BD-278); `6bc76c7`, rlo 0.9.0 (K15's `rlo.pspec`), since CMD-GA26 (POL-2 T2), GA21). `pyproject.toml` `[project] dependencies` must match it by meaning (name, extras, URL, marker; spacing and name case do not count). The URL text is part of the pin: pip refuses two spellings of a URL for one distribution, so anything else that pins rlo-sdk next to ga-sdk must use the same text. `tests/test_unified.py` also checks, where ga-sdk is installed, the Requires-Dist, rlo-sdk's version and the commit pip fetched (`direct_url.json`).
 - **Lazy import.** No ga module outside `ga.rlo.*` imports rlo. The test puts a fake `rlo` first on the path, imports every ga module (except GR's below the seam), runs `ga --help`, `ga check` and `ga rlo`, and asserts that no `rlo` module was loaded.
 - **Seam.** `ga/rlo/__init__.py` holds only a docstring and `__version__`. `ga rlo ...` is caught in `main` before argparse (`_rlo_argv` skips `--config` / `--ga-dir` and their values). It is still listed in `ga --help`. `cmd_rlo` imports `ga.rlo.cli` and calls `main(argv)` with the rest. Only that import is guarded: `ModuleNotFoundError` gives exit 2 naming `e.name`, either "is not there yet" (the module itself) or "is missing (ga.rlo.cli needs it)" (one of its imports).
 - **Ownership.** `ga/rlo/*` and `tests/test_rlo/*` are GR's (GA_UNIFIED U-P2, BD-218); GA does not edit them. Not `tests/rlo/`: with `unittest discover -s tests` a `tests/rlo/__init__.py` is a top-level package `rlo` and shadows rlo-sdk. GA owns `cmd_rlo`, `_rlo_argv` and `ga/_pins.py`. A change GR needs on GA's side goes to GA as a `요청:`, and the reverse too.
@@ -347,3 +347,26 @@ G1 → G8 → G2 → G4 → G6(우편함 · git) + **G9**(Runner · worktree · 
 - An unreadable `/usage` does not block: the reading is logged as unknown, and a quota stop still holds for the fallback.
 - **Tests:** `tests/test_agy.py` on `tests/fake_agy.py` (assumed shapes), 14 tests. 14/14 GA23 mutations killed; the GA21 set re-run gives 37/38, the one equivalent survivor as before.
 
+## 31. `ga gemini` prompts on prompt-spec/1 (CMD-GA26, POL-2 T2)
+
+- **The spec:** `ga/specs/gemini-plan.pspec` (package data), from baseline `ops/pspec/gemini-plan.pspec` at `7dc9d13` with the spec lines unchanged. It is read by `rlo.pspec` (rlo-sdk 0.9.0, `6bc76c7`), and one file gives three things: the prompt text (`verbatim` or `compact`), the answer check, and the token estimate.
+  - Sections: `once` (the protocol), `first`, `turn` (a host that resumes) and `turn_noresume` (agy: no `--resume`, so every turn carries the protocol and the task again).
+  - `protocol()` and `Supervisor._prompt` compile from it; no prompt is written with `str.format` any more.
+  - `spec_tools()` hands each tool's `about` in as `protocol()` always wrote it (`str(about).rstrip(": ")`). The spec's `{% if t.about %}` cannot take a filter, and without this a blank or colon-ended about would differ by bytes.
+  - `stray_tags()`: `plan_spec()` refuses a spec whose literal text holds a `{{` or `{%` that is not a whole tag. rlo-sdk 0.9.0 reads a text piece that starts with one as a tag, so `{{ ask }x` renders as `{{ ask }}` (reported to SDK).
+- **Modes:** the first turn is always verbatim. Follow-up turns use `prompt_mode` (config, or `ga gemini --prompt-mode`): `compact` by default, `verbatim` for comparison and fallback. The log's `turn` rows add `prompt_mode`, `prompt_est` (bytes/4) and `input_tokens` when the CLI reports them; the `task` row adds `prompt_mode`.
+- **The check:** `check_plan` stays the authority. `spec_check` (rlo.pspec.check on the same spec) runs beside it on every answer; a disagreement is logged as `check_disagree` (two booleans), and only `check_plan` decides.
+  - On baseline's 17 cases they agree 16/17 on rlo-sdk 0.9.0. The disagreement is the self-reference case (`{"id": "a", "after": ["a"]}`): check_plan rejects it, and rlo 0.9.0 counts a step's own id as seen. CMD-K16 P1 fixes that; the test expects 17/17 on any rlo other than 0.9.0.
+- **Token report:** `ga gemini --token-report <conversation.json>` (offline, no config, no model call). For each host type it gives tokens per turn in three columns: `verbatim`, `compact` (every turn compact) and `ga` (first verbatim, follow-ups compact). It also checks each turn's answer with both checks. The output holds numbers and labels only.
+  - `tests/fixtures/pspec/conversation_hero8.json` is baseline's 8-turn prototype conversation with labelled answers:
+    - Gemini (`--resume`): 646 → 447 compact, 531 as ga sends it;
+    - agy: 2263 → 1574 compact, 1658 as ga sends it.
+    - The gap is the first turn, 245 → 161, kept verbatim until baseline decides (S3).
+- **Fixtures:** `tests/fixtures/pspec/ga_438a34a.json` holds 208 prompts captured from ga-sdk `438a34a`'s real `protocol()` and `Supervisor._prompt` (`capture_prompts.py`), over four tool tables (one of edge cases), three tasks, four result sets and two asks. `compact_golden.json` is the compact snapshot (`make_compact_golden.py`); a change to a compact branch needs a new verdict.
+- **Tests:** `tests/test_pspec_prompts.py`. It covers:
+  - verbatim byte identity through the runtime path;
+  - a full sweep in which every one-byte change outside the comment lines is caught;
+  - the compact golden, and no resend of `once` on a resuming host;
+  - the token report against the prototype;
+  - the 17 cases plus boundary ids;
+  - the supervisor's mode per turn, and the beside-check log.

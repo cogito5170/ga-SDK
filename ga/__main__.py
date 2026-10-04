@@ -356,6 +356,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("prompt", nargs="*"); p.add_argument("--resume", action="store_true")
     p.add_argument("--config", dest="gemini_config", default="ga-gemini.json")
     p.add_argument("--host", choices=["gemini_cli", "agy"], help="the CLI that runs model steps (default: the config's)")
+    p.add_argument("--prompt-mode", choices=["compact", "verbatim"],
+                   help="follow-up turns: compact or today's verbatim text (default: the config's, else compact)")
+    p.add_argument("--token-report", metavar="CONVERSATION",
+                   help="offline: tokens per turn, verbatim against compact, for a labelled conversation file; no model call")
     p.set_defaults(fn=cmd_gemini)
     p = sub.add_parser("mail", help="ga forms between sessions through a git mailbox branch (CMD-GA22)")
     msub = p.add_subparsers(dest="mail_cmd", required=True)

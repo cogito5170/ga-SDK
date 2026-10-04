@@ -1,0 +1,44 @@
+# ga gemini's prompts and answer form (CMD-GA26, POL-2 T2). Language: prompt-spec/1 (baseline PROMPT_SPEC.md), read by rlo.pspec.
+# Started from baseline ops/pspec/gemini-plan.pspec at 7dc9d13; the spec lines are unchanged. ga hands `tools` in with each
+# about already as protocol() wrote it (str(about).rstrip(": ")), so verbatim stays byte-identical for any about text.
+spec gemini-plan/1
+goal Direct a controller that runs tool steps; each turn answers with one closed step list.
+in tools : Model @operator once
+in task : DecisionContext @operator once
+in results : Observation @runtime turn
+in ask : Opinion @model turn
+let max_steps = 16
+let id = /^[A-Za-z0-9_-]{1,12}$/
+out ga-gemini-plan/1
+  schema : "ga-gemini-plan/1"
+  steps? : [{id: id new, tool: key(tools), args?: {}, after?: [id seen]}] <= max_steps
+  next? : {prompt: str+, after?: [id seen]} | null
+  say? : str
+--- once
+{% v %}You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:
+{"schema": "{{ out_schema }}", "steps": [{"id": "a", "tool": "<name>", "args": {}, "after": []}], "next": {"prompt": "<what you will do with the results>", "after": ["a"]} or null, "say": "<short note for the user>"}
+Rules: at most {{ max_steps }} steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.
+Tools (closed list):
+{% c %}Reply each turn with one ```json block: {{ out }}
+id: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.
+Tools:
+{% end %}{% for t in tools %}- `{{ t.key }}`{% if t.about %}: {{ t.about }}{% end %}
+{% else %}- (none)
+{% end %}
+--- first
+{% use once %}
+Task:
+{{ task }}
+--- turn
+{% v %}Reply with one {{ out_schema }} JSON object, as before.
+{% end %}Results:
+{% for r in results %}- {{ r.id }} ({{ r.tool }}): {{ r.text }}
+{% end %}
+{% v %}Your next step: {% c %}Next: {% end %}{{ ask }}
+--- turn_noresume
+{% use first %}
+
+Results:
+{% for r in results %}- {{ r.id }} ({{ r.tool }}): {{ r.text }}
+{% end %}
+{% v %}Your next step: {% c %}Next: {% end %}{{ ask }}

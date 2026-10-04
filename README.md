@@ -223,6 +223,14 @@ The output shapes are assumptions until a real agy shows them. Run these on the 
 7. If a quota stop happens on its own (do not force one): the exact `AGY_ERROR` line and the exit code. Never answer yes to "Use AI Credits".
 8. End to end: `ga gemini --host agy --config ga-gemini.agy.json "list the tools you can use"`, plus `.ga-gemini/log.jsonl` (labels and numbers only).
 
+## `ga gemini` prompts: compact follow-ups and a token report (CMD-GA26)
+
+ga's Gemini prompts come from one spec, `ga/specs/gemini-plan.pspec` (prompt-spec/1, read by `rlo.pspec`). The first turn is today's text. Follow-up turns are compact by default. On baseline's 8-turn conversation this cuts the estimated prompt tokens (bytes/4) from 646 to 531 on Gemini CLI, and from 2263 to 1658 on agy, which resends the protocol and the task every turn. To send today's text on every turn, set `"prompt_mode": "verbatim"` in `ga-gemini.json` or pass `--prompt-mode verbatim`.
+
+```
+ga gemini --token-report tests/fixtures/pspec/conversation_hero8.json   # offline: tokens per turn, verbatim vs compact
+```
+
 ## 시험
 
 ```sh

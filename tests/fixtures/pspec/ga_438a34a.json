@@ -1,0 +1,1739 @@
+{
+ "asks": [
+  "read the three hero notes and compare them",
+  "Done?  {{ ask }}\n"
+ ],
+ "cases": [
+  {
+   "kind": "protocol",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n",
+   "tools": "six"
+  },
+  {
+   "kind": "first",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "kind": "first",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "kind": "first",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "six"
+  },
+  {
+   "kind": "protocol",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n",
+   "tools": "none"
+  },
+  {
+   "kind": "first",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "kind": "first",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "kind": "first",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "none"
+  },
+  {
+   "kind": "protocol",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n",
+   "tools": "empty_about"
+  },
+  {
+   "kind": "first",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "kind": "first",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "kind": "first",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "empty_about"
+  },
+  {
+   "kind": "protocol",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n",
+   "tools": "edges"
+  },
+  {
+   "kind": "first",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "hero",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "hero",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "kind": "first",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "multiline",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "multiline",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "kind": "first",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "none",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "none",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "one",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "one",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "two",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "two",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 0,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: read the three hero notes and compare them",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn",
+   "results": "odd",
+   "task": "unicode",
+   "text": "Reply with one ga-gemini-plan/1 JSON object, as before.\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  },
+  {
+   "ask": 1,
+   "kind": "turn_noresume",
+   "results": "odd",
+   "task": "unicode",
+   "text": "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object in a ```json fenced block, of this form:\n{\"schema\": \"ga-gemini-plan/1\", \"steps\": [{\"id\": \"a\", \"tool\": \"<name>\", \"args\": {}, \"after\": []}], \"next\": {\"prompt\": \"<what you will do with the results>\", \"after\": [\"a\"]} or null, \"say\": \"<short note for the user>\"}\nRules: at most 16 steps; ids are short labels; `after` names earlier ids of the same answer; steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps it lists; set `next` to null when the task is done.\nTools (closed list):\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nYour next step: Done?  {{ ask }}\n",
+   "tools": "edges"
+  }
+ ],
+ "ga_sdk": "438a34a26d203ee7616409b50811d227f6297499",
+ "results": {
+  "none": [],
+  "odd": [
+   [
+    "s-1_X",
+    "uni.code:+",
+    "line 1\nline 2 {{ x }}\n"
+   ],
+   [
+    "z",
+    "noop",
+    ""
+   ],
+   [
+    "q",
+    "colon",
+    "{\"k\": [1, 2]}"
+   ]
+  ],
+  "one": [
+   [
+    "a",
+    "search",
+    "3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md"
+   ]
+  ],
+  "two": [
+   [
+    "a",
+    "search",
+    "3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md"
+   ],
+   [
+    "b",
+    "list_dir",
+    "notes/: hero-v1.md hero-v2.md hero-v3.md footer.md"
+   ]
+  ]
+ },
+ "schema": "ga-prompt-fixtures/1",
+ "tasks": {
+  "hero": "Find the three most recent design notes about the hero banner and summarise what changed between them.",
+  "multiline": "Line one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+  "unicode": "한글 과제 — café ☃"
+ },
+ "tools": {
+  "edges": {
+   "bare": {
+    "python": "m:f"
+   },
+   "blank": {
+    "about": " ",
+    "python": "m:f"
+   },
+   "colon": {
+    "about": "ends with a colon:",
+    "python": "m:f"
+   },
+   "mixed": {
+    "about": "a: b :: ",
+    "mcp": "srv",
+    "tool": "t"
+   },
+   "number": {
+    "about": 7,
+    "python": "m:f"
+   },
+   "space": {
+    "about": "trailing space ",
+    "python": "m:f"
+   },
+   "uni.code:+": {
+    "about": "über — {{ not a tag }} {% if x %}",
+    "mcp": "srv",
+    "tool": "t"
+   }
+  },
+  "empty_about": {
+   "x": {
+    "about": ""
+   }
+  },
+  "none": {},
+  "six": {
+   "fetch_url": {
+    "about": "fetch a url as text"
+   },
+   "list_dir": {
+    "about": "list a directory"
+   },
+   "noop": {},
+   "read_file": {
+    "about": "read a file from the workspace"
+   },
+   "search": {
+    "about": "search the web; returns titles and urls"
+   },
+   "write_note": {
+    "about": "append a note to the user's notes"
+   }
+  }
+ }
+}

@@ -46,6 +46,11 @@ DAILY_DEFAULT = {"requests": 20, "reset_tz": "America/Los_Angeles", "reset_at": 
 # not known here — an assumption; set budget.rpm in ga-gemini.json to your key's limit minus a margin.
 DEFAULT_BUDGET = {"rpm": 5}
 HOSTS = ("gemini_cli", "agy")
+# CMD-GA26: follow-up turns are compiled compact by default; verbatim (today's text, byte for byte) stays selectable.
+# The first turn is always verbatim (S3: baseline decides on a compact first turn).
+PROMPT_MODES = ("compact", "verbatim")
+SPEC_FILE = Path(__file__).resolve().parent / "specs" / "gemini-plan.pspec"
+_SPEC: Any = None
 # agy (CMD-GA23): the slug the user pinned (BD-255); a model step waits when the family's weekly share is under the
 # floor; window and reset_fallback_s cover a /usage text that does not say them (its format is U)
 AGY_DEFAULT = {"model": "gemini-3.8-flash-high", "cli": ["agy"], "usage_floor_pct": 5, "window": "weekly",
@@ -72,6 +77,7 @@ class GeminiConfig:
     max_parallel: int | None = None      # tool steps at once; handed to the Scheduler when it takes it (K12 rev 3, S8)
     host: str = "gemini_cli"             # gemini_cli | agy (CMD-GA23); `ga gemini --host` overrides it
     agy: dict[str, Any] = field(default_factory=lambda: dict(AGY_DEFAULT))
+    prompt_mode: str = "compact"         # follow-up turns: compact | verbatim (CMD-GA26); `ga gemini --prompt-mode`
 
     @property
     def active_model(self) -> str:
@@ -91,7 +97,7 @@ def config_problems(raw: Any) -> list[Problem]:
     if not isinstance(raw, dict):
         return [Problem("$", "must be an object")]
     known = {"schema", "model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps", "result_cap",
-             "turn_timeout_s", "est_tokens", "daily", "turn_status_s", "max_parallel", "host", "agy"}
+             "turn_timeout_s", "est_tokens", "daily", "turn_status_s", "max_parallel", "host", "agy", "prompt_mode"}
     for k in sorted(set(raw) - known):
         bad(f"$.{k}", "unknown field")
     if raw.get("schema") != CONFIG_SCHEMA:
@@ -141,6 +147,8 @@ def config_problems(raw: Any) -> list[Problem]:
         bad("$.state_dir", "must be a path")
     if "host" in raw and raw["host"] not in HOSTS:
         bad("$.host", f"must be one of {', '.join(HOSTS)}")
+    if "prompt_mode" in raw and raw["prompt_mode"] not in PROMPT_MODES:
+        bad("$.prompt_mode", f"must be one of {', '.join(PROMPT_MODES)}")
     a = raw.get("agy", {})
     if not isinstance(a, dict) or set(a) - set(AGY_DEFAULT):
         bad("$.agy", "must be {model?, cli?, usage_floor_pct?, window?, reset_fallback_s?, usage_every_s?}")
@@ -184,7 +192,8 @@ def load_config(path: str | Path) -> GeminiConfig:
     if probs:
         raise FormError(probs)
     kw = {k: raw[k] for k in ("model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps",
-                              "result_cap", "turn_timeout_s", "est_tokens", "turn_status_s", "max_parallel", "host")
+                              "result_cap", "turn_timeout_s", "est_tokens", "turn_status_s", "max_parallel", "host",
+                              "prompt_mode")
           if k in raw}
     return GeminiConfig(root=path.resolve().parent, daily={**DAILY_DEFAULT, **raw.get("daily", {})},
                         agy={**AGY_DEFAULT, **raw.get("agy", {})}, **kw)
@@ -395,18 +404,92 @@ def check_plan(plan: Any, tools: dict[str, Any]) -> list[str]:
     return out
 
 
+# ---- the prompts: one prompt-spec/1 file (CMD-GA26, POL-2 T2) -------------------------------------------------------
+
+def spec_tools(tools: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """The spec's ``tools`` input: each about as protocol() always wrote it — ``str(about)`` without trailing ": " — so
+    the spec's ``{% if t.about %}`` row is byte-identical for any about text (a blank or colon-ended one included)."""
+    return {n: {"about": f"{t.get('about', '')}".rstrip(": ")} for n, t in tools.items()}
+
+
+_TAG = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)  # rlo.pspec's tag pattern
+
+
+def stray_tags(spec: Any) -> list[str]:
+    """Sections whose literal text holds a ``{{`` or ``{%`` that is not a whole tag. rlo-sdk 0.9.0 reads a text piece
+    that starts with one as a tag and drops its last two characters (``{{ ask }x`` renders as ``{{ ask }}``), so ga
+    refuses such a spec rather than send what it did not say. ga's prompts hold no literal ``{{`` or ``{%``."""
+    return [name for name, body in spec.sections.items() if "{{" in _TAG.sub("", body) or "{%" in _TAG.sub("", body)]
+
+
+def plan_spec() -> Any:
+    """ga/specs/gemini-plan.pspec, loaded once (rlo.pspec; rlo is imported here, never by ``import ga``)."""
+    global _SPEC
+    if _SPEC is None:
+        from rlo import pspec
+        spec = pspec.load_file(SPEC_FILE)
+        bad = stray_tags(spec)
+        if bad:
+            raise pspec.SpecError(f"sections {bad}: a {{{{ or {{% that is not a whole tag", source=str(SPEC_FILE))
+        _SPEC = spec
+    return _SPEC
+
+
+def prompt_text(section: str, tools: dict[str, Any], task: str = "", results: list[dict[str, str]] | None = None,
+                ask: str = "", mode: str = "verbatim") -> str:
+    """One prompt from the spec: ``once`` (the protocol), ``first``, ``turn`` (a host that resumes) or
+    ``turn_noresume`` (agy); ``results`` rows are {id, tool, text}."""
+    from rlo import pspec
+    return pspec.compile(plan_spec(), section, {"tools": spec_tools(tools), "task": task, "results": results or [],
+                                                "ask": ask}, mode)
+
+
+def spec_check(plan: Any, tools: dict[str, Any]) -> list[str]:
+    """The answer check from the same spec (rlo.pspec.check). check_plan stays the authority; this runs beside it."""
+    from rlo import pspec
+    return pspec.check(plan_spec(), plan, {"tools": tools})
+
+
 def protocol(cfg: GeminiConfig) -> str:
-    rows = "\n".join(f"- `{n}`: {t.get('about', '')}".rstrip(": ") for n, t in sorted(cfg.tools.items())) or "- (none)"
-    return (
-        "You are directing a controller. You do not call tools yourself. Answer every turn with exactly one JSON object "
-        "in a ```json fenced block, of this form:\n"
-        f'{{"schema": "{PLAN_SCHEMA}", "steps": [{{"id": "a", "tool": "<name>", "args": {{}}, "after": []}}], '
-        '"next": {"prompt": "<what you will do with the results>", "after": ["a"]} or null, "say": "<short note for the user>"}\n'
-        f"Rules: at most {MAX_PLAN_STEPS} steps; ids are short labels; `after` names earlier ids of the same answer; "
-        "steps without `after` between them run at once; `next` is your one next turn and gets the results of the steps "
-        "it lists; set `next` to null when the task is done.\n"
-        f"Tools (closed list):\n{rows}\n"
-    )
+    return prompt_text("once", cfg.tools)
+
+
+CONVERSATION_SCHEMA = "ga-gemini-conversation/1"
+
+
+def token_report(conv: dict[str, Any]) -> dict[str, Any]:
+    """S5, offline (no model call): the prompts of a recorded or labelled conversation —
+    {schema, label, source, tools, task, turns: [{results: [{id, tool, text}], ask, answer}]}, turn 0 the first —
+    compiled for each host type, tokens per turn (rlo.pspec estimate) in three columns: ``verbatim`` (today's text),
+    ``compact`` (every turn compact) and ``ga`` (what ga sends: the first turn verbatim, follow-ups compact). Each
+    turn's answer is checked by check_plan and by the same-spec check. Numbers and labels only, no text."""
+    from rlo import pspec
+    if conv.get("schema") != CONVERSATION_SCHEMA:
+        raise FormError([Problem("$.schema", f"must be {CONVERSATION_SCHEMA!r}")])
+    tools, task, turns = conv["tools"], conv["task"], conv["turns"]
+    out: dict[str, Any] = {"schema": "ga-gemini-token-report/1", "label": conv.get("label"),
+                           "source": conv.get("source"), "turns": len(turns), "estimate": "ceil(utf-8 bytes / 4)",
+                           "spec": plan_spec().name, "spec_digest": plan_spec().digest[:12], "hosts": {}}
+    for host, section in (("gemini_cli", "turn"), ("agy", "turn_noresume")):
+        cols: dict[str, list[str]] = {"verbatim": [], "compact": [], "ga": []}
+        for k, t in enumerate(turns):
+            for col in cols:
+                mode = "verbatim" if col == "verbatim" or (col == "ga" and k == 0) else "compact"
+                cols[col].append(prompt_text("first", tools, task, mode=mode) if k == 0 else
+                                 prompt_text(section, tools, task, t.get("results", []), t.get("ask", ""), mode))
+        rep = {c: pspec.token_report(texts) for c, texts in cols.items()}
+        v, c, ga = (rep[x]["estimate"] for x in ("verbatim", "compact", "ga"))
+        out["hosts"][host] = {
+            "per_turn": [{"turn": k, **{x: rep[x]["turns"][k]["estimate"] for x in cols}} for k in range(len(turns))],
+            "verbatim": v, "compact": c, "ga": ga,
+            "saved_compact_pct": round(100 * (1 - c / v), 1) if v else 0.0,
+            "saved_ga_pct": round(100 * (1 - ga / v), 1) if v else 0.0}
+    answers = [t.get("answer") for t in turns]
+    plan_ok = [not check_plan(a, tools) for a in answers]
+    spec_ok = [not spec_check(a, tools) for a in answers]
+    out["answers"] = {"n": len(answers), "check_plan_ok": sum(plan_ok), "spec_ok": sum(spec_ok),
+                      "agree": sum(p == q for p, q in zip(plan_ok, spec_ok))}
+    return out
 
 
 # ---- the supervisor -------------------------------------------------------------------------------------------------
@@ -483,17 +566,16 @@ class Supervisor:
         return text[: self.cfg.result_cap]
 
     def _prompt(self, rec: dict[str, Any]) -> str:
+        """The turn's prompt, compiled from the spec. The first turn is verbatim; a follow-up is ``turn`` on a host that
+        resumes (the protocol and the task are not sent again) or ``turn_noresume`` (agy, U: no --resume, so the
+        protocol and the task go with every turn), in the config's prompt_mode."""
         if rec.get("first"):
-            return protocol(self.cfg) + "\nTask:\n" + rec["prompt"]
-        if getattr(self.cli, "resumes", True):
-            lines = [f"Reply with one {PLAN_SCHEMA} JSON object, as before.", "Results:"]
-        else:  # a host without --resume (agy, U): every turn carries the protocol and the task again
-            first = next(s for s in self.st["steps"] if s.get("first"))
-            lines = [protocol(self.cfg), "Task:", first["prompt"], "", "Results:"]
-        for a in rec.get("needs", []):
-            t = self._rec(a)
-            lines.append(f"- {t['plan_id']} ({t['tool']}): {self._result_text(a)}")
-        return "\n".join(lines + ["", "Your next step: " + rec["prompt"]])
+            return prompt_text("first", self.cfg.tools, rec["prompt"])
+        first = next((s for s in self.st["steps"] if s.get("first")), {"prompt": ""})
+        results = [{"id": t["plan_id"], "tool": t["tool"], "text": self._result_text(a)}
+                   for a, t in ((a, self._rec(a)) for a in rec.get("needs", []))]
+        section = "turn" if getattr(self.cli, "resumes", True) else "turn_noresume"
+        return prompt_text(section, self.cfg.tools, first["prompt"], results, rec["prompt"], self.cfg.prompt_mode)
 
     def _call_tool(self, rec: dict[str, Any]) -> Any:
         t = self.cfg.tools[rec["tool"]]
@@ -545,8 +627,9 @@ class Supervisor:
                 self.say(f"[ga gemini] resumed {sid} after {waited:g} s")
                 self.log("resume", step=sid, waited_s=waited)
         from .adapters.gemini_cli import GeminiRateLimited, quota_body
+        prompt = self._prompt(rec)
         try:
-            turn = self.cli.run_turn(self._prompt(rec), self.st.get("session_id"), on_wait=self._turn_wait(sid),
+            turn = self.cli.run_turn(prompt, self.st.get("session_id"), on_wait=self._turn_wait(sid),
                                      wait_every_s=self.cfg.turn_status_s)
         except GeminiRateLimited as e:
             now = self.clock()
@@ -569,15 +652,20 @@ class Supervisor:
             self.log("turn", step=sid, ok=False, reason=e.reason, model=self.model)
             raise
         self.st["session_id"] = turn.session_id or self.st.get("session_id")
+        from rlo.pspec import tokens as est
         self.log("turn", step=sid, ok=True, served=turn.served, model=self.model, seconds=turn.seconds,
-                 tokens=turn.usage.get("total_tokens"))
+                 tokens=turn.usage.get("total_tokens"), input_tokens=turn.usage.get("input_tokens"),
+                 prompt_est=est(prompt), prompt_mode="verbatim" if rec.get("first") else self.cfg.prompt_mode)
         denied = list(getattr(turn, "denied", []) or [])
         if denied:  # agy refused tool calls inside the turn (V: denied_actions); reported, labels only
             self.say(f"[ga gemini] agy refused {len(denied)} action(s) in {sid}: {', '.join(denied[:8])}")
             self.log("denied", step=sid, count=len(denied), labels=sorted(set(denied))[:8])
         try:
             plan = extract_plan(turn.text)
-            probs = check_plan(plan, self.cfg.tools)
+            probs = check_plan(plan, self.cfg.tools)  # the authority
+            spec_probs = spec_check(plan, self.cfg.tools)  # CMD-GA26: the same-spec check, beside it; labels only
+            if bool(probs) != bool(spec_probs):
+                self.log("check_disagree", step=sid, check_plan_ok=not probs, spec_ok=not spec_probs)
             if probs:
                 raise PlanError(",".join(probs[:5]))
             self._extend(sid, plan)
@@ -707,7 +795,7 @@ class Supervisor:
                    "steps": [{"id": f"{task}.m1", "kind": "model", "first": True, "prompt": prompt, "after": []}],
                    "done": [], "failed": {}, "parked": {}, "say": ""}
         self.save()
-        self.log("task", task=task, model=self.model, host=self.host)
+        self.log("task", task=task, model=self.model, host=self.host, prompt_mode=self.cfg.prompt_mode)
         return self._execute()
 
     def resume(self) -> bool:
@@ -762,6 +850,18 @@ class Supervisor:
 # ---- `ga gemini` ----------------------------------------------------------------------------------------------------
 
 def main(args: Any) -> int:
+    if getattr(args, "token_report", None):  # offline, no config and no model call
+        try:
+            conv = json.loads(Path(args.token_report).read_text(encoding="utf-8"))
+            print(json.dumps(token_report(conv), indent=1, sort_keys=True))
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            print(f"token report: cannot read {args.token_report}: {type(e).__name__}", file=sys.stderr)
+            return 2
+        except FormError as e:
+            for p in e.problems:
+                print(f"token report: {p}", file=sys.stderr)
+            return 2
+        return 0
     try:
         cfg = load_config(args.gemini_config)
     except FormError as e:
@@ -770,6 +870,8 @@ def main(args: Any) -> int:
         return 2
     if getattr(args, "host", None):
         cfg.host = args.host
+    if getattr(args, "prompt_mode", None):
+        cfg.prompt_mode = args.prompt_mode
     sup = Supervisor(cfg)
     try:
         if args.resume:
