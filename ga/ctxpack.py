@@ -36,7 +36,7 @@ class CtxPackError(ValueError):
 
 
 def tokens(text: str) -> int:
-    """Offline estimate, the same as rlo.pspec.tokens (rlo-sdk 0.10.0): ceil(utf-8 bytes / 4). ga core stays stdlib."""
+    """Offline estimate, the same as rlo.pspec.tokens (rlo-sdk 0.11.0): ceil(utf-8 bytes / 4). ga core stays stdlib."""
     return math.ceil(len(text.encode("utf-8")) / 4)
 
 

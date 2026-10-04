@@ -2,7 +2,7 @@
 
 - The prompt goes in on stdin; ``--output-format json`` gives the end of the turn, the session id and the cost.
 - The next turn of the same session continues with ``--resume <session id>`` -- unless the turn is fresh
-  (CMD-GA29 S1): then there is never a ``--resume``, and the context-budget/1 hook (rlo-sdk 0.10.0) goes into this
+  (CMD-GA29 S1): then there is never a ``--resume``, and the context-budget/1 hook (rlo-sdk 0.11.0) goes into this
   turn's settings when ``context_budget`` is set -- only in the runner's own per-session directory.
 - The child runs in a clean environment: only PATH, locale, proxy / CA variables and ANTHROPIC_BASE_URL are
   passed (plus ``extra_env``). HOME and CLAUDE_CONFIG_DIR point at the runner's own directory, never at the

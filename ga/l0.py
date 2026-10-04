@@ -1,7 +1,7 @@
 """One Telemetry L0 record per session turn (CMD-GA29 S3): a ``run.end`` event in the l0-telemetry/1 envelope.
 
 ga core stays standard library only, so the envelope is written here by hand; tests check it with
-``telemetry.event.check`` (l0-telemetry, pinned through rlo-sdk 0.10.0). Only what the runner reported goes in:
+``telemetry.event.check`` (l0-telemetry, pinned through rlo-sdk 0.11.0). Only what the runner reported goes in:
 a field it did not give is null and listed in ``unobserved`` (never 0).
 """
 from __future__ import annotations

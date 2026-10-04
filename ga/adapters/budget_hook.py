@@ -1,4 +1,4 @@
-"""PreToolUse hook: the context-budget/1 backstop of a fresh turn (CMD-GA29 S4) -- rlo-sdk 0.10.0 ``rlo.ctxbudget``.
+"""PreToolUse hook: the context-budget/1 backstop of a fresh turn (CMD-GA29 S4) -- rlo-sdk 0.11.0 ``rlo.ctxbudget``.
 
 The headless Runner writes it only into the turn's own settings file in its per-session directory (HOME /
 CLAUDE_CONFIG_DIR of that session), never into a person's ``~/.claude`` or another session's.
@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None, stdin=None, stdout=None) -> int:
     try:
         data = json.loads(stdin.read() or "{}")
         rec.update(tool_name=data.get("tool_name"), tool_use_id=data.get("tool_use_id"))
-        from rlo import ctxbudget as CB  # rlo-sdk 0.10.0 (ga/_pins.py)
+        from rlo import ctxbudget as CB  # rlo-sdk 0.11.0 (ga/_pins.py)
 
         b = CB.Budget(a.soft, a.hard, tuple(a.state or ["STATE.md"]), a.mode)
         ctx = CB.context_tokens(data["transcript_path"]) if data.get("transcript_path") else None
