@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Iterable
 
 from . import sandbox
+from ..net import checkpoint
 from .base import TurnRequest, TurnResult
 
 KEEP_ENV = (
@@ -179,9 +180,14 @@ class HeadlessRunner:
         if sandboxed:
             writable = list(req.permissions.get("writable", [])) + [self.session_home(req.session)]
             argv = sandbox.wrap(argv, protect, writable)
+        log = self.budget_log(req.session)
+        before = checkpoint.log_size(log)
         call = run_claude(argv, req.prompt, Path(req.workdir), env, self.timeout)
         data = call.data or {}
+        # CMD-GA31 S4: an enforced stop at the hard budget in this turn is a checkpoint, not a failure
+        stop = checkpoint.budget_stop(log, before) if req.fresh and self.context_budget else ""
         return TurnResult(ended=True, session_id=call.session_id, cost=call.cost, error=call.error, seconds=call.seconds,
+                          stop=stop,
                           note=f"num_turns {data.get('num_turns')}" if "num_turns" in data else call.note, sandboxed=sandboxed,
                           usage=usage_of(data), model=served_model(data),
                           answer=data["result"] if isinstance(data.get("result"), str) else None,

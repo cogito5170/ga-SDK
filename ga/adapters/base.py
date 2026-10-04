@@ -49,6 +49,8 @@ class TurnResult:
     model: str | None = None  # the served model(s), from the runner's own result
     answer: str | None = None  # the turn's final answer text (fresh mode reads its report and state from it)
     raw: dict[str, Any] | None = None  # the runner's result JSON (numbers and ids; the answer is in ``answer``)
+    # CMD-GA31 S4: "budget_checkpoint" = the context budget stopped the turn (a checkpoint, not a failure); "" = no stop
+    stop: str = ""
 
 
 class Runner(Protocol):

@@ -124,6 +124,9 @@ def cmd_post(args) -> int:
         head, _, notes = parse_post(text)
         if head.get("schema") not in ("report/1", "report/2"):
             raise FormError([Problem("$.schema", f"a session posts report/2 (or report/1), not {head.get('schema')!r}")])
+        from .net import is_peer_form
+        if is_peer_form(text):  # CMD-GA31 S6
+            raise FormError([Problem("$", "a peer message (```peer block) never goes on a hub channel")])
     except FormError as e:
         print(f"not a valid report/2 or report/1: {e}", file=sys.stderr)
         return 2
@@ -335,6 +338,58 @@ def cmd_supervise(args) -> int:
     return gemini.supervise_main(args)
 
 
+def _ga_dir(args, cfg) -> Path:
+    return Path(args.ga_dir).resolve() if args.ga_dir else Path(args.config).resolve().parent / ".ga"
+
+
+def cmd_node(args) -> int:
+    """ga node step ME (CMD-GA31 S1): one step of a peer node; prints the step's summary (one JSON line)."""
+    from .net import PeerModeOff
+    from .net.node import Node
+    from .net.router import ConfigError
+    cfg = gacfg.load(args.config)
+    try:
+        out = Node(cfg, args.me, ga_dir=_ga_dir(args, cfg)).step()
+    except (PeerModeOff, ConfigError) as e:
+        print(f"ga node: {e}", file=sys.stderr)
+        return 2
+    print(json.dumps(out, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
+def cmd_run(args) -> int:
+    """ga run --every S [--steps N] (CMD-GA31 S5): the always-on runner with only git, local CLIs and HTTP backends.
+    Peer mode steps every node; hub mode runs ga tick (unchanged). From cron: --steps 1."""
+    from .net import PeerModeOff
+    from .net.node import run_loop
+    from .net.router import ConfigError
+    cfg = gacfg.load(args.config)
+    tick = None if cfg.peer_mode else (lambda: _hub(args).tick(dry_run=False))
+    try:
+        for r in run_loop(cfg, _ga_dir(args, cfg), every=args.every, steps=args.steps, nodes=args.node or None, tick=tick):
+            print(json.dumps(r, ensure_ascii=False, sort_keys=True, default=str))
+            sys.stdout.flush()
+    except (PeerModeOff, ConfigError) as e:
+        print(f"ga run: {e}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def cmd_usage(args) -> int:
+    """ga usage (CMD-GA31 S5): tokmon's alarms (ctx · burst · growth) from .ga's own L0; no session API."""
+    from .net import usage
+    ga_dir = Path(args.ga_dir).resolve() if args.ga_dir else Path(args.config).resolve().parent / ".ga"
+    cur, alarms = usage.run(ga_dir, Path(args.state) if args.state else None, ctx_max=args.ctx_max,
+                            read_max=args.read_max, ctx_grow=args.ctx_grow)
+    if args.json:
+        print(json.dumps({"readings": {n: {k: v for k, v in r.items() if k != "over"} for n, r in cur.items()},
+                          "alarms": alarms}, sort_keys=True))
+    else:
+        for a in alarms:
+            print(a)
+    return 1 if alarms and args.fail else 0
+
+
 RLO_CLI = "ga.rlo.cli"
 
 
@@ -444,6 +499,18 @@ def main(argv: list[str] | None = None) -> int:
         else:
             m.add_argument("--json", action="store_true")
         m.set_defaults(fn=cmd_mail)
+    p = sub.add_parser("node", help="a peer node (CMD-GA31; peer mode only)")
+    nsub = p.add_subparsers(dest="node_cmd", required=True)
+    n = nsub.add_parser("step", help="one step: inbox -> rules -> decide -> at most one fresh turn -> ga mail")
+    n.add_argument("me"); n.set_defaults(fn=cmd_node)
+    p = sub.add_parser("run", help="the always-on runner: every node (peer mode) or ga tick (hub mode) every S seconds")
+    p.add_argument("--every", type=float, required=True); p.add_argument("--steps", type=int)
+    p.add_argument("--node", action="append", help="only these nodes (peer mode)"); p.set_defaults(fn=cmd_run)
+    p = sub.add_parser("usage", help="tokmon alarms (ctx, burst, growth) from .ga's L0, no session API (CMD-GA31 S5)")
+    p.add_argument("--state"); p.add_argument("--ctx-max", type=int, default=150000)
+    p.add_argument("--read-max", type=int, default=20000000); p.add_argument("--ctx-grow", type=int, default=50000)
+    p.add_argument("--json", action="store_true"); p.add_argument("--fail", action="store_true", help="exit 1 on an alarm")
+    p.set_defaults(fn=cmd_usage)
     sub.add_parser("rlo", add_help=False, help="rlo Autonomy commands (ga.rlo, owned by GR)")  # listed here, run above
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
