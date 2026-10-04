@@ -20,4 +20,11 @@ Directive: fresh claude -p per turn + ctxpack/1 + state file + cursor + usage/L0
 - [x] ctxpack
 - [x] runner + hub fresh mode + tests/test_ga29.py (15 tests, 10/10 mutations killed: results/ga29/mutations.json)
 - [x] S5 runs: 15/30 claude -p used; results/ga29/table.md (resume, fresh, fresh-small all pass; attempts 1-3 kept)
-- [ ] report + notify
+- [x] D3: empty venv install at 0e414e4 pip check clean; fresh clone 496 tests OK (skip 1) with proxies pointed at 127.0.0.1:9
+- [x] report/2 on baseline#12 + notify/1 to baseline (after this commit; this commit is the one the report claims)
+
+## Results (S5, haiku, results/ga29/table.md)
+resume 1,138,767 read / max ctx 40,053 / $0.405 · fresh 1,118,889 / 32,566 / $0.238 · fresh-small 820,561 / 22,160 / $0.190; all pass.
+Resume's first-call context grows per turn (23.3k -> 29.2k -> 34.6k); fresh stays ~23-24k; fresh-small ~14k.
+Open: fresh totals are close to resume here because only 3 short turns and fresh made more calls (41 vs 36); the
+fixed CLI system prompt + tool schemas (~14-23k per call) dominate, and they also accumulate *within* one claude -p.
