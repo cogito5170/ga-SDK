@@ -1,0 +1,27 @@
+{
+ "variant": "fresh",
+ "turns": 3,
+ "claude_p_runs": 3,
+ "model_calls": 38,
+ "tool_calls": 37,
+ "tokens_read_calls": 1009898,
+ "max_context_per_call": 31681,
+ "output_tokens_calls": 10485,
+ "tokens_read_reported": 1009898,
+ "output_tokens_reported": 10485,
+ "cost_usd": 0.216629,
+ "served_models": [
+  "claude-haiku-4-5-20251001"
+ ],
+ "turn_errors": [
+  "",
+  "",
+  ""
+ ],
+ "integrated_each_turn": [
+  true,
+  true,
+  true
+ ],
+ "passed_checks": true
+}

@@ -1,0 +1,27 @@
+{
+ "variant": "resume",
+ "turns": 3,
+ "claude_p_runs": 3,
+ "model_calls": 67,
+ "tool_calls": 64,
+ "tokens_read_calls": 2662494,
+ "max_context_per_call": 57835,
+ "output_tokens_calls": 17734,
+ "tokens_read_reported": 2662494,
+ "output_tokens_reported": 17734,
+ "cost_usd": 0.934179,
+ "served_models": [
+  "claude-haiku-4-5-20251001"
+ ],
+ "turn_errors": [
+  "",
+  "",
+  ""
+ ],
+ "integrated_each_turn": [
+  false,
+  false,
+  false
+ ],
+ "passed_checks": false
+}

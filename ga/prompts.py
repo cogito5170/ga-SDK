@@ -205,7 +205,11 @@ def fresh_instructions(cfg: Config, session: str, directive: dict | None = None)
         "```ga",
         json.dumps(head, ensure_ascii=False),
         "```",
-        "2. One ```state block: what is done, what is next, and anything the next turn must know (it has no other memory). "
-        f"At most {s.state_max_tokens * 4} bytes.",
+        "2. Then end the answer with exactly one fenced block whose info string is `state` (not a `## State` heading): "
+        "what is done, what is next, and anything the next turn must know (it has no other memory). "
+        f"At most {s.state_max_tokens * 4} bytes. Like this:",
+        "```state",
+        "done: ... / next: ... / notes: ...",
+        "```",
         "",
     ])

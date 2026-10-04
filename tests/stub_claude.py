@@ -56,6 +56,9 @@ elif do == "reply":
            "total_cost_usd": step.get("cost", 0.004), "num_turns": 1}
     if "structured" in step:
         out["structured_output"] = step["structured"]
+    for k in ("usage", "modelUsage"):  # CMD-GA29: token usage and the served model, as claude -p gives them
+        if k in step:
+            out[k] = step[k]
     print(json.dumps(out, ensure_ascii=False))
 elif do == "cmd":
     p = subprocess.run(step["argv"], cwd=os.getcwd(), capture_output=True, text=True)

@@ -17,7 +17,7 @@ Directive: fresh claude -p per turn + ctxpack/1 + state file + cursor + usage/L0
 
 ## Progress
 - [x] pin d190d95 / version 0.2.0 (481 old tests OK in venv /home/user/venv29)
-- [x] ctxpack (tests todo)
-- [x] runner + hub fresh mode (tests todo: tests/test_ga29.py)
-- [ ] S5 runs (claude -p used: 0/30)
+- [x] ctxpack
+- [x] runner + hub fresh mode + tests/test_ga29.py (15 tests, 10/10 mutations killed: results/ga29/mutations.json)
+- [x] S5 runs: 15/30 claude -p used; results/ga29/table.md (resume, fresh, fresh-small all pass; attempts 1-3 kept)
 - [ ] report + notify

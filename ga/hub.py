@@ -350,7 +350,7 @@ class Hub:
         """S2: the context pack for this turn + the fixed instructions. -> (pack, prompt, last post id shown)."""
         s = self.cfg.sessions[to]
         cur = st.setdefault("ctx", {}).setdefault(to, {}).get("cursor")
-        posts = self.channel.read(s.channel or to, cur)
+        posts = self.channel.read(to, cur)
         inbox = [ctxpack.header_line(p.id, p.author, p.text) for p in posts if p.id != post.id]
         shown = posts[-1].id if posts else cur
         sf = self.state_file(to)
@@ -380,7 +380,7 @@ class Hub:
         if leaks:
             return "the answer holds a secret pattern"
         try:
-            p = self.channel.post(s.channel or to, to, ans.report)
+            p = self.channel.post(to, to, ans.report)
         except Exception as e:  # not posted: the cursor and the state file stay where they were
             return f"post failed: {type(e).__name__}"
         self._writes += 1
