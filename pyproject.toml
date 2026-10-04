@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ga-sdk"
-version = "0.3.0"
+version = "0.4.0"
 description = "Hub loop SDK: directive / report / verdict forms, integration, rules, gates, records"
 requires-python = ">=3.10"
 # the source of these pins is ga/_pins.py; this list must say the same (tests/test_pins.py)
