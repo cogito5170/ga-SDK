@@ -91,6 +91,8 @@ class Judgement:
     base: str = ""
     report_ref: str = ""
     directive: str = ""
+    failing: list[str] = field(default_factory=list)      # tests that fail on the report's sha and not on the base head
+    preexisting: list[str] = field(default_factory=list)  # tests that fail on the report's sha and also on the base head
 
     def worse(self, cls: str, cause: str, sub: str | None = None) -> None:
         if RANK[cls] > RANK[self.cls]:
@@ -135,6 +137,32 @@ def parse_counts(out: str) -> dict[str, int] | None:
         return {"passed": c.get("passed", 0), "failed": c.get("failed", 0) + c.get("error", 0) + c.get("errors", 0),
                 "skipped": c.get("skipped", 0)}
     return None
+
+
+_UT_RE = re.compile(r"^(?:FAIL|ERROR): (\S.*?)(?: \(\w+=.*\))?\s*$", re.M)
+_PT_RE = re.compile(r"^(?:FAILED|ERROR) (\S+?::\S+|\S+\.py)(?: - .*)?$", re.M)
+
+
+def failing_tests(out: str) -> list[str]:
+    """The ids of the failing or erroring tests in a unittest or pytest run, sorted, each once. unittest: the dotted id
+    in "FAIL: test_x (pkg.mod.Class.test_x)" (a subtest suffix is dropped); pytest: the node id in the short summary."""
+    ids: set[str] = set()
+    for m in _UT_RE.finditer(out):
+        t = m[1]
+        inner = re.search(r"\(([\w.]+)\)$", t)
+        ids.add(inner[1] if inner else t)
+    for m in _PT_RE.finditer(out):
+        ids.add(m[1])
+    return sorted(ids)
+
+
+def split_failures(head: list[str], base: list[str], head_failed: int) -> tuple[list[str], list[str], int]:
+    """(new, pre-existing, unnamed): a head failure is pre-existing only when the base head fails the same test by name.
+    Failures the output counts but does not name cannot be matched, so they count as new."""
+    base_set = set(base)
+    new = [t for t in head if t not in base_set]
+    pre = [t for t in head if t in base_set]
+    return new, pre, max(head_failed - len(head), 0)
 
 
 # ---- the pieces
@@ -310,14 +338,14 @@ def judge(report: str, repo: str | Path, base: str, *, mutations: str | None = N
 
     work = Path(tempfile.mkdtemp(prefix="ga-judge-"))
     try:
-        _measure(j, cfg, repo, sha, head, work, mutations, k)
+        _measure(j, cfg, repo, sha, head, work, mutations, k, git(repo, "rev-parse", f"{base_ref}^{{commit}}").stdout.strip())
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return j
 
 
 def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict[str, Any], work: Path,
-             mutations: str | None, k: int) -> None:
+             mutations: str | None, k: int, base_sha: str = "") -> None:
     timeout = cfg.get("timeout", 1800)
     # a private bare copy that holds the sha on a ref, so pip and the clone can reach it without touching the repo
     src = work / "src.git"
@@ -372,12 +400,12 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
     guard = work / "guard"
     guard.mkdir()
     (guard / "sitecustomize.py").write_text(_GUARD, encoding="utf-8")
-    env = make_env(guard, [str(clone / x) for x in cfg.get("pythonpath", [])])
     py = vpy if installed else sys.executable
 
-    def run_tests(argv: list[str]) -> tuple[subprocess.CompletedProcess, str]:
+    def run_tests(argv: list[str], cwd: Path = clone) -> tuple[subprocess.CompletedProcess, str]:
         wrapped, how = netless(expand(argv, py))
-        return run(wrapped, cwd=clone, env=env, timeout=timeout), how
+        env_here = make_env(guard, [str(cwd / x) for x in cfg.get("pythonpath", [])])
+        return run(wrapped, cwd=cwd, env=env_here, timeout=timeout), how
 
     p, how = run_tests(cfg["test"])
     counts = parse_counts(p.stdout + "\n" + p.stderr)
@@ -389,7 +417,21 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
         j.tests[j.repo] = counts
         j.notes.append(f"tests: {counts['passed']} passed, {counts['failed']} failed, {counts['skipped']} skipped (exit {p.returncode})")
         if counts["failed"] or p.returncode:
-            j.worse("failure", "implementation")
+            names = failing_tests(p.stdout + "\n" + p.stderr)
+            base_names: list[str] = []
+            if base_sha and names:
+                base_names = _base_failures(j, cfg, repo, src, base_sha, work, run_tests)
+            new, pre, unnamed = split_failures(names, base_names, counts["failed"])
+            j.failing, j.preexisting = new, pre
+            if new:
+                j.notes.append("failing tests (new): " + ", ".join(new[:20]) + (f" (+{len(new) - 20} more)" if len(new) > 20 else ""))
+            if pre:
+                j.notes.append(f"failing tests (pre-existing, also red on base {base_sha[:7]}; not caused by the report): "
+                               + ", ".join(pre[:20]) + (f" (+{len(pre) - 20} more)" if len(pre) > 20 else ""))
+            if unnamed:
+                j.notes.append(f"{unnamed} failure(s) the output counts but does not name: counted as new")
+            if new or unnamed or not names:  # no name at all (a crash, an unknown runner): nothing to excuse
+                j.worse("failure", "implementation")
         want = head.get("tests")
         if isinstance(want, dict):
             diff = [f"{k} claimed {want[k]}, measured {counts[k]}" for k in ("passed", "failed", "skipped")
@@ -438,7 +480,33 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
             j.needs.append(f"mutation {label} survived: tests {' '.join(mu['tests'])} do not cover it")
 
 
+def _base_failures(j: Judgement, cfg: dict[str, Any], repo: Path, src: Path, base_sha: str, work: Path, run_tests) -> list[str]:
+    """The tests that fail on the base head: the same suite, the same venv and guards, a clone of the base sha."""
+    if git(src, "fetch", "--quiet", str(repo), base_sha).returncode:
+        j.notes.append(f"base {base_sha[:7]} not fetchable: failures not compared")
+        return []
+    bclone = work / "baseclone"
+    git(work, "clone", "--quiet", "--no-checkout", str(src), str(bclone), check=True)
+    git(bclone, "checkout", "--quiet", "--detach", base_sha, check=True)
+    p, _ = run_tests(cfg["test"], bclone)
+    names = failing_tests(p.stdout + "\n" + p.stderr)
+    j.notes.append(f"base {base_sha[:7]} run: {len(names)} failing test(s) named")
+    return names
+
+
 # ---- output
+
+def template(directive: str, rev: int = 1) -> str:
+    """S3: a valid report/2 head skeleton for directive ``directive``, for a session that cannot install ga: fill the
+    placeholders, keep the shape. It passes ``ga check`` as printed."""
+    if not re.match(r"^[A-Za-z][A-Za-z0-9_.-]*$", directive or ""):
+        raise JudgeError(f"--template needs a directive id like CMD-GA32, got {directive!r}")
+    head = {"schema": "report/2", "from": "GA", "handled": [{"id": directive, "rev_seen": rev, "status": "done"}],
+            "commits": [{"repo": "owner/repo", "branch": "branch", "sha": "0" * 40}],
+            "tests": {"passed": 0, "failed": 0, "skipped": 0}, "change_size": "interface",
+            "items": [{"id": "D1", "state": "met", "evidence": ["what you ran and what it showed"]}]}
+    return dump_wire(head)
+
 
 def verdict_head(j: Judgement) -> dict[str, Any]:
     nxt = {"success": ("continue", "measured clean"), "partial": ("refine", "open items"),

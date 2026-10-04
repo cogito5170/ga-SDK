@@ -237,6 +237,16 @@ def cmd_notify(args) -> int:
 def cmd_judge(args) -> int:
     """CMD-GA30: measure a report, print the verdict/1 draft, the needs_judgement list and the two record lines."""
     from . import judge
+    if args.template:
+        try:
+            sys.stdout.write(judge.template(args.template))
+        except judge.JudgeError as e:
+            print(f"ga judge: {e}", file=sys.stderr)
+            return 2
+        return 0
+    if not (args.report and args.repo and args.base):
+        print("ga judge: --report, --repo and --base are required (or --template <CMD>)", file=sys.stderr)
+        return 2
     try:
         j = judge.judge(args.report, args.repo, args.base, mutations=args.mutations, seed=args.seed, k=args.k,
                         config=args.judge_config, remote=args.remote)
@@ -470,8 +480,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--wire", action="store_true", help="print the posted form: one minified ga block and the footer (GA27 S1)")
     p.set_defaults(fn=cmd_notify)
     p = sub.add_parser("judge", help="deterministic verdict draft for a report: checks, install, tests, mutations (CMD-GA30)")
-    p.add_argument("--report", required=True, help="a file, or <repo>@<sha>:<path> read from --repo")
-    p.add_argument("--repo", required=True, help="local clone of the repository"); p.add_argument("--base", required=True, help="integration branch")
+    p.add_argument("--report", help="a file, or <repo>@<sha>:<path> read from --repo")
+    p.add_argument("--repo", help="local clone of the repository"); p.add_argument("--base", help="integration branch")
+    p.add_argument("--template", metavar="CMD", help="print a valid report/2 head skeleton for directive CMD and exit (no install needed)")
     p.add_argument("--mutations", help="mutation spec (JSON list of {file, find, replace, tests})")
     p.add_argument("--seed", type=int, help="mutation pick seed (default random; always printed)"); p.add_argument("--k", type=int, default=1)
     p.add_argument("--judge-config", help="per-repo judge config (default <repo>/.ga-judge.json)"); p.add_argument("--remote", default="origin")

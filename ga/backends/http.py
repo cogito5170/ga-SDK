@@ -19,6 +19,7 @@ from .catalog import CATALOG
 from .base import API_VERSION, BackendError, BackendTurn, ConfigError, check_served, rate_limited
 
 Transport = Callable[[str, dict[str, str], bytes, float], tuple[int, dict[str, str], bytes]]
+EFFORTS = ("low", "medium", "high", "xhigh", "max")  # Messages API output_config.effort
 ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]{0,63}$")
 
 
@@ -42,10 +43,11 @@ class HttpRunner:
     max_tokens = 4096
 
     def __init__(self, model: str, base_url: str, key_env: str | None, *, timeout_s: float = 600.0,
-                 transport: Transport | None = None, max_tokens: int | None = None):
+                 transport: Transport | None = None, max_tokens: int | None = None, effort: str | None = None):
         self.model, self.base_url, self.key_env, self.timeout_s = model, base_url.rstrip("/"), key_env, timeout_s
         self.transport = transport or httpx_transport
         self.max_tokens = max_tokens or self.max_tokens
+        self.effort = effort
 
     def _key(self) -> str | None:
         if self.key_env is None:
@@ -113,6 +115,8 @@ class AnthropicRunner(HttpRunner):
                    **({"x-api-key": key} if key else {})}
         body = {"model": self.model, "max_tokens": self.max_tokens, "system": system,
                 "messages": [{"role": "user", "content": prompt}]}
+        if self.effort:
+            body["output_config"] = {"effort": self.effort}  # the Messages API effort knob
         return f"{self.base_url}/v1/messages", headers, body
 
     def parse(self, data: dict[str, Any]) -> tuple[str, list[str], dict[str, Any] | None]:
@@ -128,11 +132,12 @@ class _Http:
     api, version = API_VERSION, "1"
     runner: type = HttpRunner
     default_url = ""
+    knobs: tuple = ()  # options beyond the common three
     overhead = {"bare": True, "tokens": 0, "source": "documented: the request body is the system text and one user "
                 "message, no tools; the provider's own message framing is not counted", "closest": "bare"}
 
     def create(self, model: str, options: dict[str, Any], ctx: dict[str, Any]) -> HttpRunner:
-        extra = sorted(set(options) - {"base_url", "key_env", "max_tokens"})
+        extra = sorted(set(options) - {"base_url", "key_env", "max_tokens", *self.knobs})
         if extra:
             raise ConfigError(f"{self.name}: unknown option(s) {', '.join(extra)}")
         key_env = options.get("key_env")
@@ -144,8 +149,13 @@ class _Http:
         mt = options.get("max_tokens")
         if mt is not None and not (isinstance(mt, int) and not isinstance(mt, bool) and mt > 0):
             raise ConfigError(f"{self.name}: options.max_tokens must be a positive integer")
+        kw = {}
+        if "effort" in self.knobs and options.get("effort") is not None:
+            if options["effort"] not in EFFORTS:
+                raise ConfigError(f"{self.name}: options.effort must be one of {', '.join(EFFORTS)}")
+            kw["effort"] = options["effort"]
         return self.runner(model, url, key_env, timeout_s=ctx.get("timeout_s", 600.0), transport=ctx.get("transport"),
-                           max_tokens=mt)
+                           max_tokens=mt, **kw)
 
 
 class _OpenAIHttp(_Http):
@@ -156,6 +166,7 @@ class _OpenAIHttp(_Http):
 class _AnthropicHttp(_Http):
     catalog = CATALOG['anthropic_http']  # CMD-GA31 S3: what the router may pick
     name, runner, default_url = "anthropic_http", AnthropicRunner, "https://api.anthropic.com"
+    knobs = ("effort",)
 
 
 OPENAI_HTTP = _OpenAIHttp()
