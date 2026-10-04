@@ -221,10 +221,18 @@ def make_env(guard_dir: Path, pythonpath: list[str]) -> dict[str, str]:
     return env
 
 
+_LO_UP = ("import fcntl,os,socket,struct,sys\n"
+          "s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)\n"
+          "r=fcntl.ioctl(s,0x8913,struct.pack('16sH14x',b'lo',0))\n"  # SIOCGIFFLAGS
+          "f=struct.unpack('16sH14x',r)[1]|1\n"  # IFF_UP
+          "fcntl.ioctl(s,0x8914,struct.pack('16sH14x',b'lo',f))\n"  # SIOCSIFFLAGS
+          "os.execvp(sys.argv[1],sys.argv[1:])\n")
+
+
 def netless(argv: list[str]) -> tuple[list[str], str]:
-    """argv wrapped in a network namespace when `unshare -rn` works here; the loopback-only guard is always on."""
-    if shutil.which("unshare") and run(["unshare", "-rn", "true"]).returncode == 0:
-        return ["unshare", "-rn", *argv], "unshare -rn + socket guard"
+    """argv wrapped in a network namespace (loopback up) when `unshare -rn` works here; the loopback-only guard is always on."""
+    if shutil.which("unshare") and run(["unshare", "-rn", sys.executable, "-c", _LO_UP, "true"]).returncode == 0:
+        return ["unshare", "-rn", sys.executable, "-c", _LO_UP, *argv], "unshare -rn (loopback up) + socket guard"
     return argv, "socket guard (no unshare)"
 
 

@@ -52,6 +52,13 @@ class T(unittest.TestCase):
     def test_skip(self):
         pass
 
+    def test_loopback_still_works(self):
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen()
+        socket.create_connection(srv.getsockname(), timeout=1).close()
+        srv.close()
+
     def test_network_is_blocked(self):
         with self.assertRaises(OSError):
             socket.create_connection(("192.0.2.1", 80), timeout=1)
@@ -133,9 +140,9 @@ class JudgeTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_green_is_a_success_candidate_with_recorded_seed_and_blocked_network(self):
-        j = self.w.judge(self.green, {"passed": 3, "failed": 0, "skipped": 1}, results=[{"name": "version:fakepkg", "value": "1.1"}])
+        j = self.w.judge(self.green, {"passed": 4, "failed": 0, "skipped": 1}, results=[{"name": "version:fakepkg", "value": "1.1"}])
         self.assertEqual((j.cls, j.needs), ("success", []), j.notes)
-        self.assertEqual(j.tests["o/fakepkg"], {"passed": 3, "failed": 0, "skipped": 1})
+        self.assertEqual(j.tests["o/fakepkg"], {"passed": 4, "failed": 0, "skipped": 1})
         notes = " ".join(j.notes)
         self.assertIn("mutation seed 7", notes)
         self.assertIn("killed", notes)
@@ -220,7 +227,7 @@ class JudgeTest(unittest.TestCase):
         with self.assertRaises(J.JudgeError):
             J.apply(dirty, self.w.repo)
         self.assertNotEqual(sh("git", "-C", str(self.w.origin), "rev-parse", "main"), self.green)
-        clean = self.w.judge(self.green, {"passed": 3, "failed": 0, "skipped": 1})
+        clean = self.w.judge(self.green, {"passed": 4, "failed": 0, "skipped": 1})
         self.assertTrue(clean.clean, (clean.cls, clean.needs))
         try:
             J.apply(clean, self.w.repo)
