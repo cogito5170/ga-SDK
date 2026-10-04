@@ -14,6 +14,15 @@ dependencies = [
 
 [project.optional-dependencies]
 agent = ["claude-agent-sdk>=0.2"]
+http = ["httpx>=0.25"]  # openai_http · anthropic_http (CMD-GA28); the other backends need nothing more
+
+[project.entry-points."ga.backends"]  # the built-ins load through the same path as an installed plugin (agv first)
+agv = "ga.backends.builtin:AGV"
+gemini_cli = "ga.backends.builtin:GEMINI_CLI"
+claude_cli = "ga.backends.builtin:CLAUDE_CLI"
+codex_cli = "ga.backends.builtin:CODEX_CLI"
+openai_http = "ga.backends.http:OPENAI_HTTP"
+anthropic_http = "ga.backends.http:ANTHROPIC_HTTP"
 
 [project.scripts]
 ga = "ga.__main__:main"
@@ -22,4 +31,4 @@ ga = "ga.__main__:main"
 include = ["ga*"]
 
 [tool.setuptools.package-data]
-ga = ["specs/*.pspec", "specs/forms/*.pspec"]  # ga gemini's prompt spec (GA26), the form specs (GA27)
+ga = ["specs/*.pspec", "specs/forms/*.pspec"]  # the supervisor's prompt spec (GA26, GA28), the form specs (GA27)

@@ -31,7 +31,7 @@ row = {"kind": "usage" if prompt.strip() == "/usage" else "turn", "model": opt("
        "format": opt("--output-format"), "cwd": os.getcwd(), "pid": os.getpid(),
        "stdin_eof": (sys.stdin.read() == "") if not sys.stdin.isatty() else False,
        "credits_arg": any("credit" in a.lower() for a in argv), "resume_arg": "--resume" in argv,
-       "has_task": "Task:" in prompt, "has_protocol": "ga-gemini-plan/1" in prompt, "has_results": "Results:" in prompt}
+       "has_task": "Task:" in prompt, "has_protocol": "ga-gemini-plan/1" in prompt or "ga-plan/1" in prompt, "has_results": "Results:" in prompt}
 with open(calls, "a") as f:
     f.write(json.dumps(row) + "\n")
 if row["kind"] == "usage":

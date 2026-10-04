@@ -2,13 +2,13 @@
  "cases": [
   {
    "kind": "protocol",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n",
    "tools": "six"
   },
   {
    "kind": "first",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
    "tools": "six"
   },
   {
@@ -24,7 +24,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -40,7 +40,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -56,7 +56,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -72,7 +72,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -88,7 +88,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -104,7 +104,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -120,7 +120,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -136,13 +136,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
    "kind": "first",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
    "tools": "six"
   },
   {
@@ -158,7 +158,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -174,7 +174,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -190,7 +190,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -206,7 +206,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -222,7 +222,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -238,7 +238,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -254,7 +254,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -270,13 +270,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
    "kind": "first",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃",
    "tools": "six"
   },
   {
@@ -292,7 +292,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -308,7 +308,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -324,7 +324,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -340,7 +340,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -356,7 +356,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -372,7 +372,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
@@ -388,7 +388,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "six"
   },
   {
@@ -404,18 +404,18 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `fetch_url`: fetch a url as text\n- `list_dir`: list a directory\n- `noop`\n- `read_file`: read a file from the workspace\n- `search`: search the web; returns titles and urls\n- `write_note`: append a note to the user's notes\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "six"
   },
   {
    "kind": "protocol",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n",
    "tools": "none"
   },
   {
    "kind": "first",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
    "tools": "none"
   },
   {
@@ -431,7 +431,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -447,7 +447,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -463,7 +463,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -479,7 +479,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -495,7 +495,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -511,7 +511,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -527,7 +527,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -543,13 +543,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
    "kind": "first",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
    "tools": "none"
   },
   {
@@ -565,7 +565,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -581,7 +581,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -597,7 +597,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -613,7 +613,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -629,7 +629,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -645,7 +645,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -661,7 +661,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -677,13 +677,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
    "kind": "first",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃",
    "tools": "none"
   },
   {
@@ -699,7 +699,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -715,7 +715,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -731,7 +731,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -747,7 +747,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -763,7 +763,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -779,7 +779,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
@@ -795,7 +795,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "none"
   },
   {
@@ -811,18 +811,18 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- (none)\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "none"
   },
   {
    "kind": "protocol",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n",
    "tools": "empty_about"
   },
   {
    "kind": "first",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
    "tools": "empty_about"
   },
   {
@@ -838,7 +838,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -854,7 +854,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -870,7 +870,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -886,7 +886,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -902,7 +902,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -918,7 +918,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -934,7 +934,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -950,13 +950,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
    "kind": "first",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
    "tools": "empty_about"
   },
   {
@@ -972,7 +972,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -988,7 +988,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -1004,7 +1004,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -1020,7 +1020,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -1036,7 +1036,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -1052,7 +1052,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -1068,7 +1068,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -1084,13 +1084,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
    "kind": "first",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃",
    "tools": "empty_about"
   },
   {
@@ -1106,7 +1106,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -1122,7 +1122,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -1138,7 +1138,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -1154,7 +1154,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -1170,7 +1170,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -1186,7 +1186,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
@@ -1202,7 +1202,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "empty_about"
   },
   {
@@ -1218,18 +1218,18 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `x`\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "empty_about"
   },
   {
    "kind": "protocol",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n",
    "tools": "edges"
   },
   {
    "kind": "first",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.",
    "tools": "edges"
   },
   {
@@ -1245,7 +1245,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1261,7 +1261,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1277,7 +1277,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1293,7 +1293,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1309,7 +1309,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1325,7 +1325,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1341,7 +1341,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1357,13 +1357,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "hero",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nFind the three most recent design notes about the hero banner and summarise what changed between them.\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
    "kind": "first",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n",
    "tools": "edges"
   },
   {
@@ -1379,7 +1379,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1395,7 +1395,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1411,7 +1411,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1427,7 +1427,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1443,7 +1443,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1459,7 +1459,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1475,7 +1475,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1491,13 +1491,13 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "multiline",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\nLine one.\n\n  Line three with {braces} and {{ double }} and {% tag %}.\n\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
    "kind": "first",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃",
    "tools": "edges"
   },
   {
@@ -1513,7 +1513,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1529,7 +1529,7 @@
    "kind": "turn_noresume",
    "results": "none",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1545,7 +1545,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1561,7 +1561,7 @@
    "kind": "turn_noresume",
    "results": "one",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1577,7 +1577,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1593,7 +1593,7 @@
    "kind": "turn_noresume",
    "results": "two",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- a (search): 3 hits: notes/hero-v1.md, notes/hero-v2.md, notes/hero-v3.md\n- b (list_dir): notes/: hero-v1.md hero-v2.md hero-v3.md footer.md\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   },
   {
@@ -1609,7 +1609,7 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: read the three hero notes and compare them",
    "tools": "edges"
   },
   {
@@ -1625,11 +1625,11 @@
    "kind": "turn_noresume",
    "results": "odd",
    "task": "unicode",
-   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-gemini-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
+   "text": "Reply each turn with one ```json block: {\"schema\":\"ga-plan/1\",\"steps\"?:[{\"id\":id,\"tool\":tools,\"args\"?:{},\"after\"?:[id]}]≤16,\"next\"?:{\"prompt\":str+,\"after\"?:[id]}|null,\"say\"?:str}\nid: short, unique; after: earlier ids (none = run at once); next: your next turn on those results, null when done.\nTools:\n- `bare`\n- `blank`\n- `colon`: ends with a colon\n- `mixed`: a: b\n- `number`: 7\n- `space`: trailing space\n- `uni.code:+`: über — {{ not a tag }} {% if x %}\n\nTask:\n한글 과제 — café ☃\n\nResults:\n- s-1_X (uni.code:+): line 1\nline 2 {{ x }}\n\n- z (noop): \n- q (colon): {\"k\": [1, 2]}\n\nNext: Done?  {{ ask }}\n",
    "tools": "edges"
   }
  ],
  "mode": "compact",
  "schema": "ga-prompt-fixtures/1",
- "spec_digest": "6685e3b81f4167f122be679c73bd8dc55106b0b3896f2c4c662f782f80d01daf"
+ "spec_digest": "f9884e7906974947cbe45c5e524d4b9883b5687ee3b8ac548e5a16e001b19f93"
 }

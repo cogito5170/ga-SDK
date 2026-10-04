@@ -18,6 +18,14 @@ U unknown. Every shape below that is A or U is read in one place (``parse_output
 - V: ``agy -p /usage`` (and ``/quota``) prints the quota without spending any: a weekly share per model family (user's
   Mac: Gemini 96% remaining, reset 2026-10-11 00:56 KST; Claude and GPT 100%, reset 2026-10-11 01:29 KST). U: the
   exact text, so ``parse_usage`` is lenient: a family, a percent, a date-time with a zone.
+- GA28 (S3): agv is a multi-family host — the slug may be ``gpt-*``, ``claude-*`` or ``gemini-*``; ``slug_family`` reads
+  the family (any other prefix is a config error, never a guess), which picks the usage format (openai · anthropic ·
+  gemini, read by Telemetry) and the quota family (``family_of``: gemini, or the shared claude_gpt share). A: a
+  ``usage`` (or ``usageMetadata``) object in the json / stream-json output, in the family's provider shape; the last
+  one seen is the turn's. U: whether agy prints one at all — None (not reported) when it does not.
+- GA28 (S3): the command is ``agy`` (this file's facts: GMG's bench/preview/AGY.md); the user calls the host agv. No
+  Antigravity CLI is installed where GA28 was built, so ``agy --help`` could not be read offline; ``agv`` is accepted
+  as the backend name and ``agy`` as its alias, and ``cli`` in the options sets the command.
 - V: auth is the system keyring or a browser Google sign-in; ga passes nothing for auth and never reads the token store.
 Standard library only.
 """
@@ -53,6 +61,7 @@ class AgyOutput:
     full: str = ""                                   # the last whole answer, if any event carries one
     served: list[str] = field(default_factory=list)
     denied: list[str] = field(default_factory=list)  # labels of refused actions (U: the entry shape)
+    usage: dict | None = None                        # A: the provider usage object, if agy prints one
     agy_error: bool = False
     credits: bool = False
     quota: bool = False
@@ -87,6 +96,9 @@ def _walk(obj: Any, out: AgyOutput) -> None:
         m = _model_name(obj.get("model"))
         if m and m not in out.served:
             out.served.append(m)
+        for uk in ("usage", "usageMetadata"):
+            if isinstance(obj.get(uk), dict):
+                out.usage = dict(obj[uk])
         if isinstance(obj.get("denied_actions"), list):
             out.denied += [_denied_label(d) for d in obj["denied_actions"]]
         if obj.get("role") in (None, "assistant", "model"):
@@ -99,7 +111,7 @@ def _walk(obj: Any, out: AgyOutput) -> None:
                         out.full = v
                     break
         for k, v in obj.items():
-            if k not in ("model", "denied_actions") and isinstance(v, (dict, list)):
+            if k not in ("model", "denied_actions", "usage", "usageMetadata") and isinstance(v, (dict, list)):
                 _walk(v, out)
     elif isinstance(obj, list):
         for v in obj:
@@ -159,7 +171,19 @@ def parse_reset(text: str) -> float | None:
     return dt.timestamp()
 
 
+FAMILIES = {"gpt": "openai", "claude": "anthropic", "gemini": "gemini"}  # slug family -> its usage format
+
+
+def slug_family(model: str) -> str:
+    """gpt · claude · gemini from an agv slug's prefix; any other slug raises ValueError (a config error, S3)."""
+    fam = model.lower().split("-", 1)[0] if isinstance(model, str) and "-" in model else ""
+    if fam not in FAMILIES:
+        raise ValueError(f"agv: unknown model family for slug {model!r} (known: gpt-*, claude-*, gemini-*)")
+    return fam
+
+
 def family_of(model: str) -> str:
+    """The quota family of a slug: agy's /usage shows one share for Gemini and one shared by Claude and GPT (V)."""
     m = model.lower()
     return "gemini" if m.startswith("gemini") else ("claude_gpt" if m.startswith(("claude", "gpt")) else m.split("-")[0])
 
@@ -230,10 +254,9 @@ class AgyCLI:
             raise AgyQuota("quota")
         if code != 0 or o.agy_error:
             raise GeminiError("agy_error" if o.agy_error or code == 3 else f"exit_{code}")
-        if not o.served:
-            raise ModelMismatch("served_model_unknown")
-        if any(m != self.model for m in o.served):
-            raise ModelMismatch("served_model_mismatch")
+        from ..backends.base import check_served
+        check_served(o.served, self.model)
         turn = GeminiTurn(None, list(o.served), o.text, {}, round(time.monotonic() - t0, 3), o.events)
+        turn.raw_usage = o.usage  # type: ignore[attr-defined]
         turn.denied = list(o.denied)  # type: ignore[attr-defined]
         return turn
