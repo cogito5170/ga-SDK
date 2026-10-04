@@ -100,12 +100,19 @@ class Config:
     judge: dict[str, Any] = field(default_factory=dict)  # {"kind": "file" | "llm", "model", "max_runs", ...}
     runner: dict[str, Any] = field(default_factory=dict)  # {"kind": "manual" | "headless", "model", "timeout", "max_budget_usd", ...}
     base_dir: Path = Path(".")
+    # CMD-GA31 S6: {"mode": "hub" (default) | "peer", ...} (ga/net); absent or hub = the legacy loop, unchanged
+    network: dict[str, Any] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ lookups
 
     @property
     def hub_name(self) -> str:
         return self.hub["name"]
+
+    @property
+    def peer_mode(self) -> bool:
+        """PROTOCOL 1a: sessions talk to each other only in peer mode, which is off unless the config turns it on."""
+        return self.network.get("mode", "hub") == "peer"
 
     def strength(self, rule: str) -> str:
         return HARD if rule in HARD_RULES or rule in self.raised_rules else "soft"
@@ -215,7 +222,8 @@ def problems_of(raw: Any) -> list[Problem]:
     for rid in rules.get("raise", []):
         if rid not in RULE_IDS:
             bad("$.rules.raise", f"unknown rule {rid}")
-    known = {"schema", "hub", "integration_branch", "repos", "sessions", "ownership", "budget", "rules", "secret_patterns", "bundle", "runner", "judge", "isolation"}
+    known = {"schema", "hub", "integration_branch", "repos", "sessions", "ownership", "budget", "rules", "secret_patterns", "bundle", "runner", "judge", "isolation",
+             "network"}  # network: CMD-GA31 S6
     for k in raw:
         if k not in known:
             bad(f"$.{k}", "unknown key")
@@ -249,6 +257,9 @@ def problems_of(raw: Any) -> list[Problem]:
     budget = raw.get("budget", {})
     if not isinstance(budget, dict) or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in budget.values()):
         bad("$.budget", "must map names to non-negative numbers")
+    if "network" in raw:  # CMD-GA31 S6: only a config that has the section is checked for it
+        from .net import problems_of as network_problems
+        probs += network_problems(raw["network"])
     return probs
 
 
@@ -282,6 +293,7 @@ def from_dict(raw: dict[str, Any], base_dir: str | Path = ".") -> Config:
         judge=dict(raw.get("judge", {})),
         isolation=raw.get("isolation", "clone"),
         base_dir=Path(base_dir),
+        network=dict(raw.get("network") or {}),
     )
 
 
