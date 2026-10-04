@@ -9,7 +9,7 @@ description = "Hub loop SDK: directive / report / verdict forms, integration, ru
 requires-python = ">=3.10"
 # the source of these pins is ga/_pins.py; this list must say the same (tests/test_pins.py)
 dependencies = [
-    "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@3d2e7d0b2696a99d37a09283edb62cab856dbe2e",
+    "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@c491e968d0df09bd930f4ede7dcb2b67075a2a1e",
 ]
 
 [project.optional-dependencies]

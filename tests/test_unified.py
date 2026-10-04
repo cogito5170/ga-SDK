@@ -87,6 +87,32 @@ class PinTest(unittest.TestCase):
         metadata.distribution("llmsensor")  # the [sensor] extra came in
 
 
+class GeneratedGuardPinTest(unittest.TestCase):
+    """CMD-GA25 D2: a guard that ga generates (GR's ga.rlo.remote, also behind `ga rlo upgrade-remote`) installs exactly
+    the rlo-sdk ga pins — so a pin move reaches every generated guard, and an old PIN is moved by upgrade-remote."""
+
+    def test_the_generated_install_sh_pins_the_package_pin(self):
+        from ga.rlo import remote
+        sha = _pins.PINS["rlo"][3]
+        files = remote.files()
+        pins = re.findall(r'^PIN="([0-9a-f]{7,40})"$', files["ops/rlo/install.sh"], re.M)
+        self.assertEqual(pins, [sha])
+        self.assertIn(f"git+{RLO_URL}@$PIN", files["ops/rlo/install.sh"])
+        self.assertIn(sha[:7], files["ops/rlo/GUARD.md"])
+
+    def test_upgrade_remote_moves_an_old_pin_to_the_package_pin(self):
+        from ga.rlo import remote
+        old = "3d2e7d0b2696a99d37a09283edb62cab856dbe2e"  # rlo 0.7.0, the pin before CMD-GA25
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        install = tmp / "ops" / "rlo" / "install.sh"
+        install.parent.mkdir(parents=True)
+        install.write_text(remote.files()["ops/rlo/install.sh"].replace(_pins.PINS["rlo"][3], old))
+        current, commands = remote.upgrade_commands(tmp)
+        self.assertEqual(current, old)
+        self.assertTrue(any(f'PIN="{_pins.PINS["rlo"][3]}"' in c for c in commands), commands)
+
+
 class LazyImportTest(unittest.TestCase):
     def test_ga_imports_and_runs_without_importing_rlo(self):
         """A fake `rlo` is put first on the path, so an eager import would succeed and be seen in sys.modules.
