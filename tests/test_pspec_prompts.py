@@ -307,6 +307,22 @@ class SupervisorTest(unittest.TestCase):
             self.assertEqual(rows, [])
 
 
+@needs_pspec
+class AuthorityTest(unittest.TestCase):
+    """On rlo >= 0.9.1 (K16 P2) an id with a trailing newline is the one known disagreement: check_plan accepts it and
+    decides, the spec's check rejects it, and the runtime logs it."""
+
+    run_task = SupervisorTest.run_task
+
+    def test_check_plan_accepts_and_the_spec_check_is_only_logged(self):
+        from test_gemini import plan
+        script = [{"plan": plan([{"id": "a\n", "tool": "add", "args": {"a": 1, "b": 1}}], None, "two")}]
+        box, ok = self.run_task(script)
+        self.assertTrue(ok)  # check_plan decides
+        rows = [(r["check_plan_ok"], r["spec_ok"]) for r in box.log() if r["event"] == "check_disagree"]
+        self.assertEqual(rows, [] if rlo_version() == "0.9.0" else [(True, False)])
+
+
 def once_resent(spec, d):
     """Cases where a compact follow-up on a host that resumes carries a line of the compact once-section."""
     bad = []
