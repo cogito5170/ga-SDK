@@ -27,6 +27,9 @@ class FileMailbox:
         return self.root / channel
 
     def post(self, channel: str, author: str, text: str) -> Post:
+        from ..net import is_peer_form
+        if is_peer_form(text):  # CMD-GA31 S6: a peer message goes by ga mail between nodes, never on a hub channel
+            raise ValueError("a peer message (```peer block) never goes on a hub channel")
         d = self._dir(channel)
         d.mkdir(parents=True, exist_ok=True)
         pid = f"{time.time_ns():020d}-{os.getpid():07d}-{secrets.token_hex(3)}"

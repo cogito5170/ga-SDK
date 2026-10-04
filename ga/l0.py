@@ -51,3 +51,21 @@ def append(path: Path, event: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+# CMD-GA31 S1 (NET1 contract): who sent what to whom, as facts only -- no pi, score, trust or usefulness here
+PEER = ("from_session", "to_session", "msg_id", "in_reply_to", "schema", "bytes", "tokens_est")
+
+
+def peer_message(direction: str, run_id: str, seq: int, *, sender: str, to: str, msg_id: str, schema: str | None,
+                 nbytes: int, in_reply_to: str | None = None, source: str = "ga_node") -> dict[str, Any]:
+    """``peer.message.sent`` / ``peer.message.received``; tokens_est = ceil(bytes / 4)."""
+    if direction not in ("sent", "received"):
+        raise ValueError("direction: sent or received")
+    if not msg_id:
+        raise ValueError("a peer message event needs msg_id")
+    data = {"from_session": sender, "to_session": to, "msg_id": msg_id, "in_reply_to": in_reply_to,
+            "schema": schema, "bytes": nbytes, "tokens_est": -(-nbytes // 4)}
+    return {"spec": SPEC, "id": f"{run_id}:{seq}", "type": f"peer.message.{direction}", "run_id": run_id, "seq": seq,
+            "source": source, "at": None, "time_base": None, "data": data,
+            "unobserved": [k for k in PEER if data[k] is None and k != "in_reply_to"], "reported_null": []}

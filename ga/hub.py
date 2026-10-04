@@ -335,10 +335,43 @@ class Hub:
             st["resume"][to] = result.session_id
         if fresh and not result.error:
             why = self._finish_fresh(st, to, result, shown)
-            if why:  # S3: a failed turn, not silently retried
+            if result.stop:  # CMD-GA31 S4: a budget stop is a checkpoint, not a failure
+                self._checkpoint(st, directive, result, post, why)
+            elif why:  # S3: a failed turn, not silently retried
                 result.error = f"answer:{why}"[:200]
                 st["turns"][-1]["error"] = result.error
         return result
+
+    def _checkpoint(self, st: dict[str, Any], directive: dict[str, Any], result: Any, post: Post, why: str) -> None:
+        """CMD-GA31 S4: the directive stays open; the next tick continues it with a new fresh turn unless two
+        checkpoints in a row left the same state and branch heads, or a second one left no state (needs_judgement), or
+        the runs budget is spent."""
+        from .net.checkpoint import Continuation
+        to, did = directive["to"], directive["id"]
+        d = st["directives"].setdefault(did, {})
+        c = Continuation((d.get("checkpoint") or {}).get("c"))
+        sf = self.state_file(to)
+        state = sf.read_text(encoding="utf-8") if not why and sf.exists() else None
+        b = directive.get("budget") or {}
+        runs = sum(1 for t in st.get("turns", []) if t.get("directive") == did and t.get("sent", True))
+        verdict = c.after(result.stop, state, json.dumps(self._session_heads(to), sort_keys=True), runs_used=runs,
+                          runs_budget=b.get("runs", b.get("claude_p_runs")))
+        d["checkpoint"] = {"c": c.to_dict(), "verdict": verdict, "post": post.id}
+        st["turns"][-1].update(stop=result.stop, checkpoint=verdict, **({"checkpoint_note": why[:200]} if why else {}))
+
+    def _continue_checkpoints(self, st: dict[str, Any]) -> bool:
+        """CMD-GA31 S4: one new fresh turn for each open directive whose last turn stopped at a checkpoint."""
+        ran = False
+        for did, d in sorted(st["directives"].items()):
+            cp = d.get("checkpoint")
+            if not cp or cp.get("verdict") != "continue" or d.get("status") != "open":
+                continue
+            cp["verdict"] = "continued"
+            doc = d["doc"]
+            self._run_turn(st, doc, "", Post(cp["post"], doc["to"], self.cfg.hub_name, "", ""), self.runner,
+                           continuation=cp["c"]["continuations"])
+            ran = True
+        return ran
 
     # ================================================================== fresh turns (CMD-GA29)
 
@@ -742,6 +775,8 @@ class Hub:
         self._writes = 0
         st = self.load_state()
         res = TickResult()
+        if not dry_run and self._continue_checkpoints(st):  # CMD-GA31 S4
+            self.save_state(st)
 
         # ---------------------------------------------------------- 1 receive
         new_posts: list[Post] = []

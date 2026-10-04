@@ -286,6 +286,37 @@ which `ga supervise --config` also runs) still names it, so its verbatim prompts
 `ga/specs/supervisor-plan.pspec`. Every turn follows `prompt_mode` (the first one too, BD-304), and `check_plan` reads
 step ids with fullmatch.
 
+## Peer mode: nodes over a code runtime (CMD-GA31, POL-3 structure 4)
+
+Legacy hub mode is the default and unchanged. Peer mode is one switch in ga-config/1 (PROTOCOL 1a: off by default):
+
+    "network": {"mode": "peer", "mailbox": "<git repo>", "theta": 0.3, "edge_budget": {"rpm": 6, "tpm": 20000},
+                "refs": {"image.img1.description": {"needs": {"capabilities": ["vision"]}, "input": "img1.png"}},
+                "nodes": {"A": {"backends": ["claude_cli"], "task": {"id": "CMD-T1", "goal": "...", "uses": [...],
+                                "needs": {"capabilities": ["text"], "tier": "R0"}, "answer"?: "<ref>", "check"?: [argv]},
+                                "facts"?: {...}, "catalog"?: [...], "budget"?: {"runs": 6}}, ...}}
+
+    ga node step A                  one step of node A (cron it, or:)
+    ga run --every 60 [--steps N]   every node each round (peer mode), or ga tick (hub mode)
+    ga usage [--ctx-max N] [--fail] tokmon's ctx / burst / growth alarms from .ga's own L0, no session API
+
+One step: ga mail inbox (the node's own read set) -> the node's rules (a message is the fact 'j sent X'; X is an
+observation with evidence or an opinion = a Proposal; only the rules change State: accept, contradicts + uncertain,
+dedupe by evidence) -> the `peer_interaction` decision (consult / send / skip; send only on pi >= theta, an open
+request, or a contradicts verify flag; the rlo Governor per edge) -> at most one fresh turn on the backend the router
+picks (ctxpack with a `3p peer` section, same cap; report/2 + state block + optional ```peer blocks) -> ga check + R6
+-> ga mail; L0 `run.end`, `peer.message.sent/received` (facts only, no pi). A task whose answer is already valid in
+State is answered without a turn. A node writes only `.ga/nodes/<me>/` (state.json, state.md, cursor, pi.json,
+export.json, router.json, run.json, report.md, telemetry.jsonl); a peer form never goes on a hub channel.
+
+Router (NETWORK.md 7): each backend plugin declares a `catalog` (ga/backends/catalog.py); the cheapest entry meeting
+`needs` wins, a failed check goes up one tier, three successes come down one; tokens per accepted answer are learnt per
+(class, backend, model, tier). A served model other than the chosen one fails the turn; an unknown family is a config
+error. A budget stop (`TurnResult.stop = budget_checkpoint`, read from the budget hook log) is a checkpoint in both
+modes: the state is kept, the work stays open and continues in a new fresh turn; the same state and branch heads twice
+in a row, or a second stop without a state block, stop with needs_judgement; continuations count against the runs
+budget. `python tests/mutations_ga31.py` applies the D2 mutations.
+
 ## 시험
 
 ```sh
