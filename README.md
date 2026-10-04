@@ -266,3 +266,24 @@ Every turn's usage, served model and answer text land in `TurnResult`; each turn
 ```sh
 python -m unittest discover -s tests
 ```
+
+## ga judge (CMD-GA30): the verdict steps as a script
+
+`ga judge --report <path|repo@sha:path> --repo <local clone> --base <integration branch> [--mutations spec.json] [--seed N] [--k 1] [--apply]`
+runs the mechanical steps of a verdict with no model call: `ga check` on the report head; fetch of its commit and
+fast-forward from `--base` (or a dry merge listing the conflicts); an empty venv with `pip install "<dist>[extras] @
+git+file://localhost/<private copy>@<sha>"`, the `pip list` of the package and its deps, `pip check`; a fresh clone at the
+sha running the repo's test command with `PYTHONDONTWRITEBYTECODE=1` and the network blocked (`unshare -rn` when it works,
+plus a socket guard that refuses non-loopback connects); `k` seeded baseline mutations (the seed is printed) that must make
+their named tests fail; the report's claims (sha, test counts, `version:<dist>` results) against what was measured.
+
+It prints a `verdict/1` draft head (`dump_wire`), the `needs_judgement` list (deviations, proposals, unmet items, claim
+mismatches, surviving or stale mutations, non-ff merges, a missing mutation spec), a DECISION_LOG row and a BASELINE section
+13 line. Exit 0: clean success candidate; 1: something for judgement or not success; 2: error; 3: `--apply` refused.
+`--apply` fast-forwards the base branch to the sha and pushes, only when the class is success and `needs_judgement` is empty.
+Classes: red test → failure/implementation; install failure → failure/implementation; `pip check` failure →
+failure/dependency; surviving mutation or no test counts or a bad report head → insufficient/measurement.
+
+Per-repo config: `<repo>/.ga-judge.json` (`dist`, `extras`, `test`, `test_named`, `pinned`, `pip_args`, `pythonpath`, `repo`,
+`timeout`; `{python}` is the venv interpreter). Mutation spec: a JSON list of `{id, file, find, replace, tests}`; this repo's
+is `.ga-judge.mutations.json`.

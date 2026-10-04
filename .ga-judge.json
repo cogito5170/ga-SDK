@@ -1,0 +1,3 @@
+{"dist": "ga-sdk", "repo": "cogito5170/ga-sdk", "pinned": ["rlo-sdk"], "pythonpath": ["."],
+ "test": ["{python}", "-m", "unittest", "discover", "-s", "tests"],
+ "test_named": ["{python}", "-m", "unittest", "{tests}"]}

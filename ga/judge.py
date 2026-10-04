@@ -1,0 +1,495 @@
+"""``ga judge`` (CMD-GA30): the mechanical verdict steps as a deterministic script, so a hub spends model tokens only on
+deviations, proposals, failures and claim mismatches. No model call, no network of its own beyond ``git fetch``.
+
+Steps: (1) ga check the report head; (2) fetch the commits, fast-forward from base or a dry merge listing conflicts;
+(3) empty venv, pip install ``<dist>[extras] @ git+file://...@sha``, pip list of the package and its deps, pip check;
+(4) fresh clone at the sha, the repo's test command with PYTHONDONTWRITEBYTECODE=1 and the network blocked, counts;
+(5) k >= 1 baseline mutations from a spec file (seeded, the seed is recorded), each expected to make a named test fail;
+(6) the report's claims (sha, test counts, versions) against what was measured.
+
+The per-repo config is JSON (default ``<repo>/.ga-judge.json``, read from the local clone, never from the report)::
+
+    {"dist": "pkg", "extras": ["x"], "test": ["{python}", "-m", "unittest", "discover"],
+     "test_named": ["{python}", "-m", "unittest", "{tests}"],      # optional; mutation runs; else test + names
+     "pinned": ["dep"], "pip_args": ["--no-index"], "pythonpath": ["."], "python": "/usr/bin/python3",
+     "repo": "owner/name", "timeout": 1800}
+
+The mutation spec is a JSON list of ``{"file", "find", "replace", "tests": [names...], "id"?}``.
+"""
+from __future__ import annotations
+
+import json
+import os
+import random
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import venv
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from .forms import FormError, dump_wire, hard, parse_text, validate, wire_problems
+
+RANK = {"success": 0, "partial": 1, "insufficient": 2, "failure": 3, "blocked": 4}
+REF_RE = re.compile(r"^(?P<repo>[^@\s:]+)@(?P<sha>[0-9a-f]{7,40}):(?P<path>.+)$")
+CAUSE_OF_BLOCKER = {"env": "environment", "permission": "environment", "credential": "environment",
+                    "budget": "environment", "dependency": "dependency", "design": "requirement"}
+
+_GUARD = '''"""ga judge: block non-loopback network use in the python under test."""
+import ipaddress, socket
+_real_connect, _real_gai, _real_sendto = socket.socket.connect, socket.getaddrinfo, socket.socket.sendto
+
+def _loop(addr):
+    try:
+        return ipaddress.ip_address(addr).is_loopback
+    except ValueError:
+        return addr in ("localhost",)
+
+def _check(sock, address):
+    if sock.family in (socket.AF_INET, socket.AF_INET6) and not _loop(address[0]):
+        raise OSError("network blocked by ga judge: %r" % (address[0],))
+
+def connect(self, address):
+    _check(self, address)
+    return _real_connect(self, address)
+
+def sendto(self, data, *a):
+    _check(self, a[-1])
+    return _real_sendto(self, data, *a)
+
+def getaddrinfo(host, *a, **k):
+    if host is not None and not _loop(host if isinstance(host, str) else host.decode()):
+        raise socket.gaierror("network blocked by ga judge: %r" % (host,))
+    return _real_gai(host, *a, **k)
+
+socket.socket.connect, socket.socket.sendto, socket.getaddrinfo = connect, sendto, getaddrinfo
+'''
+
+
+class JudgeError(Exception):
+    pass
+
+
+@dataclass
+class Judgement:
+    cls: str = "success"
+    cause: str | None = None
+    subclass: str | None = None
+    heads: dict[str, str] = field(default_factory=dict)
+    tests: dict[str, dict[str, int]] = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)
+    claims: list[str] = field(default_factory=list)
+    needs: list[str] = field(default_factory=list)
+    seed: int = 0
+    sha: str = ""
+    repo: str = ""
+    ff: bool = False
+    base: str = ""
+    report_ref: str = ""
+    directive: str = ""
+
+    def worse(self, cls: str, cause: str, sub: str | None = None) -> None:
+        if RANK[cls] > RANK[self.cls]:
+            self.cls, self.cause, self.subclass = cls, cause, sub
+
+    @property
+    def clean(self) -> bool:
+        return self.cls == "success" and not self.needs
+
+
+def run(argv, cwd=None, env=None, timeout=None, check=False, input=None) -> subprocess.CompletedProcess:
+    try:
+        p = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout, input=input)
+    except subprocess.TimeoutExpired as e:
+        p = subprocess.CompletedProcess(argv, 124, "", "timeout")
+    except OSError as e:
+        p = subprocess.CompletedProcess(argv, 127, "", str(e))
+    if check and p.returncode:
+        raise JudgeError(f"{' '.join(map(str, argv[:4]))}: {(p.stderr or p.stdout).strip()[-300:]}")
+    return p
+
+
+def git(repo, *args, **kw) -> subprocess.CompletedProcess:
+    return run(["git", "-C", str(repo), *args], **kw)
+
+
+# ---- test output counts
+
+def parse_counts(out: str) -> dict[str, int] | None:
+    """passed/failed/skipped from unittest ("Ran N tests", "FAILED (failures=a, errors=b, skipped=c)") or pytest
+    ("3 passed, 1 failed, 2 skipped in 0.1s"); None when neither shape is found."""
+    m = re.search(r"^Ran (\d+) tests? in ", out, re.M)
+    if m:
+        n = int(m.group(1))
+        fields = dict((k, int(v)) for k, v in re.findall(r"(failures|errors|skipped|expected failures|unexpected successes)=(\d+)", out.split("Ran ")[-1]))
+        failed = fields.get("failures", 0) + fields.get("errors", 0) + fields.get("unexpected successes", 0)
+        skipped = fields.get("skipped", 0)
+        return {"passed": max(n - failed - skipped, 0), "failed": failed, "skipped": skipped}
+    m = re.search(r"^=+ (.*?) in [\d.]+s", out, re.M) or re.search(r"^(\d+ (?:passed|failed|error|skipped).*?) in [\d.]+s", out, re.M)
+    if m:
+        c = {k: int(v) for v, k in re.findall(r"(\d+) (passed|failed|errors?|skipped)", m.group(1))}
+        return {"passed": c.get("passed", 0), "failed": c.get("failed", 0) + c.get("error", 0) + c.get("errors", 0),
+                "skipped": c.get("skipped", 0)}
+    return None
+
+
+# ---- the pieces
+
+def load_config(repo: Path, path: str | None) -> dict[str, Any]:
+    p = Path(path) if path else repo / ".ga-judge.json"
+    try:
+        cfg = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise JudgeError(f"judge config {p}: {e}") from None
+    if not isinstance(cfg, dict) or not cfg.get("dist") or not isinstance(cfg.get("test"), list):
+        raise JudgeError(f"judge config {p}: needs \"dist\" and a \"test\" argv list")
+    return cfg
+
+
+def load_mutations(path: str | None) -> list[dict[str, Any]]:
+    if not path:
+        return []
+    try:
+        spec = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise JudgeError(f"mutation spec {path}: {e}") from None
+    if not isinstance(spec, list) or not all(isinstance(m, dict) and {"file", "find", "replace", "tests"} <= m.keys()
+                                             and isinstance(m["tests"], list) for m in spec):
+        raise JudgeError(f"mutation spec {path}: a list of {{file, find, replace, tests}}")
+    return spec
+
+
+def read_report(ref: str, repo: Path, remote: str) -> str:
+    m = REF_RE.match(ref) if not Path(ref).exists() else None
+    if not m:
+        try:
+            return Path(ref).read_text(encoding="utf-8")
+        except OSError as e:
+            raise JudgeError(f"report {ref}: {e}") from None
+    sha, path = m["sha"], m["path"]
+    fetch(repo, remote, sha)
+    p = git(repo, "show", f"{sha}:{path}")
+    if p.returncode:
+        raise JudgeError(f"report {ref}: {p.stderr.strip()[-200:]}")
+    return p.stdout
+
+
+def have(repo: Path, sha: str) -> bool:
+    return git(repo, "cat-file", "-e", f"{sha}^{{commit}}").returncode == 0
+
+
+def fetch(repo: Path, remote: str, sha: str, branch: str | None = None) -> bool:
+    if have(repo, sha):
+        return True
+    if branch:
+        git(repo, "fetch", "--quiet", remote, branch)
+    if not have(repo, sha):
+        git(repo, "fetch", "--quiet", remote, sha)
+    return have(repo, sha)
+
+
+def pick_commit(head: dict[str, Any], cfg: dict[str, Any], repo: Path) -> dict[str, str]:
+    commits = [c for c in head.get("commits") or [] if isinstance(c, dict)]
+    names = {cfg.get("repo"), repo.resolve().name, cfg["dist"]} - {None}
+    mine = [c for c in commits if c.get("repo") in names or str(c.get("repo", "")).rsplit("/", 1)[-1] in names]
+    if len(mine) == 1:
+        return mine[0]
+    if len(commits) == 1:
+        return commits[0]
+    raise JudgeError(f"report names {len(commits)} commits and {len(mine)} match this repo: set \"repo\" in the judge config")
+
+
+def merge_state(repo: Path, base_ref: str, sha: str) -> tuple[bool, list[str]]:
+    """(fast-forward from base?, conflicts of a dry merge when not)."""
+    if git(repo, "merge-base", "--is-ancestor", base_ref, sha).returncode == 0:
+        return True, []
+    p = git(repo, "merge-tree", "--write-tree", "--name-only", "--no-messages", base_ref, sha)
+    if p.returncode == 0:
+        return False, []
+    lines = [x for x in p.stdout.splitlines()[1:] if x.strip()]
+    return False, lines or [(p.stderr or "merge-tree failed").strip()[:200]]
+
+
+def make_env(guard_dir: Path, pythonpath: list[str]) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "VIRTUAL_ENV")}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PYTHONPATH"] = os.pathsep.join([str(guard_dir), *pythonpath])
+    return env
+
+
+def netless(argv: list[str]) -> tuple[list[str], str]:
+    """argv wrapped in a network namespace when `unshare -rn` works here; the loopback-only guard is always on."""
+    if shutil.which("unshare") and run(["unshare", "-rn", "true"]).returncode == 0:
+        return ["unshare", "-rn", *argv], "unshare -rn + socket guard"
+    return argv, "socket guard (no unshare)"
+
+
+def expand(argv: list[str], python: str, tests: list[str] | None = None) -> list[str]:
+    out: list[str] = []
+    for a in argv:
+        if a == "{tests}":
+            out += tests or []
+        else:
+            out.append(a.replace("{python}", python))
+    return out
+
+
+def judge(report: str, repo: str | Path, base: str, *, mutations: str | None = None, seed: int | None = None, k: int = 1,
+          config: str | None = None, remote: str = "origin", today: str | None = None) -> Judgement:
+    repo = Path(repo).resolve()
+    cfg = load_config(repo, config)
+    j = Judgement(base=base, report_ref=report if REF_RE.match(report) else "")
+    j.seed = random.SystemRandom().randrange(2**32) if seed is None else seed
+    text = read_report(report, repo, remote)
+
+    # (1) ga check on the head: a hard problem is insufficient, cause measurement
+    try:
+        head, _ = parse_text(text)
+        probs = validate(head) + wire_problems(text)
+    except FormError as e:
+        probs, head = e.problems, {}
+    if hard(probs):
+        j.worse("insufficient", "measurement")
+        j.notes += [f"ga check: {p}" for p in hard(probs)][:5]
+        j.notes.append("report head refused by ga check; nothing measured")
+        return j
+    if head.get("schema") != "report/2":
+        j.worse("insufficient", "measurement")
+        j.notes.append(f"report head is {head.get('schema')}, not report/2; nothing measured")
+        return j
+    j.notes.append("ga check: head ok")
+    j.directive = ",".join(h.get("id", "") for h in head.get("handled", []))
+    for key, label in (("deviations", "deviation"), ("proposals", "proposal")):
+        j.needs += [f"{label}: {x}" for x in head.get(key) or []]
+    for it in head.get("items") or []:
+        if it["state"] in ("unmet", "blocked"):
+            j.needs.append(f"item {it['id']} is {it['state']}")
+            blk = next(iter(head.get("blockers") or []), None)
+            if it["state"] == "blocked":
+                j.worse("blocked", CAUSE_OF_BLOCKER.get(blk["kind"], "requirement") if blk else "requirement")
+            else:
+                j.worse("partial", "requirement")
+    for b in head.get("blockers") or []:
+        j.needs.append(f"blocker {b['kind']}: {b['what']}")
+
+    # (2) commits, fast-forward or conflicts
+    c = pick_commit(head, cfg, repo)
+    sha_claim = c["sha"]
+    if not fetch(repo, remote, sha_claim, c.get("branch")):
+        j.worse("insufficient", "measurement")
+        j.notes.append(f"commit {sha_claim} not fetchable from {remote}")
+        return j
+    sha = git(repo, "rev-parse", f"{sha_claim}^{{commit}}", check=True).stdout.strip()
+    j.sha, j.repo = sha, c.get("repo") or cfg.get("repo") or repo.name
+    j.heads = {j.repo: sha}
+    git(repo, "fetch", "--quiet", remote, base)
+    base_ref = f"{remote}/{base}" if git(repo, "rev-parse", "--verify", "-q", f"{remote}/{base}").returncode == 0 else base
+    if git(repo, "rev-parse", "--verify", "-q", base_ref).returncode:
+        raise JudgeError(f"base {base!r} not found")
+    j.ff, conflicts = merge_state(repo, base_ref, sha)
+    if j.ff:
+        j.notes.append(f"{sha[:7]} fast-forwards {base}")
+    else:
+        j.needs.append(f"non-ff: {sha[:7]} does not fast-forward {base}; dry merge " +
+                       (f"conflicts in {', '.join(conflicts)}" if conflicts else "is clean"))
+    if sha[: len(sha_claim)] != sha_claim:
+        j.claims.append(f"commit sha {sha_claim} resolved to {sha}")
+    j.claims.append(f"commit sha {sha[:7]} fetched: ok")
+
+    work = Path(tempfile.mkdtemp(prefix="ga-judge-"))
+    try:
+        _measure(j, cfg, repo, sha, head, work, mutations, k)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    return j
+
+
+def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict[str, Any], work: Path,
+             mutations: str | None, k: int) -> None:
+    timeout = cfg.get("timeout", 1800)
+    # a private bare copy that holds the sha on a ref, so pip and the clone can reach it without touching the repo
+    src = work / "src.git"
+    git(work, "init", "--bare", "--quiet", "-b", "judge", str(src), check=True)
+    git(repo, "push", "--quiet", str(src), f"{sha}:refs/heads/judge", check=True)
+
+    # (3) empty venv, install, pip list, pip check
+    vdir = work / "venv"
+    venv.create(vdir, with_pip=True, clear=True, symlinks=os.name != "nt")
+    vpy = str(vdir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+    dist, extras = cfg["dist"], cfg.get("extras") or []
+    req = f"{dist}{'[' + ','.join(extras) + ']' if extras else ''} @ git+file://localhost{src}@{sha}"  # pip needs a host in the URL
+    p = run([vpy, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *cfg.get("pip_args", []), req],
+            timeout=timeout)
+    installed = p.returncode == 0
+    if not installed:
+        j.worse("failure", "implementation")
+        j.notes.append(f"pip install failed: {(p.stderr or p.stdout).strip().splitlines()[-1:] or ['?']}"[:200])
+    else:
+        show = run([vpy, "-m", "pip", "show", dist]).stdout
+        req_line = next((x for x in show.splitlines() if x.startswith("Requires:")), "Requires:")
+        names = {n.strip().lower().replace("_", "-") for n in req_line.split(":", 1)[1].split(",") if n.strip()}
+        names |= {dist.lower().replace("_", "-"), *[x.lower().replace("_", "-") for x in cfg.get("pinned", [])]}
+        pl = json.loads(run([vpy, "-m", "pip", "list", "--format=json", "--disable-pip-version-check"]).stdout or "[]")
+        got = {x["name"].lower().replace("_", "-"): x["version"] for x in pl if x["name"].lower().replace("_", "-") in names}
+        j.notes.append("pip list: " + ", ".join(f"{n}=={v}" for n, v in sorted(got.items())))
+        pc = run([vpy, "-m", "pip", "check", "--disable-pip-version-check"])
+        if pc.returncode:
+            j.worse("failure", "dependency")
+            j.notes.append(f"pip check failed: {pc.stdout.strip().splitlines()[0] if pc.stdout.strip() else pc.stderr.strip()[:150]}")
+        else:
+            j.notes.append("pip check: ok")
+        measured = got.get(dist.lower().replace("_", "-"))
+        for r in head.get("results") or []:
+            m = re.match(r"^(?:version[: ](\S+)|(\S+?)[ _]version)$", str(r.get("name", "")))
+            if m:
+                want = (m[1] or m[2]).lower().replace("_", "-")
+                have_v = got.get(want)
+                if have_v is None or str(r["value"]) != have_v:
+                    j.claims.append(f"version {want}: claimed {r['value']}, measured {have_v}")
+                    j.needs.append(f"claim mismatch: version {want} claimed {r['value']}, measured {have_v}")
+                else:
+                    j.claims.append(f"version {want} {have_v}: ok")
+        if measured is None:
+            j.notes.append(f"{dist} missing from pip list")
+
+    # (4) fresh clone, the repo's test command, network blocked
+    clone = work / "clone"
+    git(work, "clone", "--quiet", "--no-checkout", str(src), str(clone), check=True)
+    git(clone, "checkout", "--quiet", "--detach", sha, check=True)
+    guard = work / "guard"
+    guard.mkdir()
+    (guard / "sitecustomize.py").write_text(_GUARD, encoding="utf-8")
+    env = make_env(guard, [str(clone / x) for x in cfg.get("pythonpath", [])])
+    py = vpy if installed else sys.executable
+
+    def run_tests(argv: list[str]) -> tuple[subprocess.CompletedProcess, str]:
+        wrapped, how = netless(expand(argv, py))
+        return run(wrapped, cwd=clone, env=env, timeout=timeout), how
+
+    p, how = run_tests(cfg["test"])
+    counts = parse_counts(p.stdout + "\n" + p.stderr)
+    j.notes.append(f"tests run in fresh clone, PYTHONDONTWRITEBYTECODE=1, network blocked ({how})")
+    if counts is None:
+        j.worse("insufficient", "measurement")
+        j.notes.append(f"tests: no counts in output (exit {p.returncode})")
+    else:
+        j.tests[j.repo] = counts
+        j.notes.append(f"tests: {counts['passed']} passed, {counts['failed']} failed, {counts['skipped']} skipped (exit {p.returncode})")
+        if counts["failed"] or p.returncode:
+            j.worse("failure", "implementation")
+        want = head.get("tests")
+        if isinstance(want, dict):
+            diff = [f"{k} claimed {want[k]}, measured {counts[k]}" for k in ("passed", "failed", "skipped")
+                    if k in want and want[k] != counts[k]]
+            if diff:
+                j.claims.append("tests: " + "; ".join(diff))
+                j.needs.append("claim mismatch: tests " + "; ".join(diff))
+            else:
+                j.claims.append("tests match")
+
+    # (5) baseline mutations
+    spec = load_mutations(mutations)
+    if not spec:
+        j.needs.append("no mutation run: no spec given")
+        return
+    rng = random.Random(j.seed)
+    chosen = rng.sample(spec, min(max(k, 1), len(spec)))
+    j.notes.append(f"mutation seed {j.seed}, picked {len(chosen)} of {len(spec)}")
+    named = cfg.get("test_named") or [*cfg["test"], "{tests}"]
+    for i, mu in enumerate(chosen):
+        label = mu.get("id") or f"{mu['file']}:{mu['find'][:30]!r}"
+        path = clone / mu["file"]
+        try:
+            orig = path.read_text(encoding="utf-8")
+        except OSError:
+            orig = ""
+        if orig.count(mu["find"]) != 1:
+            j.needs.append(f"mutation {label} does not apply (find text found {orig.count(mu['find'])} times); spec is stale")
+            j.notes.append(f"mutation {label}: not applied")
+            continue
+        path.write_text(orig.replace(mu["find"], mu["replace"]), encoding="utf-8")
+        try:
+            p, _ = run_tests(expand(named, py, list(mu["tests"])) if "{tests}" in named else named)
+        finally:
+            path.write_text(orig, encoding="utf-8")
+            git(clone, "checkout", "--quiet", "--", mu["file"])
+        out = p.stdout + p.stderr
+        c = parse_counts(out)
+        if p.returncode and c is not None and c["failed"]:
+            j.notes.append(f"mutation {label}: killed ({c['failed']} failed)")
+        elif p.returncode and c is None:
+            j.notes.append(f"mutation {label}: killed (exit {p.returncode}, no counts)")
+        else:
+            j.worse("insufficient", "measurement")
+            j.notes.append(f"mutation {label}: SURVIVED (exit {p.returncode})")
+            j.needs.append(f"mutation {label} survived: tests {' '.join(mu['tests'])} do not cover it")
+
+
+# ---- output
+
+def verdict_head(j: Judgement) -> dict[str, Any]:
+    nxt = {"success": ("continue", "measured clean"), "partial": ("refine", "open items"),
+           "insufficient": ("verify", "measurement gap"), "failure": ("refine", "failing evidence"),
+           "blocked": ("wait", "blocked")}[j.cls]
+    notes = list(j.notes)
+    if j.needs:
+        notes.append(f"needs_judgement: {len(j.needs)}")
+    head: dict[str, Any] = {"schema": "verdict/1", "class": j.cls}
+    if j.cause:
+        head["cause"] = j.cause
+    if j.subclass:
+        head["subclass"] = j.subclass
+    head["evidence"] = {"heads": j.heads, "tests": j.tests, "notes": notes}
+    head["claims_vs_evidence"] = j.claims
+    head["next"] = {"choice": nxt[0], "reason": nxt[1] if j.clean or not j.needs else "judgement needed"}
+    if j.report_ref:
+        head["report_ref"] = j.report_ref
+    head["note"] = (f"ga judge draft; seed {j.seed}; " + ("clean" if j.clean else f"{len(j.needs)} for judgement"))[:280]
+    return head
+
+
+def decision_log_row(j: Judgement, today: str) -> str:
+    t = j.tests.get(j.repo, {})
+    return (f"| BD-? | {today} | ga judge {j.directive or '?'}: {j.repo}@{j.sha[:7]} {j.cls}"
+            f"{' · ' + j.cause if j.cause else ''}; tests {t.get('passed', '?')}/{t.get('failed', '?')}/{t.get('skipped', '?')}; "
+            f"seed {j.seed}; needs_judgement {len(j.needs)} | ga judge |")
+
+
+def section13_line(j: Judgement, today: str) -> str:
+    t = j.tests.get(j.repo, {})
+    return (f"- {today} {j.directive or '?'}: {j.repo}@{j.sha[:7]} {j.cls}{' · ' + j.cause if j.cause else ''} — "
+            f"tests {t.get('passed', '?')} passed {t.get('failed', '?')} failed {t.get('skipped', '?')} skipped; "
+            f"mutation seed {j.seed}; {'ff' if j.ff else 'not ff'} {j.base}")
+
+
+def render(j: Judgement, today: str | None = None) -> str:
+    today = today or date.today().isoformat()
+    out = [dump_wire(verdict_head(j)), "needs_judgement:"]
+    out += [f"- {x}" for x in j.needs] or ["- (none)"]
+    out += ["", "DECISION_LOG:", decision_log_row(j, today), "", "BASELINE 13:", section13_line(j, today)]
+    return "\n".join(out) + "\n"
+
+
+def apply(j: Judgement, repo: str | Path, remote: str = "origin") -> str:
+    """S3: fast-forward the integration branch to the sha and push; refuse unless the class is success, nothing is
+    left for judgement and the sha fast-forwards. Returns a one-line result; raises JudgeError on refusal."""
+    repo = Path(repo).resolve()
+    if j.cls != "success":
+        raise JudgeError(f"apply refused: class is {j.cls}")
+    if j.needs:
+        raise JudgeError(f"apply refused: {len(j.needs)} item(s) for judgement")
+    if not j.ff or not j.sha:
+        raise JudgeError("apply refused: not a fast-forward")
+    cur = git(repo, "symbolic-ref", "-q", "--short", "HEAD").stdout.strip()
+    if cur == j.base:
+        git(repo, "merge", "--ff-only", "--quiet", j.sha, check=True)
+    else:
+        old = git(repo, "rev-parse", "--verify", f"refs/heads/{j.base}")
+        args = ["update-ref", f"refs/heads/{j.base}", j.sha] + ([old.stdout.strip()] if old.returncode == 0 else [])
+        git(repo, *args, check=True)
+    git(repo, "push", "--quiet", remote, f"{j.sha}:refs/heads/{j.base}", check=True)
+    return f"pushed {j.sha[:7]} to {remote}/{j.base}"
