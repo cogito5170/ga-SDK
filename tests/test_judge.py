@@ -92,6 +92,7 @@ class World:
         sh("git", "clone", "-q", str(self.origin), str(self.repo))
         for k, v in (("user.email", "t@t"), ("user.name", "t")):
             sh("git", "-C", str(self.repo), "config", k, v)
+        self.write("README", "x"); self.commit("init")  # one commit deeper than a --depth 2 clone reaches
         self.write("tinybuild.py", BACKEND); self.write("pyproject.toml", PYPROJECT); self.write("VERSION", "1.0")
         self.write("REQUIRES", ""); self.write("fakepkg/__init__.py", INIT); self.write("tests/test_f.py", TESTS)
         self.write("tests/__init__.py", ""); self.write(".ga-judge.json", json.dumps(CONFIG))
@@ -221,6 +222,17 @@ class JudgeTest(unittest.TestCase):
         f = self.w.td / "unused"
         j = J.judge(f"o/fakepkg@{sha}:reports/R.md", self.w.repo, "main", mutations=str(self.w.mut), seed=3)
         self.assertEqual(j.sha, self.green)
+
+    def test_shallow_source_repo(self):
+        shallow = self.w.td / "shallow"
+        sh("git", "clone", "-q", "--depth", "2", "--no-single-branch", f"file://{self.w.origin}", str(shallow))
+        self.assertEqual(sh("git", "-C", str(shallow), "rev-parse", "--is-shallow-repository"), "true")
+        f = self.w.td / "shallow-report.md"
+        f.write_text(report(self.green))
+        before = sh("git", "-C", str(shallow), "for-each-ref")
+        j = J.judge(str(f), shallow, "main", mutations=str(self.w.mut), seed=2)
+        self.assertEqual((j.cls, j.needs, j.sha), ("success", [], self.green), (j.notes, j.needs))
+        self.assertEqual(sh("git", "-C", str(shallow), "for-each-ref"), before)  # the user's repo is untouched
 
     def test_apply_refuses_unless_clean_and_pushes_when_clean(self):
         dirty = self.w.judge(self.green, deviations=["d"])
