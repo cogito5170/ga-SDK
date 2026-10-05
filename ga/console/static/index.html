@@ -2,13 +2,34 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>GA Console</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<script type="module" src="app.js"></script>
 </head>
 <body>
-<h1>GA Console</h1>
-<p>GA API가 실행 중입니다. 화면(프런트엔드)은 다음 작업에서 이 자리에 들어옵니다.</p>
-<p>API: <code>/api/state</code> · <code>/api/work</code> · <code>/api/branches</code> · <code>/api/tokens</code> ·
-<code>/api/decisions</code> · <code>/api/mail</code> · <code>/api/events</code></p>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span id="where">127.0.0.1 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="#/now" data-route="now">지금</a></li>
+      <li><a href="#/work" data-route="work">작업<span class="n" id="n-work"></span></a></li>
+      <li><a href="#/branches" data-route="branches">브랜치</a></li>
+      <li><a href="#/services" data-route="services">서비스<span class="n" id="n-svc"></span></a></li>
+      <li><a href="#/tokens" data-route="tokens">토큰</a></li>
+      <li><a href="#/ask" data-route="ask">묻기</a></li>
+      <li><a href="#/decisions" data-route="decisions">결정</a></li>
+    </ul>
+  </nav>
+</header>
+<div class="banner" id="banner" role="status" hidden><p id="banner-text"></p></div>
+
+<div id="view"></div>
+
+<footer class="foot">
+  <p id="foot">로그인 없음: <code>ga console</code> 이 연 이 주소와 한 번 쓰는 열쇠로만 열립니다. 이 Mac 밖으로는 아무것도 보내지 않습니다.</p>
+</footer>
 </body>
 </html>
