@@ -11,9 +11,11 @@ slices, then NEED results — and then the longest remaining section is cut; the
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
 from ..ctxpack import tokens
+from ..rules import SECRET_PATTERNS
 from .fmt import SPEC
 
 DEFAULT_CAP = 6000
@@ -54,6 +56,15 @@ class Card:
     @property
     def text(self) -> str:
         return self.prefix + self.body
+
+
+def redact(text: str) -> tuple[str, int]:
+    """Every span a secret pattern (rule R6, as ga.mailbox.secrets_in) flags -> "(withheld)"; (text, spans)."""
+    n = 0
+    for pat in SECRET_PATTERNS:
+        text, k = re.subn(pat, "(withheld)", text)
+        n += k
+    return text, n
 
 
 def _render(units: list[Unit]) -> str:

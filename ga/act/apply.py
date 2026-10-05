@@ -7,6 +7,7 @@ item's ``files`` globs (the pool's ownership rule, ga.net.pool.owned). A SEARCH 
 from __future__ import annotations
 
 import difflib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -25,7 +26,7 @@ class Outcome:
 def safe_rel(root: Path, rel: str) -> Path | None:
     """The path ``rel`` inside ``root`` or None (absolute, .., .git/.ga, or a symlink out)."""
     parts = rel.replace("\\", "/").split("/")
-    if not rel or rel.startswith("/") or ".." in parts or parts[0] in (".git", ".ga") or "" in parts:
+    if not rel or rel.startswith("/") or ".." in parts or any(x in (".git", ".ga") for x in parts) or "" in parts:
         return None
     p = root / rel
     try:
@@ -33,6 +34,28 @@ def safe_rel(root: Path, rel: str) -> Path | None:
     except OSError:
         return None
     return p if rp == rr or rr in rp.parents else None
+
+
+SECRET_FILE = re.compile(r"^(\.env.*|.*\.pem|.*\.key|id_rsa.*|id_ed25519.*|id_ecdsa.*|id_dsa.*|.*\.p12|.*\.pfx|"
+                         r"\.npmrc|\.pypirc|\.netrc|\.git-credentials)$", re.I)
+
+
+def secret_path(rel: str) -> bool:
+    """A path any part of which is .git, .ga, or a secret-shaped file name (.env*, *.pem, *.key, id_rsa*, ...)."""
+    return any(x in (".git", ".ga") or SECRET_FILE.match(x) for x in rel.replace("\\", "/").split("/"))
+
+
+def readable(root: Path, rel: str) -> Path | None:
+    """The path a retriever may read (CMD-GA38 rev 2): inside the root and never a secret or internal file."""
+    p = safe_rel(root, rel)
+    if p is None or secret_path(rel):
+        return None
+    try:
+        if secret_path(str(p.resolve().relative_to(Path(root).resolve()))):  # a symlink to a secret file
+            return None
+    except (OSError, ValueError):
+        return None
+    return p
 
 
 def occurrences(text: str, search: str) -> list[int]:

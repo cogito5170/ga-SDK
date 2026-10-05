@@ -27,7 +27,7 @@ from ..net.pool import owned
 from . import card as C
 from . import commands as K
 from . import retrieve as R
-from .apply import apply
+from .apply import apply, secret_path
 from .fmt import parse
 
 SPEC = "act/1"
@@ -81,7 +81,8 @@ class Act:
         self.state = Path(state_dir) if state_dir else self.root / ".ga" / "act"
         self.clock, self.on_turn = clock, on_turn
         self.owned_now = [f for f in R.files(self.root, exts=None) if owned(f, item.files)]
-        self.prefix = C.prefix(item.id, item.goal, item.done_when, item.files, self.owned_now, self.commands)
+        self.prefix, _ = C.redact(C.prefix(item.id, item.goal, item.done_when, item.files, self.owned_now,
+                                           self.commands))
         self.last = ""                  # the last turn's summary only: never a history
         self.needs: list[str] = []      # NEED results for the next card
         self.measure: K.Ran | None = None
@@ -128,6 +129,8 @@ class Act:
         return sum(v for k, v in self.used.items() if k != "estimated")
 
     def serve_need(self, a: Any) -> str:
+        if a.need == "file" and (secret_path(a.arg) or R.safe_rel(self.root, a.arg) is None):
+            return f"NEED file {a.arg}: refused (a secret or internal file, or outside the repository)"
         if a.need == "symbol":
             got = R.symbol(self.root, a.arg)
         elif a.need == "file":
@@ -147,12 +150,17 @@ class Act:
         for turn in range(1, self.max_turns + 1):
             if self.total() >= self.max_tokens:
                 return self._result("blocked", f"token cap ({self.total()} >= {self.max_tokens})", turn - 1, rows)
-            cd = C.build(self.prefix, self.units(turn), self.cap)
+            units, withheld = self.units(turn), 0
+            for u in units:  # defence in depth: nothing secret-shaped reaches the provider
+                u.text, k = C.redact(u.text)
+                withheld += k
+            cd = C.build(self.prefix, units, self.cap)
             self.cards.append(cd)
             t0 = self.clock()
             row: dict[str, Any] = {"schema": "act-ledger/1", "item": self.item.id, "turn": turn,
                                    "backend": self.backend, "model": self.model, "card_tokens": cd.tokens,
-                                   "prefix_tokens": tokens(cd.prefix), "dropped": cd.dropped}
+                                   "prefix_tokens": tokens(cd.prefix), "dropped": cd.dropped,
+                                   "withheld": withheld}
             err, answer, usage, served = "", "", None, None
             try:
                 if getattr(self.runner, "bare", False):

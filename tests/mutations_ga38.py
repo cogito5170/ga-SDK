@@ -26,6 +26,9 @@ M = [  # (name, file, [(old, new), ...])
  ("progress check removed", "ga/act/loop.py", [("if stall >= NO_PROGRESS_TURNS:", "if False:")]),
  ("card cap ignored", "ga/act/card.py", [("    kept = list(units)\n", "    cap = 10 ** 9\n    kept = list(units)\n")]),
  ("secret env passed to commands", "ga/act/commands.py", [("        env = clean_env()\n", "        env = dict(os.environ)\n")]),
+ (".env / secret-file check removed", "ga/act/apply.py",
+  [('return any(x in (".git", ".ga") or SECRET_FILE.match(x) for x', 'return any(x in (".git", ".ga") for x')]),
+ ("card redaction removed", "ga/act/loop.py", [("                u.text, k = C.redact(u.text)", "                k = 0")]),
 ]
 ok = True
 for name, f, reps in M:

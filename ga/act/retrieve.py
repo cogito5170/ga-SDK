@@ -8,7 +8,7 @@ import ast
 import re
 from pathlib import Path
 
-from .apply import safe_rel
+from .apply import readable as safe_rel, secret_path
 
 SKIP = {".git", ".ga", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
 PY = (".py",)
@@ -23,7 +23,7 @@ def files(root: Path, exts: tuple[str, ...] | None = PY + JS, limit: int = 2000)
     for d, dirs, names in os.walk(root):
         dirs[:] = sorted(x for x in dirs if x not in SKIP)
         for n in sorted(names):
-            if exts is None or Path(n).suffix in exts:
+            if (exts is None or Path(n).suffix in exts) and not secret_path(n):
                 out.append(str((Path(d) / n).relative_to(root)))
                 if len(out) >= limit:
                     return sorted(out)

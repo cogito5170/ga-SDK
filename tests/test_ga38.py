@@ -219,6 +219,53 @@ class Retrieve(unittest.TestCase):
         self.assertIn("calc.py:2:", R.grep(root, "return a - b"))
 
 
+FAKE_KEY = "sk-ant-" + "fake0notareal0key0value0xx"  # key-shaped, fake
+
+
+class Secrets(unittest.TestCase):
+    """rev 2 (baseline sent back): reads never serve secret files; the card withholds secret-shaped spans."""
+
+    def secret_repo(self):
+        root = py_repo(self)
+        (root / ".env").write_text("API_KEY=fake-not-real-env\n")
+        (root / "cfg").mkdir()
+        (root / "cfg" / ".env.local").write_text("TOKEN=fake-not-real-local\n")
+        (root / "id_rsa").write_text("fake-not-real-rsa\n")
+        (root / "sub" / ".git").mkdir(parents=True)
+        (root / "sub" / ".git" / "config").write_text("[x] fake-not-real-git\n")
+        return root
+
+    def test_retrievers_refuse_secret_and_internal_files(self):
+        root = self.secret_repo()
+        for rel in (".env", "cfg/.env.local", "id_rsa", "sub/.git/config", "a.pem", ".npmrc"):
+            self.assertIsNone(R.file_slice(root, rel), rel)
+        self.assertNotIn("fake-not-real", R.grep(root, "fake-not-real"))
+        self.assertNotIn(".env", " ".join(R.files(root, exts=None)))
+
+    def test_need_file_refused_with_a_reason_in_the_next_card(self):
+        root = self.secret_repo()
+        ans = "NEED file .env\nNEED file cfg/.env.local\nNEED file id_rsa\nNEED file sub/.git/config\nNEED grep fake-not-real\n"
+        res, fake, _, _ = run(self, root, [ans], max_turns=2)
+        c2 = bodies(fake)[1]
+        for rel in (".env", "cfg/.env.local", "id_rsa", "sub/.git/config"):
+            self.assertIn(f"NEED file {rel}: refused", c2)
+        for v in ("fake-not-real-env", "fake-not-real-local", "fake-not-real-rsa", "fake-not-real-git"):
+            self.assertNotIn(v, c2)
+
+    def test_key_shaped_output_reaches_the_card_withheld(self):
+        root = py_repo(self)
+        cfg = dict(ACT_CFG, commands=dict(ACT_CFG["commands"], leak=["{python}", "-c", f"import sys; print('k={FAKE_KEY}'); sys.exit(3)"]))
+        (root / ".ga-act.json").write_text(json.dumps(cfg))
+        res, fake, _, state = run(self, root, ["RUN leak\n"], max_turns=2)
+        c2 = bodies(fake)[1]
+        self.assertNotIn(FAKE_KEY, c2 + "".join(c["system"] for c in fake.calls))
+        rows = [json.loads(x) for x in next((state / "ledger").glob("*.jsonl")).read_text().splitlines()]
+        self.assertEqual(rows[1]["withheld"], 1)
+        self.assertNotIn(FAKE_KEY, json.dumps(rows))
+        self.assertIn("$ leak: exit 3", c2)
+        self.assertIn("k=(withheld)", c2)
+
+
 class Card(unittest.TestCase):
     def test_cap_is_enforced_by_dropping_then_cutting(self):
         pre = C.prefix("CMD-X1", "goal", ["true"], ["a.py"], ["a.py"], {"test": ["x"]})
