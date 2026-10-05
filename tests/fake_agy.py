@@ -11,6 +11,9 @@
       {"set_usage": "<text>"}             -> (with any entry) usage.txt becomes <text> after this turn
       CMD-GA36: {"capacity": true} -> "AGY_ERROR: 503 MODEL_CAPACITY_EXHAUSTED", exit 3; {"sleep": s} waits s seconds
       first; {"text": "..."} answers that text instead of a plan; {"usage": {...}} is printed with the answer (json)
+      CMD-GA41: {"status_error": "<message>"} -> one JSON {"status": "ERROR", "error": <message>}, exit 0 (the Mac
+      run); {"capacity_exit0": true} -> the same with a 503 MODEL_CAPACITY_EXHAUSTED message
+    agy plugin install <dir> -> a row of kind "plugin" (argv kept), exit FAKE_AGY_PLUGIN_EXIT (default 0)
 Every call appends a row to calls.jsonl.
 """
 import json
@@ -28,6 +31,11 @@ def opt(name):
 
 prompt = opt("-p") or ""
 calls = d / "calls.jsonl"
+if argv[:2] == ["plugin", "install"]:
+    with open(calls, "a") as f:
+        f.write(json.dumps({"kind": "plugin", "argv": argv, "cwd": os.getcwd()}) + "\n")
+    print(f"installed {argv[2] if len(argv) > 2 else '?'}")
+    sys.exit(int(os.environ.get("FAKE_AGY_PLUGIN_EXIT", "0")))
 rows = [json.loads(x) for x in calls.read_text().splitlines()] if calls.exists() else []
 row = {"kind": "usage" if prompt.strip() == "/usage" else "turn", "model": opt("--model"),
        "format": opt("--output-format"), "cwd": os.getcwd(), "pid": os.getpid(),
@@ -54,6 +62,10 @@ if entry.get("crash"):
 if entry.get("capacity"):
     print("AGY_ERROR: 503 MODEL_CAPACITY_EXHAUSTED: no capacity for this model right now", file=sys.stderr)
     sys.exit(3)
+if entry.get("status_error") or entry.get("capacity_exit0"):
+    msg = entry.get("status_error") or "API error (attempt 3): MODEL_CAPACITY_EXHAUSTED (code 503)"
+    print(json.dumps({"status": "ERROR", "error": msg}))
+    sys.exit(0)
 if entry.get("quota"):
     print("AGY_ERROR: You have reached the quota limit for Gemini models.", file=sys.stderr)
     sys.exit(3)

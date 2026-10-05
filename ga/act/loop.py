@@ -21,14 +21,16 @@ from typing import Any, Callable
 
 from .. import l0
 from ..adapters.base import TurnResult
-from ..backends.base import BackendError, ModelMismatch, RateLimited
+from ..backends.base import TRANSIENT_BACKOFF_S, BackendError, ModelMismatch, RateLimited, Transient, retry_transient
 from ..ctxpack import tokens
 from ..net.pool import owned
 from . import card as C
 from . import commands as K
 from . import retrieve as R
 from .apply import apply, secret_path
-from .fmt import parse
+from .fmt import SPEC as FORM, parse
+
+REPAIR_SYSTEM = "ga act: answer only with the actions of the form below; nothing else."
 
 SPEC = "act/1"
 MAX_TURNS, MAX_TOKENS = 10, 400_000
@@ -59,6 +61,17 @@ class Result:
                 "failing": self.failing, "tokens": self.tokens, "changed": self.changed}
 
 
+def _label(e: BaseException) -> str:
+    from ..gemini import tool_error_label
+    return tool_error_label(e)
+
+
+def _broken(answer: str) -> bool:
+    """An answer that breaks the action form: format problems, or no action at all."""
+    p = parse(answer or "")
+    return bool(p.problems) or not p.actions
+
+
 def usage_counts(usage: Any, fmt: str | None) -> dict[str, int] | None:
     from ..net.node import usage_counts as uc
     out = uc(usage, fmt)
@@ -73,13 +86,15 @@ class Act:
     def __init__(self, root: Path, item: Item, runner: Any, *, backend: str, model: str,
                  commands: dict[str, list[str]], timeout_s: float = 300.0, max_turns: int = MAX_TURNS,
                  max_tokens: int = MAX_TOKENS, cap: int = C.DEFAULT_CAP, state_dir: Path | None = None,
-                 clock: Callable[[], float] = time.time, on_turn: Callable[[dict], None] | None = None):
+                 clock: Callable[[], float] = time.time, on_turn: Callable[[dict], None] | None = None,
+                 sleep: Callable[[float], None] = time.sleep, transient_backoff_s: float = TRANSIENT_BACKOFF_S):
         self.root, self.item, self.runner = Path(root), item, runner
         self.backend, self.model = backend, model
         self.commands, self.timeout_s = dict(commands), timeout_s
         self.max_turns, self.max_tokens, self.cap = max_turns, max_tokens, cap
         self.state = Path(state_dir) if state_dir else self.root / ".ga" / "act"
         self.clock, self.on_turn = clock, on_turn
+        self.sleep, self.transient_backoff_s = sleep, transient_backoff_s
         self.owned_now = [f for f in R.files(self.root, exts=None) if owned(f, item.files)]
         self.prefix, _ = C.redact(C.prefix(item.id, item.goal, item.done_when, item.files, self.owned_now,
                                            self.commands))
@@ -128,6 +143,12 @@ class Act:
     def total(self) -> int:
         return sum(v for k, v in self.used.items() if k != "estimated")
 
+    def _need(self, a: Any) -> str:
+        try:
+            return self.serve_need(a)
+        except Exception as e:  # GA41 S2: a retriever that raises is a result the next card shows
+            return f"NEED {a.need} {a.arg} failed: {_label(e)}"
+
     def serve_need(self, a: Any) -> str:
         if a.need == "file" and (secret_path(a.arg) or R.safe_rel(self.root, a.arg) is None):
             return f"NEED file {a.arg}: refused (a secret or internal file, or outside the repository)"
@@ -161,22 +182,23 @@ class Act:
                                    "backend": self.backend, "model": self.model, "card_tokens": cd.tokens,
                                    "prefix_tokens": tokens(cd.prefix), "dropped": cd.dropped,
                                    "withheld": withheld}
-            err, answer, usage, served = "", "", None, None
-            try:
-                if getattr(self.runner, "bare", False):
-                    turn_out = self.runner.run_turn(cd.body, None, system=cd.prefix)
+            err, answer, usage, served, secs = self._call(cd.body, cd.prefix, cd.text, t0)
+            row["repairs"], row["thinking"] = 0, getattr(self, "thinking", None)
+            if not err and _broken(answer):  # GA41 S1: one repair turn: the problems, the form, the answer; no card
+                from .. import repair
+                row["repairs"] = 1
+                labels = parse(answer).problems or ["no action found: the answer holds none of the actions"]
+                text = repair.prompt(labels, FORM, answer)
+                err, answer2, usage2, served, secs2 = self._call(text, REPAIR_SYSTEM, REPAIR_SYSTEM + "\n\n" + text,
+                                                                  self.clock())
+                answer = answer2 if not err else answer
+                secs = float(secs) + float(secs2)
+                if usage is not None or usage2 is not None:
+                    usage = {k: int((usage or {}).get(k, 0)) + int((usage2 or {}).get(k, 0))
+                             for k in ("input", "output", "cache_read", "cache_creation")}
                 else:
-                    turn_out = self.runner.run_turn(cd.text, None)
-                answer = turn_out.answer or ""
-                usage = usage_counts(turn_out.usage, getattr(turn_out, "usage_format", None))
-                served = ",".join(getattr(turn_out, "served", []) or []) or None
-                secs = getattr(turn_out, "seconds", None) or round(self.clock() - t0, 3)
-            except ModelMismatch as e:
-                err, secs = str(getattr(e, "reason", None) or e) or "served_model_mismatch", self.clock() - t0
-            except RateLimited as e:
-                err, secs = f"rate_limited:{getattr(e, 'kind', '?')}", self.clock() - t0
-            except BackendError as e:
-                err, secs = f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200], self.clock() - t0
+                    self.used["input"] += tokens(text) + tokens(REPAIR_SYSTEM)
+                    self.used["estimated"] += tokens(text) + tokens(REPAIR_SYSTEM)
             if usage:
                 for k in ("input", "output", "cache_read", "cache_creation"):
                     self.used[k] += int(usage.get(k, 0))
@@ -206,6 +228,29 @@ class Act:
                 return self._result(status, reason, turn, rows)
         return self._result("blocked", f"turn cap ({self.max_turns})", self.max_turns, rows)
 
+    def _call(self, body: str, system: str, whole: str, t0: float) -> tuple[str, str, Any, str | None, float]:
+        """One model turn: (error label or "", answer, usage counts, served, seconds). A transient server error is
+        retried once after the backoff (GA41 S3); a second one is the error ``transient:<code>``."""
+        def turn() -> Any:
+            if getattr(self.runner, "bare", False):
+                return self.runner.run_turn(body, None, system=system)
+            return self.runner.run_turn(whole, None)
+        try:
+            out = retry_transient(turn, backoff_s=self.transient_backoff_s, sleep=self.sleep)
+            usage = usage_counts(out.usage, getattr(out, "usage_format", None))
+            from ..gemini import thinking_tokens
+            self.thinking = thinking_tokens(out.usage)
+            served = ",".join(getattr(out, "served", []) or []) or None
+            return "", out.answer or "", usage, served, getattr(out, "seconds", None) or round(self.clock() - t0, 3)
+        except ModelMismatch as e:
+            return str(getattr(e, "reason", None) or e) or "served_model_mismatch", "", None, None, self.clock() - t0
+        except RateLimited as e:
+            return f"rate_limited:{getattr(e, 'kind', '?')}", "", None, None, self.clock() - t0
+        except Transient as e:
+            return e.reason, "", None, None, self.clock() - t0
+        except BackendError as e:
+            return f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200], "", None, None, self.clock() - t0
+
     def _act(self, answer: str, row: dict) -> tuple[str | None, str]:
         p = parse(answer)
         out = apply(self.root, p.actions, self.item.files)
@@ -224,10 +269,13 @@ class Act:
                 if a.arg not in self.commands:
                     notes.append(f"RUN {a.arg}: rejected, not a listed command name ({', '.join(sorted(self.commands)) or 'none'})")
                     continue
-                r = K.run(a.arg, self.commands[a.arg], self.root, self.timeout_s)
                 ran.append(a.arg)
-                notes.append(K.summarize(r, self.root))
-        self.needs = [self.serve_need(a) for a in p.actions if a.kind == "NEED"][:6]
+                try:
+                    r = K.run(a.arg, self.commands[a.arg], self.root, self.timeout_s)
+                    notes.append(K.summarize(r, self.root))
+                except Exception as e:  # GA41 S2: a failed command is a note the next card shows, never a crash
+                    notes.append(f"RUN {a.arg} failed: {_label(e)}")
+        self.needs = [self._need(a) for a in p.actions if a.kind == "NEED"][:6]
         for a in p.actions:
             if status:
                 break

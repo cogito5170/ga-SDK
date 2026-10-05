@@ -657,8 +657,8 @@ class D5Solve(SolveBase):
                        plan(say="unused")])
         r = self.solve(cli, cap=3)
         self.assertEqual(r["refused"], ["write_file"])
-        self.assertTrue(any(x.get("event") == "plan" and not x.get("ok") and "tool_not_in_table" in x.get("problems", "")
-                            for x in self.log_rows(r)))  # refused by ga's own plan check, by label
+        self.assertTrue(any(x.get("event") == "repair" and any("tool_not_in_table" in p for p in x.get("problems", []))
+                            for x in self.log_rows(r)))  # refused by ga's own plan check, by label (GA41: then repaired)
         self.assertTrue(any("거부된 도구" in x and "write_file" in x for x in self.lines))
         self.assertFalse(any(x.get("event") == "tool" and x.get("tool") == "write_file" for x in self.log_rows(r)))
         self.assertFalse((self.w.work / "x").exists())
@@ -726,9 +726,9 @@ class D5UiSolve(UiBase):
 class Version(unittest.TestCase):
     def test_minor_bump(self):
         import ga
-        self.assertEqual(ga.__version__, "0.8.0")
+        self.assertGreaterEqual(tuple(map(int, ga.__version__.split("."))), (0, 8, 0))  # GA41 moved it on to 0.9.0
         text = (TESTS.parent / "pyproject.toml").read_text()
-        self.assertIn('version = "0.8.0"', text)
+        self.assertIn(f'version = "{ga.__version__}"', text)
         self.assertIn('"ui/*.html", "ui/*.js", "ui/*.css"', text)
 
     def test_cli_entries_are_listed(self):

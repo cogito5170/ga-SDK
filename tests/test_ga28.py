@@ -392,7 +392,7 @@ class D2Mutations(Run):
                 written = "".join(p.read_text(errors="replace") for p in self.dir.rglob("*") if p.is_file())
                 for s in (SECRET, OTHER, "SECRET", "OTHER-default"):
                     self.assertNotIn(s, written + self.out.getvalue())
-        for status, reason in ((500, "http_500"), (401, "http_401"), (429, "rate_limited_minute")):  # failed turns
+        for status, reason in ((500, "transient:500"), (401, "http_401"), (429, "rate_limited_minute")):  # failed turns (GA41: 500 is transient)
             with self.subTest(status=status):
                 self.setUp()
                 rec = Recorded("openai_http", status=status, headers={"retry-after": "7"})

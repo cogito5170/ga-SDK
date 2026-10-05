@@ -119,7 +119,7 @@ def run_supervise(cfg: dict[str, Any], conf: Path, task: str, progress: Callable
 def is_capacity(run: dict[str, Any]) -> bool:
     """agy's 503 MODEL_CAPACITY_EXHAUSTED (or its exit 3 straight through): the server's capacity, retryable."""
     return (run.get("code") == 3 or bool(CAPACITY.search(run.get("out") or ""))
-            or any(e.get("event") == "turn" and e.get("reason") == "capacity" for e in run.get("events") or []))
+            or any(e.get("event") == "turn" and e.get("reason") in ("capacity", "transient:503") for e in run.get("events") or []))
 
 
 def build_report(cfg: dict[str, Any], head: dict[str, Any], run: dict[str, Any], capacity: bool = False) -> str:
@@ -186,7 +186,9 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
                 task = task_text(head)
                 run = runner(cfg, conf, task)
                 capacity = is_capacity(run)
-                if capacity:  # once, after a short backoff; a second capacity stop is reported, not retried again
+                retried = any(e.get("event") == "transient" for e in run.get("events") or [])
+                if capacity and not retried:  # once, after a short backoff; a second capacity stop is reported, not retried
+                    # again (GA41: ga supervise retries a transient turn itself; then the bridge does not retry the run)
                     log(f"bridge: agy capacity exhausted (503); one retry in {cfg['capacity_backoff_s']} s")
                     sleep(float(cfg["capacity_backoff_s"]))
                     run = runner(cfg, conf, task)

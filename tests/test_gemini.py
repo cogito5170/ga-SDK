@@ -376,10 +376,11 @@ class SupervisorTest(RunTask, unittest.TestCase):
         self.assertEqual(len(box.calls()), 1)  # and not tried on another model
 
     def test_a_plan_outside_the_closed_table_fails_the_step(self):
-        script = [{"plan": plan([{"id": "a", "tool": "shell", "args": {"cmd": "rm"}}])}]
-        box, sup, ok, *_ = self.run_task(script)
+        bad = {"plan": plan([{"id": "a", "tool": "shell", "args": {"cmd": "rm"}}])}
+        box, sup, ok, *_ = self.run_task([bad, bad])  # GA41: the one repair turn answers outside the table again
         self.assertFalse(ok)
         self.assertEqual(box.state()["failed"], {"T1.m1": "PlanError"})
+        self.assertEqual(len(box.calls()), 2)
 
     def test_results_in_memory_are_capped_and_kept_on_disk(self):
         script = [{"plan": plan([{"id": "a", "tool": "big", "args": {"n": 50_000}}], {"prompt": "go", "after": ["a"]})},

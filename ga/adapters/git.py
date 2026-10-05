@@ -129,7 +129,7 @@ def checked_out_at(rd: str | Path, branch: str) -> Path | None:
     path = None
     for line in git(rd, "worktree", "list", "--porcelain").splitlines():
         if line.startswith("worktree "):
-            path = Path(line[len("worktree "):])
+            path = Path(os.path.realpath(line[len("worktree "):]))  # GA41 S5: a real path, as callers compare it
         elif line == f"branch refs/heads/{branch}" and path is not None:
             return path
     return None
@@ -178,7 +178,7 @@ class GitVcs:
     def __init__(self, cfg: Config, ga_dir: str | Path):
         self.cfg = cfg
         # absolute: session clones are made with another working directory than this process's (GA10 F4)
-        self.ga_dir = Path(ga_dir).resolve()
+        self.ga_dir = Path(os.path.realpath(ga_dir))  # GA41 S5
 
     # ------------------------------------------------------------------ basics
 

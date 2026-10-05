@@ -227,10 +227,10 @@ class FiveBackends(Base):
     def test_agv_overhead_recorded(self):
         res, _, ga = self.run_on("agv", [json.dumps(good_answer())],
                                  overhead=overhead_of("agv", __import__("ga.backends", fromlist=["x"]).get("agv")))
-        self.assertEqual(res.turns[0].overhead_tokens, 11124)
+        self.assertEqual(res.turns[0].overhead_tokens, 9852)  # GA41 S4: the plugin's measured default-agent figure
         self.assertFalse(res.turns[0].bare)
         row = json.loads(next((ga / "ledger").iterdir()).read_text().splitlines()[0])
-        self.assertEqual((row["backend"], row["bare"], row["overhead_tokens"]), ("agv", False, 11124))
+        self.assertEqual((row["backend"], row["bare"], row["overhead_tokens"]), ("agv", False, 9852))
         res, _, _ = self.run_on("claude_cli", [json.dumps(good_answer())], overhead=945)
         self.assertIsNone(res.turns[0].overhead_tokens)  # bare: no host overhead beyond what usage reports
 

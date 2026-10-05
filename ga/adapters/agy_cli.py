@@ -68,6 +68,8 @@ class AgyOutput:
     agy_error: bool = False
     credits: bool = False
     quota: bool = False
+    status_error: bool = False                       # GA41: a JSON ``status: "ERROR"`` (agy may still exit 0)
+    error_text: str = ""                             # that event's error/message text, read for its class only
     events: int = 0
 
     @property
@@ -96,6 +98,12 @@ def _denied_label(d: Any) -> str:
 def _walk(obj: Any, out: AgyOutput) -> None:
     """Collect text, model and denied_actions from one JSON value (A/U shapes: looked for at any depth)."""
     if isinstance(obj, dict):
+        if str(obj.get("status", "")).upper() == "ERROR":  # GA41 (Mac run): exit 0 with status ERROR is an error
+            out.status_error = True
+            for k in ("error", "message", "detail"):
+                v = obj.get(k)
+                if v is not None:
+                    out.error_text += " " + (v if isinstance(v, str) else json.dumps(v))[:500]
         m = _model_name(obj.get("model"))
         if m and m not in out.served:
             out.served.append(m)
@@ -138,9 +146,9 @@ def parse_output(stdout: str, stderr: str = "") -> AgyOutput:
                 except ValueError:
                     pass
     plain = "\n".join(x for x in (stdout + "\n" + stderr).splitlines() if not x.strip().startswith("{"))
-    out.agy_error = "AGY_ERROR" in plain
+    out.agy_error = "AGY_ERROR" in plain or out.status_error
     out.credits = bool(CREDITS.search(stdout + "\n" + stderr))
-    out.quota = out.agy_error and bool(QUOTA_WORDS.search(plain))
+    out.quota = out.agy_error and bool(QUOTA_WORDS.search(plain + " " + out.error_text))
     return out
 
 
@@ -211,13 +219,17 @@ class AgyCLI:
     resumes = False  # U: no known --resume; the supervisor sends self-contained prompts
 
     def __init__(self, command: list[str] | None = None, model: str = DEFAULT_MODEL, *, cwd: str | None = None,
-                 env: dict[str, str] | None = None, timeout_s: float = 600.0, settings_dir: Any = None):
+                 env: dict[str, str] | None = None, timeout_s: float = 600.0, settings_dir: Any = None,
+                 agent: str | None = None, effort: str | None = None):
         self.command = list(command or ["agy"])
         self.model, self.cwd, self.timeout_s = model, cwd, timeout_s
         self.env = clean_env() if env is None else dict(env)
+        self.agent, self.effort = agent, effort  # GA41 S4/S6: --agent <plugin agent> before -p; --effort <level>
 
     def argv(self, prompt: str, session_id: str | None = None) -> list[str]:
-        return self.command + ["-p", prompt, "--output-format", "stream-json", "--model", self.model]
+        head = ["--agent", self.agent] if self.agent else []
+        tail = ["--effort", self.effort] if self.effort else []
+        return self.command + head + ["-p", prompt, "--output-format", "stream-json", "--model", self.model] + tail
 
     def _run(self, argv: list[str], on_wait: Callable[[float], None] | None = None,
              wait_every_s: float | None = None) -> tuple[str, str, int]:
@@ -251,13 +263,19 @@ class AgyCLI:
         t0 = time.monotonic()
         stdout, stderr, code = self._run(self.argv(prompt), on_wait, wait_every_s)
         o = parse_output(stdout, stderr)
-        if code != 0 and CAPACITY.search(stdout + "\n" + stderr):
-            raise GeminiError("capacity")  # GA36: retryable; ga bridge retries once, then reports capacity (not quota)
+        from ..backends.base import Transient, transient_code
         if o.credits:  # never accept paid credits: the plan quota is spent
             raise AgyQuota("credits")
         if o.quota:
             raise AgyQuota("quota")
         if code != 0 or o.agy_error:
+            # GA41 S3: 503 MODEL_CAPACITY_EXHAUSTED (GA36) and 'INTERNAL (code 500)' are the server's passing trouble:
+            # the loop retries once, then the step fails as transient:<code>
+            c = transient_code(o.error_text + "\n" + stdout + "\n" + stderr)
+            if c is not None:
+                raise Transient(c)
+            if o.status_error and code == 0:
+                raise GeminiError("agy_status_error")
             raise GeminiError("agy_error" if o.agy_error or code == 3 else f"exit_{code}")
         from ..backends.base import check_served
         check_served(o.served, self.model)
