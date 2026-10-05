@@ -1343,3 +1343,451 @@ class Hub:
             if q.get("decision") in approved_by and self._is_user_decision(q["decision"]) and q.get("label") == q["doc"]["options"][0]["label"]:
                 out.add(q["gate"])
         return out
+
+
+# ====================================================================== CMD-GA42 S1: ga hub (mail-driven tick)
+# The same stage-1 pass (receive → reproduce/judge → decide → integrate → record → mail) for reports that arrive by
+# ga mail, with judgement narrowed to one small-model turn over a fixed-size verdict card. Code decides what the
+# model's word may do: ACCEPT integrates only a judge success (fast-forward, never force), SEND_BACK is capped per id,
+# anything unclear goes to the human inbox. Nothing new → no write, no model call (R9).
+
+HUB_SPEC = """# ga hub: decide one report. Answer with exactly one of these (no prose):
+ACCEPT
+SEND_BACK
+- <one thing the session must fix> (1 to 6 lines, each starting with '- ')
+ASK_HUMAN <one-line question for the person>
+Code acts on it: ACCEPT integrates only when the judge class is success; SEND_BACK mails a verdict and the next
+revision of the directive; ASK_HUMAN mails the person. Judge class, failing tests and surviving mutants are facts.
+"""
+CARD_MAX = 6000      # bytes, the whole card (S1: <= 6 KB)
+ASKS_MAX = 6
+SENDBACK_CAP = 3
+DAILY_TURNS = 20
+_DECIDE = re.compile(r"^\s*(ACCEPT|SEND_BACK|ASK_HUMAN)\b[ \t:]*(.*)$")
+_BD = re.compile(r"^\| BD-(\d+) \|", re.M)
+_ROUND = re.compile(r"^- (\d+) 회차:", re.M)
+
+
+def parse_decision(answer: str) -> tuple[str, list[str]]:
+    """(ACCEPT | SEND_BACK | ASK_HUMAN, lines). The first action line counts; anything else is ASK_HUMAN."""
+    rows = [x for x in (answer or "").replace("\r\n", "\n").split("\n") if x.strip() and not x.strip().startswith("```")]
+    for i, ln in enumerate(rows):
+        m = _DECIDE.match(ln)
+        if not m:
+            continue
+        if m[1] == "ACCEPT":
+            return "ACCEPT", []
+        if m[1] == "ASK_HUMAN":
+            return "ASK_HUMAN", [(m[2].strip() or "the model asked for a person")[:300]]
+        asks = [x.strip()[2:].strip()[:200] for x in rows[i + 1:] if x.strip().startswith("- ")][:ASKS_MAX]
+        return ("SEND_BACK", asks) if asks else ("ASK_HUMAN", ["SEND_BACK without any ask line"])
+    return "ASK_HUMAN", ["the model's answer was not ACCEPT / SEND_BACK / ASK_HUMAN"]
+
+
+def _cut(text: str, n: int) -> str:
+    return text if len(text) <= n else text[: max(n - 4, 0)] + " ..."
+
+
+def verdict_card(directive: dict[str, Any], head: dict[str, Any], j: Any, diffstat: list[str], outside: list[str],
+                 previous: list[dict[str, Any]], cap: int = CARD_MAX) -> str:
+    """The fixed-size card: every section has its own cap and the whole is cut to ``cap`` bytes (UTF-8)."""
+    from .act.card import redact
+    dw = [f"- {x.get('id')}: {x.get('text', '')}" for x in directive.get("done_when", []) if isinstance(x, dict)]
+    items = [f"- {x.get('id')} {x.get('state')}: " + _cut(" | ".join(x.get("evidence") if isinstance(x.get("evidence"), list)
+                                                                   else [str(x.get("evidence", ""))]), 160)
+             for x in head.get("items", []) if isinstance(x, dict)]
+    t = j.tests.get(j.repo, {}) if getattr(j, "tests", None) else {}
+    mutants = [n for n in getattr(j, "notes", []) if re.search(r"(?i)mutant|surviv", n)]
+    sec = [
+        ("## directive", f"{directive.get('id', '?')} rev {directive.get('rev', '?')}: " + _cut(str(directive.get("goal", "")), 600), 700),
+        ("## done_when", "\n".join(dw), 1100),
+        ("## report items", "\n".join(items[:12]), 1100),
+        ("## judge", f"class {j.cls}{' · ' + j.cause if j.cause else ''}; tests {t.get('passed', '?')} passed "
+                     f"{t.get('failed', '?')} failed {t.get('skipped', '?')} skipped; ff {bool(j.ff)}; "
+                     f"needs_judgement {len(j.needs)}\nfailing: " + (", ".join(j.failing[:20]) or "none")
+         + "\nsurviving mutants: " + ("; ".join(mutants[:8]) or "none"), 1100),
+        ("## diff stat", "\n".join(diffstat[:30]) or "(none)", 700),
+        ("## files outside the directive's owned paths", "\n".join(outside[:20]) or "none", 400),
+        ("## previous verdicts on this id", "\n".join(f"- {p.get('decision')} ({p.get('class')})" for p in previous[-5:])
+         or "none", 300),
+    ]
+    body = HUB_SPEC + "\n" + "\n\n".join(f"{t_}\n{_cut(redact(b)[0], n)}" for t_, b, n in sec) + "\n"
+    raw = body.encode("utf-8")
+    return body if len(raw) <= cap else raw[:cap - 4].decode("utf-8", "ignore") + "\n..."
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """The JSON object lines of ``path`` (a missing file is empty; a broken line is skipped)."""
+    if not Path(path).exists():
+        return []
+    out = []
+    for ln in Path(path).read_text(encoding="utf-8").splitlines():
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue
+        if isinstance(r, dict):
+            out.append(r)
+    return out
+
+
+_SAME = {"ACCEPT": "ACCEPT", "ACCEPTED": "ACCEPT", "CONTINUE": "ACCEPT", "SEND_BACK": "SEND_BACK", "SENT_BACK": "SEND_BACK",
+         "REFINE": "SEND_BACK", "ASK_HUMAN": "ASK_HUMAN", "ASK_USER": "ASK_HUMAN"}
+
+
+def shadow_compare(baseline: list[dict[str, Any]], shadow: list[dict[str, Any]]) -> dict[str, Any]:
+    """Line a baseline verdict list {id, rev, decision} up against shadow.jsonl by (id, rev) — the last shadow line
+    of a pair counts — and count agreement, false accepts (hub ACCEPT where baseline sent back) and extra send-backs
+    (hub SEND_BACK where baseline accepted). BASELINE_INTO_GA.md stage 2 gate: ``gate_ok`` needs 0 false accepts."""
+    def key(r: dict[str, Any]) -> tuple[str, str]:
+        return str(r.get("id")), str(r.get("rev"))
+
+    def norm(d: Any) -> str:
+        return _SAME.get(str(d or "").strip().upper().replace("-", "_").replace(" ", "_"), str(d or "?"))
+
+    hub = {key(r): norm(r.get("decision")) for r in shadow}
+    rows, false_accepts, extra, missing = [], [], [], []
+    for b in baseline:
+        k = key(b)
+        if k not in hub:
+            missing.append(f"{k[0]} rev {k[1]}")
+            continue
+        bd, hd = norm(b.get("decision")), hub[k]
+        rows.append({"id": k[0], "rev": k[1], "baseline": bd, "hub": hd, "agree": bd == hd})
+        if hd == "ACCEPT" and bd == "SEND_BACK":
+            false_accepts.append(f"{k[0]} rev {k[1]}")
+        if hd == "SEND_BACK" and bd == "ACCEPT":
+            extra.append(f"{k[0]} rev {k[1]}")
+    agree = sum(r["agree"] for r in rows)
+    return {"compared": len(rows), "agree": agree, "agreement": round(agree / len(rows), 3) if rows else None,
+            "false_accepts": false_accepts, "extra_send_backs": extra, "missing_in_shadow": missing,
+            "rows": rows, "gate_ok": bool(rows) and not false_accepts}
+
+
+class MailHub(Hub):
+    """``ga hub tick``: the hub tick for mailed reports (CMD-GA42 S1). Reuses Hub's quiet writes (R9) and its
+    directive rev+1 (``_next_rev``); the judge is ``ga judge``, the integration is ``ga judge --apply``.
+
+    Shadow mode (``shadow=True``, ``ga hub tick --shadow`` or ``"shadow": true`` in the config; CMD-GA42 rev 2) runs
+    the judge, the card and the model decision exactly as above but changes nothing: no integration, no mail, no
+    baseline record, no state, no ledger, no read mark. Its one write is a line per decision in
+    ``<ga dir>/hub/shadow.jsonl``; a mail already in that file is not decided again."""
+
+    def __init__(self, conf: dict[str, Any], *, ga_dir: str | Path, mailbox: Any = None, runner: Any = None,
+                 judge_fn: Callable[..., Any] | None = None, apply_fn: Callable[..., Any] | None = None,
+                 today: Callable[[], str] = lambda: date.today().isoformat(), shadow: bool | None = None):
+        from . import judge as J
+        from .mailbox import Mailbox
+        self.conf = conf
+        self.ga = real_path(ga_dir)
+        self.state_path = self.ga / "hub" / "state.json"
+        self.today = today
+        self._writes = 0
+        self.name = conf.get("name", "baseline")
+        self.human = conf.get("human", "human")
+        self.mailbox = mailbox or Mailbox(conf["mailbox_repo"], remote=conf.get("mailbox_remote", "origin"))
+        self.runner = runner
+        self.judge_fn = judge_fn or J.judge
+        self.apply_fn = apply_fn or J.apply
+        self.shadow = bool(conf.get("shadow")) if shadow is None else bool(shadow)
+        self.shadow_path = self.ga / "hub" / "shadow.jsonl"
+        self._usage: dict[str, Any] | None = None
+
+    # ---------------------------------------------------------------- state
+    def load_state(self) -> dict[str, Any]:
+        if self.state_path.exists():
+            return json.loads(self.state_path.read_text(encoding="utf-8"))
+        return {"handled": {}, "verdicts": {}, "sendbacks": {}, "directives": {}}
+
+    def _ledger_today(self) -> Path:
+        return self.ga / "hub" / "ledger" / f"{self.today()}.jsonl"
+
+    def turns_today(self) -> int:
+        if self.shadow:
+            return sum(r.get("at", "").startswith(self.today()) for r in self._shadow_rows())
+        f = self._ledger_today()
+        return len(f.read_text(encoding="utf-8").splitlines()) if f.exists() else 0
+
+    def _shadow_rows(self) -> list[dict[str, Any]]:
+        return read_jsonl(self.shadow_path)
+
+    def _shadow(self, m: Any, did: str | None, head: dict[str, Any], directive: dict[str, Any] | None, j: Any,
+                decision: str, lines: list[str]) -> None:
+        """The one write of a shadow decision (S1 rev 2)."""
+        from datetime import datetime, timezone
+        rev = next((h.get("rev_seen") for h in head.get("handled", []) if isinstance(h, dict) and h.get("id") == did),
+                   None) or (directive or {}).get("rev")
+        u = self._usage or {}
+        row = {"at": f"{self.today()}T{datetime.now(timezone.utc).strftime('%H:%M:%S')}Z", "id": did, "rev": rev, "sha": getattr(j, "sha", None),
+               "judge_class": getattr(j, "cls", None), "needs": list(getattr(j, "needs", None) or []),
+               "decision": decision, "asks": list(lines), "tokens": {"input": u.get("input"), "output": u.get("output")},
+               "mail": m.path}
+        self.shadow_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.shadow_path, "a", encoding="utf-8") as h:
+            h.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+        self._writes += 1
+
+    def _runner(self) -> Any:
+        if self.runner is None:
+            from . import backends
+            self.runner = backends.create(self.conf.get("backend", "agv"), self.conf.get("model", "gpt-oss-120b-medium"),
+                                          dict(self.conf.get("options") or {}),
+                                          {"cwd": str(self.ga), "state_dir": str(self.ga / "hub")})
+        return self.runner
+
+    # ---------------------------------------------------------------- the tick
+    def tick(self, dry_run: bool = False) -> TickResult:
+        self._writes = 0
+        res = TickResult()
+        st = self.load_state()
+        done = {r.get("mail") for r in self._shadow_rows()} if self.shadow else st["handled"]
+        msgs = [m for m in self.mailbox.unread(self.name) if m.path not in done]
+        if not msgs:
+            res.quiet = True
+            return res
+        for m in msgs:
+            if self.turns_today() >= int(self.conf.get("daily_turns", DAILY_TURNS)):
+                res.plan.append(f"daily turn cap {self.conf.get('daily_turns', DAILY_TURNS)} reached; {m.path} waits")
+                break
+            if dry_run:
+                res.plan.append(f"would judge and decide {m.path}")
+                continue
+            if self.shadow:  # nothing but shadow.jsonl: no read mark, no state
+                self._one(json.loads(json.dumps(st)), m, res)
+                continue
+            self._one(st, m, res)
+            self.mailbox.mark_read(self.name, m.path)
+            self.save_state(st)
+        res.writes = self._writes
+        res.quiet = not res.sent and not res.plan and not res.integrated
+        return res
+
+    def _one(self, st: dict[str, Any], m: Any, res: TickResult) -> None:
+        from .forms import parse_text
+        try:
+            head, _ = parse_text(m.text)
+        except Exception:
+            head = {}
+        if m.schema != "report/2" or m.problems:
+            st["handled"][m.path] = "skipped: " + ("; ".join(m.problems) or f"not a report ({m.schema})")[:200]
+            return
+        did = next((h.get("id") for h in head.get("handled", []) if isinstance(h, dict)), None)
+        commit = next((c for c in head.get("commits", []) if isinstance(c, dict) and c.get("repo") in self.conf.get("repos", {})), None)
+        directive = self._directive(st, did)
+        if not did or commit is None or directive is None:
+            why = "no configured repo in the report's commits" if commit is None else f"no directive {did} on file"
+            if self.shadow:
+                self._usage = None
+                self._shadow(m, did, head, directive, None, "ASK_HUMAN", [why])
+                res.plan.append(f"shadow ASK_HUMAN {did}")
+                return
+            self._ask(st, m, did or "?", head, None, why)
+            res.sent.append(f"ASK_HUMAN {did}")
+            return
+        rc = self.conf["repos"][commit["repo"]]
+        rp = Path(rc["path"]).expanduser()
+        if self.shadow:  # the report goes to a throwaway file, not <ga dir>/hub/reports
+            import tempfile
+            tmp = Path(tempfile.mkdtemp(prefix="ga-hub-shadow-"))
+            rfile = tmp / Path(m.path).name
+            rfile.write_text(m.text, encoding="utf-8")
+        else:
+            tmp, rfile = None, self.ga / "hub" / "reports" / Path(m.path).name
+            self._write(rfile, m.text)
+        try:
+            j = self.judge_fn(str(rfile), rp, rc["base"], mutations=rc.get("mutations"), config=rc.get("config"),
+                              remote=rc.get("remote", "origin"))
+        except Exception as e:  # the judge itself failed: a person looks
+            if self.shadow:
+                self._usage = None
+                self._shadow(m, did, head, directive, None, "ASK_HUMAN", [f"ga judge failed: {type(e).__name__}"])
+                res.plan.append(f"shadow ASK_HUMAN {did}")
+                return
+            self._ask(st, m, did, head, None, f"ga judge failed: {type(e).__name__}: {str(e)[:200]}")
+            res.sent.append(f"ASK_HUMAN {did}")
+            return
+        finally:
+            if tmp is not None:
+                shutil.rmtree(tmp, ignore_errors=True)
+        j.directive = j.directive or did
+        j.repo = j.repo or commit["repo"]
+        diffstat, changed = self._diff(rp, rc["base"], j.sha or commit.get("sha", ""))
+        owned = self.conf.get("owned", {}).get(did, [])
+        from fnmatch import fnmatch
+        outside = [f for f in changed if owned and not any(fnmatch(f, g) for g in owned)]
+        card = verdict_card(directive, head, j, diffstat, outside, st["verdicts"].get(did, []))
+        decision, lines, err = self._decide(card, did)
+        if decision == "ACCEPT" and not (j.cls == "success" and not j.needs):
+            decision, lines = "ASK_HUMAN", [f"the model said ACCEPT but the judge class is {j.cls}"
+                                            f"{' with ' + str(len(j.needs)) + ' item(s) for judgement' if j.needs else ''}"]
+        if decision == "SEND_BACK" and st["sendbacks"].get(did, 0) >= int(self.conf.get("sendback_cap", SENDBACK_CAP)):
+            decision, lines = "ASK_HUMAN", [f"send-back cap {self.conf.get('sendback_cap', SENDBACK_CAP)} reached on "
+                                            f"{did}; the model wanted another: " + "; ".join(lines)[:200]]
+        if self.shadow:  # decided exactly as above; nothing is integrated, mailed or recorded
+            self._shadow(m, did, head, directive, j, decision, lines)
+            res.plan.append(f"shadow {decision} {did}")
+            return
+        if decision == "ACCEPT":
+            try:
+                pushed = self.apply_fn(j, rp, rc.get("remote", "origin"))
+            except Exception as e:  # refused or rejected: never forced
+                decision, lines = "ASK_HUMAN", [f"integration refused: {type(e).__name__}: {str(e)[:200]}"]
+            else:
+                res.integrated[commit["repo"]] = j.sha
+                rec = self._record(directive, j, m.sender)
+                self._mail(m.sender, self._verdict(j, "continue", "accepted: " + pushed, []))
+                st["verdicts"].setdefault(did, []).append({"decision": "ACCEPT", "class": j.cls, "sha": j.sha, **rec})
+                st["handled"][m.path] = "ACCEPT"
+                res.sent.append(f"ACCEPT {did}")
+                return
+        if decision == "SEND_BACK":
+            st["sendbacks"][did] = st["sendbacks"].get(did, 0) + 1
+            nxt = self._next_directive(st, did, lines)
+            self._mail(m.sender, self._verdict(j, "refine", "sent back: " + "; ".join(lines)[:200], lines))
+            self._mail(m.sender, nxt["wire"])
+            st["verdicts"].setdefault(did, []).append({"decision": "SEND_BACK", "class": j.cls, "rev": nxt["rev"]})
+            st["handled"][m.path] = "SEND_BACK"
+            res.sent.append(f"SEND_BACK {did} rev {nxt['rev']}")
+            return
+        self._ask(st, m, did, head, j, "; ".join(lines) + (f" ({err})" if err else ""))
+        res.sent.append(f"ASK_HUMAN {did}")
+
+    # ---------------------------------------------------------------- pieces
+    def _directive(self, st: dict[str, Any], did: str | None) -> dict[str, Any] | None:
+        if not did:
+            return None
+        if did in st["directives"]:
+            return st["directives"][did]
+        d = self.conf.get("directives_dir")
+        f = Path(d).expanduser() / f"{did}.md" if d else None
+        if f is None or not f.is_file():
+            return None
+        from .forms import parse_text
+        try:
+            head, _ = parse_text(f.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        return head if head.get("schema") == "directive/2" and head.get("id") == did else None
+
+    def _next_directive(self, st: dict[str, Any], did: str, asks: list[str]) -> dict[str, Any]:
+        from .forms import dump_wire
+        prev = self._directive(st, did)
+        doc = self._next_rev({"doc": prev, "rev": prev.get("rev", 1)}, did, "send-back: " + "; ".join(asks)[:600],
+                             "every send-back ask in this revision is met and the full suite is green",
+                             replace_done=False)
+        doc.pop("supersedes", None)
+        st["directives"][did] = apply_changes(prev, doc)
+        return {"rev": doc["rev"], "wire": dump_wire(doc)}
+
+    @staticmethod
+    def _diff(repo: Path, base: str, sha: str) -> tuple[list[str], list[str]]:
+        import subprocess
+        if not sha:
+            return [], []
+        p = subprocess.run(["git", "diff", "--numstat", f"{base}...{sha}"], cwd=repo, capture_output=True, text=True)
+        if p.returncode:
+            return [], []
+        rows = [ln.split("\t") for ln in p.stdout.splitlines() if ln.count("\t") >= 2]
+        return [f"{f} +{a} -{d}" for a, d, f in rows], [f for _, _, f in rows]
+
+    def _decide(self, card: str, did: str) -> tuple[str, list[str], str]:
+        """One model turn; it goes to the ledger and L0 whatever happens."""
+        import time as _t
+        from . import l0
+        from .act.loop import usage_counts
+        runner = self._runner()
+        t0, err, answer, usage, served = _t.time(), "", "", None, None
+        try:
+            out = runner.run_turn(card, None, system=HUB_SPEC) if getattr(runner, "bare", False) else runner.run_turn(card, None)
+            answer = out.answer or ""
+            usage = usage_counts(out.usage, getattr(out, "usage_format", None))
+            served = ",".join(getattr(out, "served", []) or []) or None
+        except Exception as e:  # a backend error is a label, and the report goes to a person
+            err = f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200]
+        decision, lines = parse_decision(answer) if not err else ("ASK_HUMAN", ["the model turn failed"])
+        secs = round(_t.time() - t0, 3)
+        self._usage = usage
+        if self.shadow:  # the tokens go to shadow.jsonl; no ledger, no L0
+            return decision, lines, err
+        row = {"id": did, "kind": "hub", "backend": self.conf.get("backend", "agv"), "model": self.conf.get("model"),
+               "served": served, "decision": decision, "error": err, "card_bytes": len(card.encode("utf-8")),
+               "input": (usage or {}).get("input"), "output": (usage or {}).get("output"), "seconds": secs}
+        l0.append(self._ledger_today(), row)
+        ev = l0.run_end(f"hub:{did}:{self.turns_today()}", TurnResult(ended=True, usage=usage, model=served,
+                                                                     seconds=float(secs), error=err),
+                        decision_ref=did, source="ga_hub")
+        l0.append(self.ga / "telemetry" / "hub.jsonl", ev)
+        self._writes += 2
+        return decision, lines, err
+
+    def _verdict(self, j: Any, choice: str, reason: str, asks: list[str]) -> str:
+        from .forms import dump_wire
+        from .judge import verdict_head
+        head = verdict_head(j)
+        head["next"] = {"choice": choice, "reason": reason[:500]}
+        if asks:
+            head["claims_vs_evidence"] = list(head.get("claims_vs_evidence", [])) + [f"ask: {a}" for a in asks]
+        head["evidence"]["tests"] = {k: v for k, v in head["evidence"].get("tests", {}).items()
+                                     if isinstance(v, dict) and all(isinstance(x, int) for x in v.values())}
+        return dump_wire(head)
+
+    def _mail(self, to: str, text: str) -> str:
+        from .mailbox import secrets_in
+        if secrets_in(text):
+            raise RuntimeError("ga hub: refusing to mail a form that looks like it holds a secret")
+        return self.mailbox.send(to, text, sender=self.name)
+
+    def _ask(self, st: dict[str, Any], m: Any, did: str, head: dict[str, Any], j: Any, question: str) -> None:
+        from .forms import dump_wire
+        from .judge import Judgement, verdict_head
+        jj = j or Judgement(cls="insufficient", cause="measurement", directive=did)
+        v = verdict_head(jj)
+        v["next"] = {"choice": "ask_user", "reason": f"{did}: {question}"[:500]}
+        v["evidence"]["tests"] = {}
+        v["note"] = f"ga hub: {did} from {m.sender} needs a person ({m.path})"[:280]
+        self._mail(self.human, dump_wire(v))
+        st["verdicts"].setdefault(did, []).append({"decision": "ASK_HUMAN", "class": jj.cls})
+        st["handled"][m.path] = "ASK_HUMAN"
+
+    # ---------------------------------------------------------------- baseline records
+    def _record(self, directive: dict[str, Any], j: Any, role: str) -> dict[str, Any]:
+        """One BD row, one round line, the sessions.txt line; commit and push (never force) in the baseline repo."""
+        import subprocess
+        base = Path(self.conf["baseline_repo"]).expanduser()
+        did = directive.get("id", j.directive)
+        dl, bl, ss = base / "DECISION_LOG.md", base / "BASELINE.md", base / "ops" / "tokmon" / "sessions.txt"
+        text = dl.read_text(encoding="utf-8")
+        n = max([int(x) for x in _BD.findall(text)] or [0]) + 1
+        rel = sorted(set(re.findall(r"\bBD-\d+\b", " ".join([str(directive.get("why", ""))] + [str(r) for r in directive.get("refs", [])]))),
+                     key=lambda x: int(x[3:]))
+        t = j.tests.get(j.repo, {})
+        row = (f"| BD-{n} | {self.today()} ga hub ACCEPT {did} rev {directive.get('rev', 1)}: {j.repo}@{j.sha[:7]} "
+               f"{j.cls}, tests {t.get('passed', '?')}/{t.get('failed', '?')}/{t.get('skipped', '?')}, ff {j.base} | "
+               f"{', '.join(rel) or '-'} |").replace("\n", " ")
+        lines = text.split("\n")
+        at = next((i for i, ln in enumerate(lines) if ln.startswith("| BD-60 |")), None)
+        if at is None:
+            at = max((i for i, ln in enumerate(lines) if _BD.match(ln)), default=len(lines) - 1) + 1
+        lines.insert(at, row)
+        self._write(dl, "\n".join(lines))
+        btext = bl.read_text(encoding="utf-8")
+        blines = btext.split("\n")
+        r = max([int(x) for x in _ROUND.findall(btext)] or [0]) + 1
+        last = max((i for i, ln in enumerate(blines) if _ROUND.match(ln)), default=len(blines) - 1)
+        blines.insert(last + 1, f"- {r} 회차: {did} 수용 — {j.repo}@{j.sha[:7]} ff {j.base} (BD-{n}).")
+        self._write(bl, "\n".join(blines))
+        sid = (self.conf.get("sessions") or {}).get(role, "unknown")
+        sline = f"{sid} {role} {did}"
+        old = ss.read_text(encoding="utf-8") if ss.exists() else ""
+        if sline not in old.splitlines():
+            self._write(ss, old + ("" if not old or old.endswith("\n") else "\n") + sline + "\n")
+        g = ["git", "-C", str(base)]
+        if not subprocess.run(g + ["config", "user.email"], capture_output=True, text=True).stdout.strip():
+            g += ["-c", "user.name=ga hub", "-c", "user.email=ga-hub@localhost"]
+        subprocess.run(g + ["add", "--", "DECISION_LOG.md", "BASELINE.md", "ops/tokmon/sessions.txt"], check=True,
+                       capture_output=True)
+        subprocess.run(g + ["commit", "-q", "-m", f"ga hub: BD-{n} {did} accepted ({j.repo}@{j.sha[:7]})"], check=True,
+                       capture_output=True)
+        push = subprocess.run(["git", "-C", str(base), "push", "-q", self.conf.get("baseline_remote", "origin"), "HEAD"],
+                              capture_output=True, text=True)
+        return {"bd": f"BD-{n}", "round": r, "baseline_pushed": push.returncode == 0}

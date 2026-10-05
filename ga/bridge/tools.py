@@ -3,6 +3,8 @@ calls these as Python tools; the model only plans.
 
 Rules for every tool here: read-only, confined to the project folder (the process cwd), output capped, no network,
 no shell. A new tool comes in only through review (code + test), never installed because a model asked for it.
+The one door for more (CMD-GA42 S3): commands a person approved in GA Actions appear as the single table tool
+``action`` (args: name + placeholder values); the model sees their names and one-line abouts only.
 """
 from __future__ import annotations
 
@@ -97,4 +99,24 @@ def run_check(name: str) -> str:
         out, code = (p.stdout or "") + (p.stderr or ""), p.returncode
     except subprocess.TimeoutExpired:
         out, code = "timed out after 600 s", 124
+    return f"exit {code}\n" + out[-CAP:]
+
+
+def table() -> dict[str, dict[str, str]]:
+    """TOOLS, plus ``action`` when GA Actions has approved entries (CMD-GA42 S3): one tool, names + about only."""
+    from .. import actions
+    names = actions.about()
+    if not names:
+        return dict(TOOLS)
+    listing = "; ".join(f"{n}: {a}" for n, a in names.items())
+    return {**TOOLS, "action": {"python": "ga.bridge.tools:action",
+                                "about": f"run an approved action by name; args: name, path or name values for its "
+                                         f"placeholders. approved: {listing}"[:1500]}}
+
+
+def action(name: str, path: str | None = None, **values: str) -> str:
+    """Run one approved GA Action by name in the project (no shell; values only for {path} / {name})."""
+    from .. import actions
+    vals = {**values, **({"path": path} if path is not None else {})}
+    code, out = actions.run(str(name), vals, _root())
     return f"exit {code}\n" + out[-CAP:]

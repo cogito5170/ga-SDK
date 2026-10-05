@@ -24,7 +24,7 @@ from typing import Any, Callable
 from ..forms import FormError, hard, parse_text, validate
 from ..mailbox import Mailbox, MailError, secrets_in
 from ..runlog import Tail, TurnMeter, follow
-from .tools import TOOLS
+from .tools import TOOLS, table
 
 DEFAULTS = {"name": "AGY", "hub": "baseline", "every_s": 300, "turn_timeout_s": 1800, "max_answer_chars": 4000,
             "supervise_config": "ga-supervise.json", "pull": True, "capacity_backoff_s": 30}
@@ -59,7 +59,7 @@ def effective_config(cfg: dict[str, Any], directive_id: str | None = None, max_s
     """ga-supervise.json + ga's tool table; each directive gets its own state dir (<state_dir>/<id>). ``max_steps``
     (ga ask: the daily agy cap left) lowers the config's model-turn cap, never raises it."""
     base = json.loads((Path(cfg["workdir"]) / cfg["supervise_config"]).read_text(encoding="utf-8"))
-    base["tools"] = {**TOOLS, **(base.get("tools") or {})}
+    base["tools"] = {**table(), **(base.get("tools") or {})}
     if directive_id:
         base["state_dir"] = str(Path(base.get("state_dir") or ".ga-supervise") / directive_id)
     if max_steps is not None:
@@ -128,6 +128,12 @@ def build_report(cfg: dict[str, Any], head: dict[str, Any], run: dict[str, Any],
     ok = run["code"] == 0 and end.get("status") == "done" and not capacity
     out = run["out"]
     needed = TOOL_NEEDED.findall(out)
+    if needed:  # CMD-GA42 S2: a TOOL_NEEDED line becomes a proposal (refused until a person writes its argv)
+        from .. import actions
+        try:
+            actions.from_text(out, Path(cfg["workdir"]), source="ga bridge")
+        except (OSError, ValueError, KeyError):
+            pass
     refused = REFUSED.findall(out)
     blockers = []
     if capacity:

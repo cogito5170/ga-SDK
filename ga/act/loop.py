@@ -96,8 +96,10 @@ class Act:
         self.clock, self.on_turn = clock, on_turn
         self.sleep, self.transient_backoff_s = sleep, transient_backoff_s
         self.owned_now = [f for f in R.files(self.root, exts=None) if owned(f, item.files)]
+        from .. import actions as GA
+        self.actions = GA.about()  # CMD-GA42: approved actions, by name + one-line about only
         self.prefix, _ = C.redact(C.prefix(item.id, item.goal, item.done_when, item.files, self.owned_now,
-                                           self.commands))
+                                           self.commands, self.actions))
         self.last = ""                  # the last turn's summary only: never a history
         self.needs: list[str] = []      # NEED results for the next card
         self.measure: K.Ran | None = None
@@ -265,6 +267,12 @@ class Act:
             if m.ok:
                 status, reason = "done", "done_when passes"
         for a in p.actions:
+            if a.kind == "PROPOSE":
+                notes.append(self._propose(a))
+            if a.kind == "RUN" and a.arg not in self.commands and a.arg in self.actions:
+                ran.append(a.arg)
+                notes.append(self._action(a))
+                continue
             if a.kind == "RUN":
                 if a.arg not in self.commands:
                     notes.append(f"RUN {a.arg}: rejected, not a listed command name ({', '.join(sorted(self.commands)) or 'none'})")
@@ -292,6 +300,28 @@ class Act:
                     "needs": sum(1 for a in p.actions if a.kind == "NEED"), "format_problems": len(p.problems),
                     "noise_lines": p.noise, "changed": list(out.changed)})
         return status, reason
+
+    def _propose(self, a: Any) -> str:
+        """CMD-GA42 S2: record a proposal (check + trial); it never becomes callable here."""
+        from .. import actions as GA
+        try:
+            p = json.loads(a.content)
+        except ValueError:
+            p = None
+        if not isinstance(p, dict):
+            return f"PROPOSE {a.arg}: the line after it must be one JSON object"
+        rec = GA.propose({**p, "name": a.arg}, self.root, source=f"ga act {self.item.id}")
+        if not rec["check"]["ok"]:
+            return f"PROPOSE {a.arg}: refused: {'; '.join(rec['check']['reasons'])}"[:400]
+        return f"PROPOSE {a.arg}: recorded; a person decides (ga actions approve {a.arg}); not callable until then"
+
+    def _action(self, a: Any) -> str:
+        from .. import actions as GA
+        try:
+            code, out = GA.run(a.arg, a.values, self.root)
+        except GA.ActionError as e:
+            return f"RUN {a.arg}: refused: {e}"[:400]
+        return f"RUN {a.arg}: exit {code}\n{out[-1500:]}"
 
     def _last_text(self, out: Any, p: Any, notes: list[str]) -> str:
         lines = [f"applied: {', '.join(out.applied) or 'nothing'}"]

@@ -37,6 +37,10 @@ NEW <path>
 <whole content of a file that does not exist yet>
 >>>>>>> END
 RUN <name>                 run a command listed under "commands" (names only, never a command line)
+RUN <action> path=<p>      run an approved action by name; values only for its placeholders (path=, name=)
+PROPOSE <name>             propose a new named command; the next line is one JSON object:
+{"argv": [...], "why": "...", "example": {"path": "..."}, "cwd": ".", "timeout_s": 60, "writes": []}
+                           (no shell; a person approves it later, never in this answer)
 NEED symbol <dotted.name>  code of a function/class (e.g. pkg.mod.func or Class.method), shown next turn
 NEED file <path> [lines a-b]
 NEED grep <text>
@@ -45,7 +49,8 @@ BLOCKED <reason>           you cannot finish; say why in one line
 Rules: edit only the files listed under "files"; a rejected block shows the nearest lines next turn.
 """
 
-_TOP = re.compile(r"^(EDIT|NEW|RUN|NEED|DONE|BLOCKED)(?:[ \t]+(.*?))?[ \t]*$")
+_TOP = re.compile(r"^(EDIT|NEW|RUN|NEED|DONE|BLOCKED|PROPOSE)(?:[ \t]+(.*?))?[ \t]*$")
+_KV = re.compile(r"^(path|name)=\S+$")
 _NEED = re.compile(r"^(symbol|file|grep)[ \t]+(.+?)$")
 _LINES = re.compile(r"^(?P<path>\S+)(?:[ \t]+lines?[ \t]+(?P<a>\d+)[ \t]*-[ \t]*(?P<b>\d+))?$")
 S_OPEN, S_MID, S_CLOSE = "<<<<<<< SEARCH", "=======", ">>>>>>> REPLACE"
@@ -60,12 +65,13 @@ class Block:
 
 @dataclass
 class Action:
-    kind: str                      # EDIT NEW RUN NEED DONE BLOCKED
+    kind: str                      # EDIT NEW RUN NEED DONE BLOCKED PROPOSE
     arg: str = ""                  # path, command name, reason; NEED: the target
     need: str = ""                 # NEED: symbol file grep
     lines: tuple[int, int] | None = None
     blocks: list[Block] = field(default_factory=list)
-    content: str = ""
+    content: str = ""              # NEW: the file; PROPOSE: the JSON line
+    values: dict[str, str] = field(default_factory=dict)  # RUN <action>: placeholder values
 
 
 @dataclass
@@ -100,10 +106,19 @@ def parse(answer: str) -> Parsed:
         elif kind == "BLOCKED":
             acts.append(Action("BLOCKED", arg or "no reason given"))
         elif kind == "RUN":
-            if not arg or " " in arg:
-                probs.append(f"RUN takes one command name, got {arg!r}"[:200])
+            name, *kv = arg.split() or [""]
+            vals = dict(x.split("=", 1) for x in kv if _KV.match(x))
+            if not arg or len(vals) != len(kv):
+                probs.append(f"RUN takes one command name (and key=value for an action), got {arg!r}"[:200])
             else:
-                acts.append(Action("RUN", arg))
+                acts.append(Action("RUN", name, values=vals))
+        elif kind == "PROPOSE":
+            body = lines[i].strip() if i < len(lines) else ""
+            if not arg or not body.startswith("{"):
+                probs.append(f"PROPOSE <name> then one JSON line, got {arg!r}"[:200])
+            else:
+                acts.append(Action("PROPOSE", arg, content=body))
+                i += 1
         elif kind == "NEED":
             n = _NEED.match(arg)
             if not n:

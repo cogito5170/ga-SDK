@@ -59,6 +59,8 @@ class BridgeTest(unittest.TestCase):
     def setUp(self):
         self.w = World()
         self.logs = []
+        os.environ["GA_HOME"] = str(self.w.tmp / "ga-home")  # CMD-GA42: TOOL_NEEDED proposals land here, not in ~/.ga
+        self.addCleanup(os.environ.pop, "GA_HOME", None)
 
     def pass_(self, runner):
         return bridge.one_pass(self.w.cfg, box=self.w.mac, runner=runner, log=self.logs.append)
@@ -250,6 +252,8 @@ class EndToEndTest(unittest.TestCase):
         os.environ["GA_ASK_HOME"] = str(self.w.tmp / "home")
         self.addCleanup(os.environ.pop, "FAKE_AGY_DIR", None)
         self.addCleanup(os.environ.pop, "GA_ASK_HOME", None)
+        os.environ["GA_HOME"] = str(self.w.tmp / "ga-home")  # CMD-GA42: TOOL_NEEDED proposals land here, not in ~/.ga
+        self.addCleanup(os.environ.pop, "GA_HOME", None)
         (self.w.work / "ga-supervise.json").write_text(json.dumps({
             "schema": "ga-supervise/1", "backend": "agv", "model": "gpt-oss-120b-medium",
             "options": {"cli": [sys.executable, str(TESTS / "fake_agy.py")]}, "tools": {},

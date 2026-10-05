@@ -93,7 +93,8 @@ class Base(unittest.TestCase):
         self.home.mkdir()
         self.agy = self.w.tmp / "agy"
         self.agy.mkdir()
-        self.env(GA_ASK_HOME=str(self.home), FAKE_AGY_DIR=str(self.agy), GA_BRIDGE_CONFIG="")
+        self.env(GA_ASK_HOME=str(self.home), FAKE_AGY_DIR=str(self.agy), GA_BRIDGE_CONFIG="",
+                 GA_HOME=str(self.home / "ga-home"))  # CMD-GA42: proposals land here, not in ~/.ga
         self.bridge_cfg = self.w.tmp / "agy-bridge.json"
         self.bridge_cfg.write_text(json.dumps({"mailbox_repo": str(self.w.tmp / "mac"), "workdir": str(self.w.work),
                                                "capacity_backoff_s": 0, "turn_timeout_s": 120, "poll_s": 0.05}))

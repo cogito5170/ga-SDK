@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable
 
-from ..bridge.tools import TOOLS
+from ..bridge.tools import TOOLS, table as tools_table
 from ..runlog import RunLog, Tail, TurnMeter, follow, redact
 from .store import AGV_OVERHEAD, DayTurns, Ledger
 
@@ -60,7 +60,7 @@ def build_config(home: Path, run_id: str, backend: str, model: str, cap: int, op
     d = home / "solve" / run_id
     d.mkdir(parents=True, exist_ok=True)
     conf = {"schema": "ga-supervise/1", "backend": backend, "model": model, "options": opts,
-            "tools": dict(TOOLS), "max_model_steps": int(cap), "state_dir": "state"}
+            "tools": tools_table(), "max_model_steps": int(cap), "state_dir": "state"}
     path = d / "ga-supervise.json"
     path.write_text(json.dumps(conf, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     return path
@@ -70,8 +70,8 @@ class Watch:
     """Wraps the backend runner: keeps, per turn, the plan's tool names outside the table and TOOL_NEEDED lines
     (labels only). The supervisor's own plan check is still the authority that refuses them."""
 
-    def __init__(self, inner: Any):
-        self.inner, self.outside, self.needed = inner, [], []
+    def __init__(self, inner: Any, root: Any = None):
+        self.inner, self.outside, self.needed, self.proposed, self.root = inner, [], [], [], root
         for k in ("resumes", "bare", "usage_format", "quota_family"):
             if hasattr(inner, k):
                 setattr(self, k, getattr(inner, k))
@@ -90,6 +90,12 @@ class Watch:
         except (PlanError, AttributeError, TypeError):
             pass
         self.needed += [x[:200] for x in TOOL_NEEDED.findall(turn.text or "") if x[:200] not in self.needed]
+        if self.root is not None:  # CMD-GA42 S2: PROPOSE blocks and TOOL_NEEDED lines become proposals (never tools)
+            from .. import actions
+            try:
+                self.proposed += [r["name"] for r in actions.from_text(turn.text or "", self.root, source="ga supervise")]
+            except (OSError, ValueError):
+                pass
         return turn
 
 
@@ -159,7 +165,7 @@ def run(question: str, *, home: Path, settings: dict[str, Any], line: Callable[[
         sup = G.Supervisor(cfg, cli=cli, out=sup_out)
     except FormError as e:
         raise SolveRefused("설정 오류: " + "; ".join(str(p) for p in e.problems)[:300]) from None
-    watch = Watch(sup.cli)
+    watch = Watch(sup.cli, Path.cwd())
     sup.cli = watch
     box: dict[str, Any] = {}
 
@@ -191,6 +197,8 @@ def run(question: str, *, home: Path, settings: dict[str, Any], line: Callable[[
         show(f"거부된 도구 (ga 도구 표에 없음, 설치하지 않음): {name}")
     for n in needed:
         show(f"필요한 도구 (TOOL_NEEDED, 설치하지 않음): {n}")
+    for n in watch.proposed:
+        show(f"제안된 도구 (GA Actions, 사람이 승인하기 전에는 쓸 수 없음): {n} — ga actions show {n}")
     for d in sorted(set(meter.denied)):
         show(f"agy가 거부한 동작: {d}")
     show(f"── 합계 ── 턴 {t['turns']} · 입력 {t['input']:,} · 출력 {t['output']:,} 토큰 · {t['seconds']:g}초 · "
