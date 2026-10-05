@@ -41,7 +41,8 @@ function add(n, kids) {
   return n;
 }
 
-const mark = (kind) => h("span", { class: "mark " + kind, "aria-hidden": "true" });
+// data-line="functional": a line or shape that carries meaning (progress, live, the current tab), kept by any re-theme
+const mark = (kind) => h("span", { class: "mark " + kind, "aria-hidden": "true", "data-line": kind === "live" ? "functional" : null });
 const state = (kind, word) => h("span", { class: "state" }, mark(kind), word);
 const mono = (s) => h("span", { class: "mono" }, s);
 const sha7 = (s) => (s ? String(s).slice(0, 7) : "—");
@@ -425,7 +426,7 @@ function track(w) {
   const i = STOP[w.status] ?? 0;
   const back = w.status === "sent_back" || w.status === "failed";
   const stops = [["보냄", w.sent_at], ["도는 중", null], ["보고됨", w.reported_at], ["통합됨", null]];
-  return h("ol", { class: "track", "aria-label": "진행" }, stops.map(([word, at], k) => {
+  return h("ol", { class: "track", "aria-label": "진행", "data-line": "functional" }, stops.map(([word, at], k) => {
     const t = at && k <= i ? `${word} ${when(at)}` : word;
     if (w.status === "draft" && k === 0) return h("li", null, mark("wait"), "초안");
     if (k === 3 && back) return h("li", { class: "back" }, mark("fail"), WORD[w.status]);
@@ -680,7 +681,7 @@ const TOKENS = {
     return section("per", "작업마다", "장부 전체 · 합계 순", h("ul", { class: "bars" }, l.map(([id, v]) => {
       const i = h("i");
       i.style.width = Math.round((v / top) * 100) + "%";
-      return h("li", null, h("span", { class: "id" }, id), h("span", { class: "bar", "aria-hidden": "true" }, i), h("span", { class: "v" }, num(v)));
+      return h("li", null, h("span", { class: "id" }, id), h("span", { class: "bar", "aria-hidden": "true", "data-line": "functional" }, i), h("span", { class: "v" }, num(v)));
     })));
   },
   ledger() {

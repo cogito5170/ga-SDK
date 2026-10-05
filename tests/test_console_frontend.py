@@ -65,6 +65,8 @@ def static_problems(folder=STATIC):
     calm = re.sub(r"@media \(prefers-reduced-motion:no-preference\)\{(?:[^{}]|\{[^{}]*\}|\{(?:[^{}]|\{[^{}]*\})*\})*\}", "", css)
     if re.search(r"animation\s*:\s*(?!none)", calm) or "@keyframes" in calm:
         out.append("app.css animates outside @media (prefers-reduced-motion:no-preference)")
+    if re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(", re.sub(r"/\*.*?\*/", "", css, flags=re.S)):
+        out.append("app.css has a raw colour (take it from tokens.css)")
     if "prefers-reduced-motion:reduce" not in css:
         out.append("app.css has no reduced-motion stop rule")
     return out
@@ -132,7 +134,15 @@ class Browser(unittest.TestCase):
         self.assertIn('<script type="module" src="app.js">', html)
         self.assertIn('lang="ko"', html)
         for r in ("now", "work", "branches", "services", "tokens", "ask", "decisions"):
-            self.assertIn(f'href="#/{r}"', html)
+            self.assertIn(f'<a data-line="functional" href="#/{r}"', html)  # the current-tab marker carries meaning
+
+    def test_d1_functional_lines_are_marked(self):
+        pg = self.page("work")
+        self.assertGreater(pg.locator(".track[data-line=functional]").count(), 0)
+        self.assertEqual(pg.locator(".mark.live:not([data-line=functional])").count(), 0)
+        self.assertGreater(pg.locator(".mark.live[data-line=functional]").count(), 0)
+        tok = self.page("tokens")
+        self.assertEqual(tok.locator(".bar:not([data-line=functional])").count(), 0)
 
     def test_d1_judge_passes_every_screen_on_real_data(self):
         want = {"now": "우편함", "work": "CMD-A2", "branches": "claude/open", "services": "worker",
