@@ -70,4 +70,5 @@ def metrics(model: str, calls: list[dict[str, Any]], *, correct: bool, tool_call
             "max_call_share": (max(q_calls) / q) if q else 0.0,
             "quota_per_correct": (q if correct else None),
             "total_cost_usd_sum": sum((c.get("total_cost_usd") or 0.0) for c in calls),
+            "quota_cli_usd": sum((c.get("total_cost_usd") or 0.0) for c in calls),
             "cost_disagree_calls": flags}

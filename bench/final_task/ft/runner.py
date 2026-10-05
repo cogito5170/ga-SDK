@@ -55,7 +55,7 @@ def run_matrix(backend, budget: Budget, runs_path: Path, *, items: list[dict[str
     """Start runs in order until done, ``max_runs``, or the cap: a run that could pass either cap (worst case) is not
     started and the matrix stops there. -> {"started", "stopped": None | reason}."""
     tasks = make_tasks()
-    done = {key(r) for r in load_rows(runs_path)}
+    done = {key(r) for r in load_rows(runs_path) if not r.get("void")}
     items = plan() if items is None else items
     bulk = bulk if bulk is not None else (bulk_context() if any(i["mode"] == "bulk" for i in items) else None)
     started, stopped = 0, None
@@ -69,7 +69,7 @@ def run_matrix(backend, budget: Budget, runs_path: Path, *, items: list[dict[str
         if it["mode"] == "bulk" and bt < MIN_TOKENS:
             raise ValueError("bulk context is under the 50k minimum")
         if not budget.can_start(MAX_CALLS[it["arm"]], estimate_usd(it["arm"], it["model"], it["mode"], bt)):
-            stopped = f"cap: {budget.calls} calls, ${budget.usd:.4f} used; the next run could pass {budget.max_calls} calls or ${budget.usd_cap}"
+            stopped = f"cap: {budget.calls} rev-2 calls, ${budget.usd:.4f} cumulative cli cost used; the next run could pass {budget.max_calls} calls or ${budget.usd_cap}"
             break
         run_id = key(it)
         run = Run(tasks[it["task"]], it["model"], it["mode"], backend, budget, run_id, bulk if it["mode"] == "bulk" else None)
@@ -78,14 +78,14 @@ def run_matrix(backend, budget: Budget, runs_path: Path, *, items: list[dict[str
         except CapReached as e:
             stopped = f"cap: {e}"
             break
-        row = {"schema": "final-task-metrics/1", "run_id": run_id, **it, **m}
+        row = {"schema": "final-task-metrics/1", "run_id": run_id, "rev": 2, **it, **m}
         if it["mode"] == "bulk":
             row["bulk"] = {"files_ref": "bulk_files.json", "tokens_est": bulk["tokens"], "n_files": len(bulk["files"])}
         with runs_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n")
         started += 1
         log(f"{run_id}: correct={m['result_correct']} calls={m['llm_calls']} quota=${m['quota_usd']:.4f} "
-            f"(total {budget.calls} calls, ${budget.usd:.4f})" + (f" ERROR {m['error']}" if m["error"] else ""))
+            f"(rev-2 calls {budget.calls}, cumulative cli ${budget.usd:.4f})" + (f" ERROR {m['error']}" if m["error"] else ""))
     return {"started": started, "stopped": stopped}
 
 

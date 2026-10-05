@@ -201,7 +201,33 @@ class Cap(unittest.TestCase):
             self.assertFalse(Budget(p, max_calls=3).can_start(2, 0.0))
             self.assertFalse(Budget(p, usd_cap=4.0).can_start(1, 1.0))
             self.assertTrue(Budget(p).can_start(4, 30.0))
-            self.assertEqual((Budget(None).max_calls, Budget(None).usd_cap), (110, 35.0))
+            self.assertEqual((Budget(None).max_calls, Budget(None).usd_cap), (130, 35.0))
+
+    def test_rev2_caps_cli_cost_cumulatively_and_counts_calls_per_rev(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "l.jsonl"
+            p.write_text("".join(json.dumps({"quota_usd": 0.1, "total_cost_usd": 0.2}) + "\n" for _ in range(107)))  # rev 1 rows
+            b = Budget(p)
+            self.assertEqual(b.calls, 0)                       # rev-1 calls do not use the 130 of rev 2
+            self.assertAlmostEqual(b.usd, 21.4)                # but their claude -p cost counts towards the $35
+            self.assertTrue(b.can_start(4, 13.0))
+            self.assertFalse(b.can_start(4, 13.7))             # would pass $35 cumulative
+            b.record({"quota_usd": 0.1, "total_cost_usd": 0.5})
+            self.assertEqual(Budget(p).calls, 1)
+            self.assertFalse(Budget(p, max_calls=1).can_start(1, 0.0))
+            self.assertAlmostEqual(Budget(p).usd, 21.9)
+
+    def test_void_rows_are_rerun_and_kept(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            items = [i for i in plan() if i["task"] == "T2"][:2]
+            run_matrix(FakeBackend(Sim()), Budget(d / "l"), d / "r", items=items, log=lambda *_: None)
+            rows = [json.loads(x) for x in (d / "r").read_text().splitlines()]
+            (d / "r").write_text("".join(json.dumps({**r, "void": True}) + "\n" for r in rows))
+            out = run_matrix(FakeBackend(Sim()), Budget(d / "l"), d / "r", items=items, log=lambda *_: None)
+            self.assertEqual(out["started"], 2)
+            self.assertEqual(len((d / "r").read_text().splitlines()), 4)   # void rows stay in the file
+            self.assertTrue(all("quota_cli_usd" in json.loads(x) for x in (d / "r").read_text().splitlines()[2:]))
 
     def test_resume_skips_done_runs(self):
         with tempfile.TemporaryDirectory() as d:

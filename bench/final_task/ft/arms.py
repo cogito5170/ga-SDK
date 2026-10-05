@@ -109,11 +109,11 @@ class Run:
         try:
             res = self.backend.call(self.model, system, prompt, image)
         except BackendError as e:
-            self.budget.record({"n": self.budget.calls + 1, "run_id": self.run_id, "role": role, "model": self.model,
+            self.budget.record({"n": len(self.budget.rows) + 1, "run_id": self.run_id, "role": role, "model": self.model,
                                 "usage": {}, "total_cost_usd": None, "quota_usd": 0.0, "error": str(e)[:200]})
             raise RunFailed(str(e)[:200]) from e
         q = quota.quota_usd(self.model, res.usage)
-        self.budget.record({"n": self.budget.calls + 1, "run_id": self.run_id, "role": role, "model": self.model,
+        self.budget.record({"n": len(self.budget.rows) + 1, "run_id": self.run_id, "role": role, "model": self.model,
                             "usage": res.usage, "total_cost_usd": res.total_cost_usd, "quota_usd": q,
                             "model_usage": res.model_usage})
         self.calls.append({"usage": res.usage, "total_cost_usd": res.total_cost_usd})
