@@ -1,14 +1,9 @@
-# STATE — CMD-FT1 rev 1, branch claude/ft1 (done, partial matrix)
+# STATE — CMD-FT1 rev 2, branch claude/ft1r2 (done, full matrix)
 
-Harness: bench/final_task/ (ft/ package, run.py, fixtures/). Tests: tests/test_ft1.py (27, offline, fake backend), tests/mutations_ft1.py kills 4/4.
-Real runs: bench/final_task/results/ (runs.jsonl 58 rows, ledger.jsonl 107 `claude -p` calls incl. 2 probes, SUMMARY.md, bulk_files.json).
-Stopped by the harness at the cap: 107 of 110 calls used, the next run could pass 110 ($7.50 of $35 spent). Only 58 of 100 runs: bulk control 10, A selective 10 (rep 1),
-B 20 (rep 1-2 mostly), C 18. The 110-call cap, not the dollar cap, binds (A costs 3 calls per run).
+Harness: bench/final_task/ (ft/ package, run.py, fixtures/). Offline tests: tests/test_ft1.py (30), tests/mutations_ft1.py kills 5/5 (incl. void T2 fixture).
+Rev 2: T2 fixture fixed (`from textutil import *`), 12 rev-1 T2 rows marked `void` (kept in runs.jsonl, excluded from tables) and rerun; 42 missing runs done.
+Result: 100 of 100 valid runs, 0 errors. rev-2 `claude -p` calls 106 of 130; cumulative claude -p cost $18.32 of $35 (rev 1 $14.49 + rev 2 $3.83); usage-based quota_usd $9.60.
+Caps now: 130 calls counted per rev (ledger rows carry `rev`, none = rev 1), $35 cumulative by claude -p total_cost_usd.
+Both quota columns (quota_usd, quota_cli_usd) in results/SUMMARY.md; section 6 names which measure bound each conclusion.
 
-Known problems (not fixed, runs are kept as they are):
-- T2 is void: fixture test_textutil.py imports only the old names, so no answer's `test_slugify` could call `slugify` -> 0 correct everywhere. Fix for a rerun:
-  `from textutil import *` in fixtures/t2/test_textutil.py. No calls were left to rerun. SUMMARY.md 1b shows the tables without T2.
-- `usage` vs claude -p total_cost_usd disagree on 103/105 calls: total_cost_usd is priced from modelUsage, which adds an internal Haiku call per claude -p. Both are recorded.
-- Sonnet calls with ~$0.0005 quota are prompt-cache hits (cache_read x0.1) on the repeated system prompt.
-- C T5 has 1 run per model; B Haiku T5 once asked for a tool; the C vs A (H3) verdicts rest on 5 cells per model.
-- Full `unittest discover -s tests` shows 35 errors / 1 failure (not looked into; tests.test_ga32_net and tests.test_cli pass).
+Known: claude -p cost vs usage disagree on nearly every call (internal Haiku call). Full-suite state: see reports/CMD-FT1.md.
