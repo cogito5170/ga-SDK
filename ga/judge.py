@@ -256,6 +256,29 @@ def load_mutations(path: str | None) -> list[dict[str, Any]]:
     return spec
 
 
+def test_names(names: list[str], argv: list[str], root: Path) -> list[str]:
+    """CMD-GA39 S2: a spec's test names may be file paths (tests/test_x.py[::T::t]) or module paths (tests.test_x[.T.t]);
+    each becomes the form the test command takes: module paths for unittest, file paths for pytest."""
+    runner = "pytest" if any("pytest" in a for a in argv) else "unittest" if any("unittest" in a for a in argv) else ""
+    out = []
+    for n in names:
+        if runner == "unittest" and (n.endswith(".py") or ".py::" in n or "/" in n):
+            path, _, rest = n.partition("::")
+            mod = path[:-3] if path.endswith(".py") else path
+            out.append(".".join([mod.strip("/").replace("/", "."), *[x for x in rest.split("::") if x]]))
+        elif runner == "pytest" and "/" not in n and "::" not in n and not n.endswith(".py"):
+            parts = n.split(".")
+            for i in range(len(parts), 0, -1):
+                if (root / Path(*parts[:i])).with_suffix(".py").is_file():
+                    out.append("::".join(["/".join(parts[:i]) + ".py", *parts[i:]]))
+                    break
+            else:
+                out.append(n)
+        else:
+            out.append(n)
+    return out
+
+
 def read_report(ref: str, repo: Path, remote: str) -> str:
     m = REF_RE.match(ref) if not Path(ref).exists() else None
     if not m:
@@ -410,13 +433,23 @@ def judge(report: str, repo: str | Path, base: str, *, mutations: str | None = N
 
 
 def judge_commit(repo: str | Path, sha: str, base: str, *, config: str | None = None, mutations: str | None = None,
-                 seed: int | None = None, k: int = 1) -> Judgement:
+                 seed: int | None = None, k: int = 1, remote: str | None = None) -> Judgement:
     """Steps (2)-(5) on a local commit, no report (CMD-GA34 S5: the pool judges a node's branch head against the
-    integration branch). Both are refs of the local repository ``repo``; nothing is fetched."""
+    integration branch). Both are refs of the local repository ``repo``; nothing is fetched unless ``remote`` is
+    given (CMD-GA39 S2, ``ga judge --sha``: any commit, a hub-side merge too; base is then ``remote/base``)."""
     repo = Path(repo).resolve()
     cfg = load_config(repo, config)
     j = Judgement(base=base)
     j.seed = random.SystemRandom().randrange(2**32) if seed is None else seed
+    if remote:
+        if git(repo, "rev-parse", "--verify", "-q", f"{sha}^{{commit}}").returncode and not fetch(repo, remote, sha):
+            raise JudgeError(f"commit {sha} not found locally nor fetchable from {remote}")
+        git(repo, "fetch", "--quiet", remote, base)
+        if git(repo, "rev-parse", "--verify", "-q", f"{remote}/{base}").returncode == 0:
+            base = f"{remote}/{base}"
+    for ref in (sha, base):
+        if git(repo, "rev-parse", "--verify", "-q", f"{ref}^{{commit}}").returncode:
+            raise JudgeError(f"{ref!r} is not a commit in {repo}")
     sha = git(repo, "rev-parse", f"{sha}^{{commit}}", check=True).stdout.strip()
     base_sha = git(repo, "rev-parse", f"{base}^{{commit}}", check=True).stdout.strip()
     j.sha, j.repo = sha, cfg.get("repo") or repo.name
@@ -522,8 +555,18 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
             else:
                 j.claims.append("tests match")
 
-    # (5) baseline mutations
-    spec = load_mutations(mutations)
+    # (5) baseline mutations ("auto": generated from base...sha, CMD-GA39 S1)
+    if mutations == "auto":
+        from .verify.mutate import MutateError, mutations as generate
+        try:
+            spec = generate(repo, base_sha, sha) if base_sha else []
+        except MutateError as e:
+            spec = []
+            j.notes.append(f"mutations auto: {e}"[:200])
+        j.notes.append(f"mutations auto: {len(spec)} generated from {base_sha[:7]}...{sha[:7]}; picking from the top 15")
+        spec = spec[:max(15, k)]
+    else:
+        spec = load_mutations(mutations)
     if not spec:
         j.needs.append("no mutation run: no spec given")
         return
@@ -544,7 +587,9 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
             continue
         path.write_text(orig.replace(mu["find"], mu["replace"]), encoding="utf-8")
         try:
-            p, _ = run_tests(expand(named, py, list(mu["tests"])) if "{tests}" in named else named)
+            names = test_names(list(mu["tests"]), named, clone)
+            p, _ = run_tests(expand(named, py, names) if "{tests}" in named and names else
+                             named if "{tests}" not in named else cfg["test"])
         finally:
             path.write_text(orig, encoding="utf-8")
             git(clone, "checkout", "--quiet", "--", mu["file"])
