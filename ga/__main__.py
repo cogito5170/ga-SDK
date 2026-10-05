@@ -492,7 +492,7 @@ def _rlo_argv(argv: list[str]) -> list[str] | None:
 
 
 # CMD-GA36: GA CLI entries with their own argument parsers (handed the rest of the command line, like rlo)
-OWN_PARSER = {"ask": "ga.ask:main", "bridge": "ga.bridge:main", "ui": "ga.ui:main"}
+OWN_PARSER = {"ask": "ga.ask:main", "bridge": "ga.bridge:main", "ui": "ga.ui:main", "console": "ga.console.server:main"}
 
 
 def _own_argv(argv: list[str]) -> tuple[str, list[str]] | None:
@@ -630,6 +630,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("bridge", add_help=False, help="GA CLI: the agy bridge — the hub's directives through ga supervise, "
                    "report/2 back (CMD-GA36)")
     sub.add_parser("ui", add_help=False, help="GA UI: a local browser page over the same engine as ga ask (CMD-GA36)")
+    sub.add_parser("console", add_help=False, help="GA Console: the GA API server on 127.0.0.1 — repos, work, mail, "
+                   "tokens, the Token dev stack and the agy bridge (CMD-CON2; `ga console init` first)")
     from .intake.cli import add_parser as _add_do  # CMD-GA37: ga do
     _add_do(sub)
     args = ap.parse_args(argv)

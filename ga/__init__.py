@@ -1,3 +1,3 @@
 """ga-SDK: machinery for a hub session that drives worker sessions by directives and reports (METHOD.md)."""
 
-__version__ = "0.8.0"
+__version__ = "0.10.0"

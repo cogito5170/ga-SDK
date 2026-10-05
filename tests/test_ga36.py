@@ -726,9 +726,9 @@ class D5UiSolve(UiBase):
 class Version(unittest.TestCase):
     def test_minor_bump(self):
         import ga
-        self.assertEqual(ga.__version__, "0.8.0")
+        self.assertGreaterEqual(tuple(map(int, ga.__version__.split("."))), (0, 8, 0))  # GA41 moved it on to 0.9.0
         text = (TESTS.parent / "pyproject.toml").read_text()
-        self.assertIn('version = "0.8.0"', text)
+        self.assertIn(f'version = "{ga.__version__}"', text)
         self.assertIn('"ui/*.html", "ui/*.js", "ui/*.css"', text)
 
     def test_cli_entries_are_listed(self):
