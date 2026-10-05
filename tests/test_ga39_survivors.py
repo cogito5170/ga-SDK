@@ -76,6 +76,17 @@ class SchemaScan(unittest.TestCase):
             self.assertEqual(sorted(I.schema_types(r)), ["Kept"])
             self.assertEqual(I.schema_types(r)["Kept"], {"name", "exitCode"})
 
+    def test_only_ts_and_py_files_on_schema_paths_are_read(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = Path(td)
+            (r / "src/types").mkdir(parents=True)
+            (r / "src/types/index.ts").write_text(TYPES)
+            (r / "src/types/legacy.js").write_text(TYPES.replace("ActionTurn", "Script"))      # not .ts/.tsx/.py
+            (r / "src/lib").mkdir(parents=True)
+            (r / "src/lib/view.ts").write_text(TYPES.replace("ActionTurn", "Elsewhere"))      # not a schema path
+            (r / "src/api.ts").mkdir()                                                        # a directory, not a file
+            self.assertEqual(sorted(I.schema_types(r)), ["ActionTurn"])
+
     def test_python_schema_types(self):
         with tempfile.TemporaryDirectory() as td:
             r = Path(td)
@@ -100,6 +111,23 @@ class LimitName(unittest.TestCase):
         for src in ("WIDTH = 5\n", "max_bytes = 5\n", "MAX_NAME = 'x'\n", "Max_Bytes = 5\n", "PORTS = 8000\n"):
             with self.subTest(src=src):
                 self.assertEqual([m for m in muts(src) if m["op"] == "limit"], [])
+
+
+class KeywordFlags(unittest.TestCase):
+    def flags(self, call: str) -> list[str]:
+        return [m["replace"].strip() for m in muts(f"import subprocess\nsubprocess.run(['x'], {call})\n") if m["op"] == "flag"]
+
+    def test_weakening_flips_are_emitted(self):
+        self.assertEqual(self.flags("shell=False"), ["subprocess.run(['x'], shell=True)"])
+        self.assertEqual(self.flags("allow_query=False"), ["subprocess.run(['x'], allow_query=True)"])
+        self.assertEqual(self.flags("allow_x=False"), ["subprocess.run(['x'], allow_x=True)"])
+        self.assertEqual(self.flags("check=True"), ["subprocess.run(['x'], check=False)"])
+
+    def test_strengthening_or_non_bool_values_are_not_flags(self):
+        for call in ("shell=True", "check=False", "allow_x=True", "text=False", "verify=False", "timeout=5",
+                     "check=1", "**{'check': True}"):
+            with self.subTest(call=call):
+                self.assertEqual(self.flags(call), [])
 
 
 class ForceWithLease(unittest.TestCase):
