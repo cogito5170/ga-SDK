@@ -42,7 +42,7 @@ function add(n, kids) {
 }
 
 // data-line="functional": a line or shape that carries meaning (progress, live, the current tab), kept by any re-theme
-const mark = (kind) => h("span", { class: "mark " + kind, "aria-hidden": "true", "data-line": kind === "live" ? "functional" : null });
+const mark = (kind) => h("span", { class: "mark " + kind, "aria-hidden": "true", "data-line": ["live", "wait", "off"].includes(kind) ? "functional" : null });  // as the goldens (CON1 rev 2)
 const state = (kind, word) => h("span", { class: "state" }, mark(kind), word);
 const mono = (s) => h("span", { class: "mono" }, s);
 const sha7 = (s) => (s ? String(s).slice(0, 7) : "—");
