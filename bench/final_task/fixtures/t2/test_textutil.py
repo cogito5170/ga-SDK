@@ -1,4 +1,4 @@
-from textutil import is_blank, title_case, truncate, word_count
+from textutil import *  # noqa: F401,F403  (an answer's test_slugify may call slugify unqualified)
 
 
 def test_word_count():

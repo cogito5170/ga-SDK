@@ -70,8 +70,19 @@ def do(arm, task, mis=(), model=HAIKU, mode="selective", max_calls=110):
     run = Run(world.make_tasks()[task], model, mode, be, bd, f"{arm}-{task}", bulk)
     return execute(run, arm), be, bd
 
+# reference answer as a model would write it: the test calls slugify unqualified, relying on the fixture's imports
+REF = {"function": SLUG["function"],
+       "test": "def test_slugify():\n    assert slugify('Hello, World!') == 'hello-world'\n    assert slugify('  A  b__C ') == 'a-b-c'"}
+
 
 class Graders(unittest.TestCase):
+    def test_t2_reference_answer_passes_and_wrong_fails(self):
+        """A void fixture (test file importing only the old names) must not recur: the reference answer is graded right."""
+        self.assertTrue(world.grade_t2(REF, 0, 0)[0])
+        self.assertFalse(world.grade_t2(dict(REF, function="def slugify(text):\n    return text.lower()"), 0, 0)[0])
+        self.assertFalse(world.grade_t2(dict(REF, test="def test_slugify():\n    assert slugify('a b') == 'a_b'"), 0, 0)[0])
+        self.assertIn("import *", (world.FIX / "t2" / "test_textutil.py").read_text())
+
     def test_t4_fails_if_a_tool_or_peer_message_is_used(self):
         g = world.grade_t4
         self.assertEqual(g("5", 0, 0), (True, None))

@@ -18,6 +18,9 @@ M = [
  ("bulk context silently trimmed below 50k", [("bench/final_task/ft/bulk.py",
   "        if total >= target:", "        if total >= 30_000:"),
   ("bench/final_task/ft/bulk.py", "    if total < MIN_TOKENS:\n        raise", "    if False:\n        raise")]),
+ ("T2 grader passes a void fixture (reference answer graded wrong)", [("bench/final_task/fixtures/t2/test_textutil.py",
+  "from textutil import *  # noqa: F401,F403  (an answer's test_slugify may call slugify unqualified)",
+  "from textutil import is_blank, title_case, truncate, word_count")]),
 ]
 ok = True
 for name, edits in M:
