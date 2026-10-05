@@ -57,6 +57,23 @@ def default(home: str = "~") -> dict[str, Any]:
     }
 
 
+def vm(home: str = "~") -> dict[str, Any]:
+    """The VM layout (CMD-OPS1): the engine only. ~/baseline and ~/ga-sdk, no Token stack, no bridge, no services."""
+    h = home.rstrip("/")
+    br = "claude/gracious-meitner-vp49xe"
+    return {
+        "schema": SCHEMA,
+        "baseline": f"{h}/baseline",
+        "repos": [{"name": "baseline", "path": f"{h}/baseline", "integration_branch": br},
+                  {"name": "ga-sdk", "path": f"{h}/ga-sdk", "integration_branch": br}],
+        "mailbox": {"repo": f"{h}/baseline", "remote": "origin", "fetch_every_s": 60, "name": "baseline"},
+        "ask_home": None,
+        "token_sources": {"act": [f"{h}/ga-sdk/.ga/act/ledger"], "supervise": [f"{h}/ga-sdk/.ga/ledger.jsonl"]},
+        "bridge": None,
+        "services": {},
+    }
+
+
 def _x(s: Any) -> str:
     return str(Path(str(s)).expanduser()) if str(s).startswith("~") else str(s)
 
