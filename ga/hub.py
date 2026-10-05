@@ -1416,13 +1416,66 @@ def verdict_card(directive: dict[str, Any], head: dict[str, Any], j: Any, diffst
     return body if len(raw) <= cap else raw[:cap - 4].decode("utf-8", "ignore") + "\n..."
 
 
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """The JSON object lines of ``path`` (a missing file is empty; a broken line is skipped)."""
+    if not Path(path).exists():
+        return []
+    out = []
+    for ln in Path(path).read_text(encoding="utf-8").splitlines():
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue
+        if isinstance(r, dict):
+            out.append(r)
+    return out
+
+
+_SAME = {"ACCEPT": "ACCEPT", "ACCEPTED": "ACCEPT", "CONTINUE": "ACCEPT", "SEND_BACK": "SEND_BACK", "SENT_BACK": "SEND_BACK",
+         "REFINE": "SEND_BACK", "ASK_HUMAN": "ASK_HUMAN", "ASK_USER": "ASK_HUMAN"}
+
+
+def shadow_compare(baseline: list[dict[str, Any]], shadow: list[dict[str, Any]]) -> dict[str, Any]:
+    """Line a baseline verdict list {id, rev, decision} up against shadow.jsonl by (id, rev) — the last shadow line
+    of a pair counts — and count agreement, false accepts (hub ACCEPT where baseline sent back) and extra send-backs
+    (hub SEND_BACK where baseline accepted). BASELINE_INTO_GA.md stage 2 gate: ``gate_ok`` needs 0 false accepts."""
+    def key(r: dict[str, Any]) -> tuple[str, str]:
+        return str(r.get("id")), str(r.get("rev"))
+
+    def norm(d: Any) -> str:
+        return _SAME.get(str(d or "").strip().upper().replace("-", "_").replace(" ", "_"), str(d or "?"))
+
+    hub = {key(r): norm(r.get("decision")) for r in shadow}
+    rows, false_accepts, extra, missing = [], [], [], []
+    for b in baseline:
+        k = key(b)
+        if k not in hub:
+            missing.append(f"{k[0]} rev {k[1]}")
+            continue
+        bd, hd = norm(b.get("decision")), hub[k]
+        rows.append({"id": k[0], "rev": k[1], "baseline": bd, "hub": hd, "agree": bd == hd})
+        if hd == "ACCEPT" and bd == "SEND_BACK":
+            false_accepts.append(f"{k[0]} rev {k[1]}")
+        if hd == "SEND_BACK" and bd == "ACCEPT":
+            extra.append(f"{k[0]} rev {k[1]}")
+    agree = sum(r["agree"] for r in rows)
+    return {"compared": len(rows), "agree": agree, "agreement": round(agree / len(rows), 3) if rows else None,
+            "false_accepts": false_accepts, "extra_send_backs": extra, "missing_in_shadow": missing,
+            "rows": rows, "gate_ok": bool(rows) and not false_accepts}
+
+
 class MailHub(Hub):
     """``ga hub tick``: the hub tick for mailed reports (CMD-GA42 S1). Reuses Hub's quiet writes (R9) and its
-    directive rev+1 (``_next_rev``); the judge is ``ga judge``, the integration is ``ga judge --apply``."""
+    directive rev+1 (``_next_rev``); the judge is ``ga judge``, the integration is ``ga judge --apply``.
+
+    Shadow mode (``shadow=True``, ``ga hub tick --shadow`` or ``"shadow": true`` in the config; CMD-GA42 rev 2) runs
+    the judge, the card and the model decision exactly as above but changes nothing: no integration, no mail, no
+    baseline record, no state, no ledger, no read mark. Its one write is a line per decision in
+    ``<ga dir>/hub/shadow.jsonl``; a mail already in that file is not decided again."""
 
     def __init__(self, conf: dict[str, Any], *, ga_dir: str | Path, mailbox: Any = None, runner: Any = None,
                  judge_fn: Callable[..., Any] | None = None, apply_fn: Callable[..., Any] | None = None,
-                 today: Callable[[], str] = lambda: date.today().isoformat()):
+                 today: Callable[[], str] = lambda: date.today().isoformat(), shadow: bool | None = None):
         from . import judge as J
         from .mailbox import Mailbox
         self.conf = conf
@@ -1436,6 +1489,9 @@ class MailHub(Hub):
         self.runner = runner
         self.judge_fn = judge_fn or J.judge
         self.apply_fn = apply_fn or J.apply
+        self.shadow = bool(conf.get("shadow")) if shadow is None else bool(shadow)
+        self.shadow_path = self.ga / "hub" / "shadow.jsonl"
+        self._usage: dict[str, Any] | None = None
 
     # ---------------------------------------------------------------- state
     def load_state(self) -> dict[str, Any]:
@@ -1447,8 +1503,29 @@ class MailHub(Hub):
         return self.ga / "hub" / "ledger" / f"{self.today()}.jsonl"
 
     def turns_today(self) -> int:
+        if self.shadow:
+            return sum(r.get("at", "").startswith(self.today()) for r in self._shadow_rows())
         f = self._ledger_today()
         return len(f.read_text(encoding="utf-8").splitlines()) if f.exists() else 0
+
+    def _shadow_rows(self) -> list[dict[str, Any]]:
+        return read_jsonl(self.shadow_path)
+
+    def _shadow(self, m: Any, did: str | None, head: dict[str, Any], directive: dict[str, Any] | None, j: Any,
+                decision: str, lines: list[str]) -> None:
+        """The one write of a shadow decision (S1 rev 2)."""
+        from datetime import datetime, timezone
+        rev = next((h.get("rev_seen") for h in head.get("handled", []) if isinstance(h, dict) and h.get("id") == did),
+                   None) or (directive or {}).get("rev")
+        u = self._usage or {}
+        row = {"at": f"{self.today()}T{datetime.now(timezone.utc).strftime('%H:%M:%S')}Z", "id": did, "rev": rev, "sha": getattr(j, "sha", None),
+               "judge_class": getattr(j, "cls", None), "needs": list(getattr(j, "needs", None) or []),
+               "decision": decision, "asks": list(lines), "tokens": {"input": u.get("input"), "output": u.get("output")},
+               "mail": m.path}
+        self.shadow_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.shadow_path, "a", encoding="utf-8") as h:
+            h.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+        self._writes += 1
 
     def _runner(self) -> Any:
         if self.runner is None:
@@ -1463,7 +1540,8 @@ class MailHub(Hub):
         self._writes = 0
         res = TickResult()
         st = self.load_state()
-        msgs = [m for m in self.mailbox.unread(self.name) if m.path not in st["handled"]]
+        done = {r.get("mail") for r in self._shadow_rows()} if self.shadow else st["handled"]
+        msgs = [m for m in self.mailbox.unread(self.name) if m.path not in done]
         if not msgs:
             res.quiet = True
             return res
@@ -1473,6 +1551,9 @@ class MailHub(Hub):
                 break
             if dry_run:
                 res.plan.append(f"would judge and decide {m.path}")
+                continue
+            if self.shadow:  # nothing but shadow.jsonl: no read mark, no state
+                self._one(json.loads(json.dumps(st)), m, res)
                 continue
             self._one(st, m, res)
             self.mailbox.mark_read(self.name, m.path)
@@ -1495,20 +1576,39 @@ class MailHub(Hub):
         directive = self._directive(st, did)
         if not did or commit is None or directive is None:
             why = "no configured repo in the report's commits" if commit is None else f"no directive {did} on file"
+            if self.shadow:
+                self._usage = None
+                self._shadow(m, did, head, directive, None, "ASK_HUMAN", [why])
+                res.plan.append(f"shadow ASK_HUMAN {did}")
+                return
             self._ask(st, m, did or "?", head, None, why)
             res.sent.append(f"ASK_HUMAN {did}")
             return
         rc = self.conf["repos"][commit["repo"]]
         rp = Path(rc["path"]).expanduser()
-        rfile = self.ga / "hub" / "reports" / Path(m.path).name
-        self._write(rfile, m.text)
+        if self.shadow:  # the report goes to a throwaway file, not <ga dir>/hub/reports
+            import tempfile
+            tmp = Path(tempfile.mkdtemp(prefix="ga-hub-shadow-"))
+            rfile = tmp / Path(m.path).name
+            rfile.write_text(m.text, encoding="utf-8")
+        else:
+            tmp, rfile = None, self.ga / "hub" / "reports" / Path(m.path).name
+            self._write(rfile, m.text)
         try:
             j = self.judge_fn(str(rfile), rp, rc["base"], mutations=rc.get("mutations"), config=rc.get("config"),
                               remote=rc.get("remote", "origin"))
         except Exception as e:  # the judge itself failed: a person looks
+            if self.shadow:
+                self._usage = None
+                self._shadow(m, did, head, directive, None, "ASK_HUMAN", [f"ga judge failed: {type(e).__name__}"])
+                res.plan.append(f"shadow ASK_HUMAN {did}")
+                return
             self._ask(st, m, did, head, None, f"ga judge failed: {type(e).__name__}: {str(e)[:200]}")
             res.sent.append(f"ASK_HUMAN {did}")
             return
+        finally:
+            if tmp is not None:
+                shutil.rmtree(tmp, ignore_errors=True)
         j.directive = j.directive or did
         j.repo = j.repo or commit["repo"]
         diffstat, changed = self._diff(rp, rc["base"], j.sha or commit.get("sha", ""))
@@ -1523,6 +1623,10 @@ class MailHub(Hub):
         if decision == "SEND_BACK" and st["sendbacks"].get(did, 0) >= int(self.conf.get("sendback_cap", SENDBACK_CAP)):
             decision, lines = "ASK_HUMAN", [f"send-back cap {self.conf.get('sendback_cap', SENDBACK_CAP)} reached on "
                                             f"{did}; the model wanted another: " + "; ".join(lines)[:200]]
+        if self.shadow:  # decided exactly as above; nothing is integrated, mailed or recorded
+            self._shadow(m, did, head, directive, j, decision, lines)
+            res.plan.append(f"shadow {decision} {did}")
+            return
         if decision == "ACCEPT":
             try:
                 pushed = self.apply_fn(j, rp, rc.get("remote", "origin"))
@@ -1602,6 +1706,9 @@ class MailHub(Hub):
             err = f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200]
         decision, lines = parse_decision(answer) if not err else ("ASK_HUMAN", ["the model turn failed"])
         secs = round(_t.time() - t0, 3)
+        self._usage = usage
+        if self.shadow:  # the tokens go to shadow.jsonl; no ledger, no L0
+            return decision, lines, err
         row = {"id": did, "kind": "hub", "backend": self.conf.get("backend", "agv"), "model": self.conf.get("model"),
                "served": served, "decision": decision, "error": err, "card_bytes": len(card.encode("utf-8")),
                "input": (usage or {}).get("input"), "output": (usage or {}).get("output"), "seconds": secs}

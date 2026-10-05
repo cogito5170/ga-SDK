@@ -96,8 +96,10 @@ def cmd_hub(args, sleep=None) -> int:
     import time
 
     from .hub import MailHub
+    if args.hub_cmd == "shadow-compare":
+        return cmd_hub_shadow_compare(args)
     conf = json.loads(Path(args.config).expanduser().read_text(encoding="utf-8"))
-    hub = MailHub(conf, ga_dir=args.ga_dir)
+    hub = MailHub(conf, ga_dir=args.ga_dir, shadow=True if args.shadow else None)
     while True:
         res = hub.tick(dry_run=args.dry_run)
         if not res.quiet:
@@ -106,6 +108,28 @@ def cmd_hub(args, sleep=None) -> int:
         if args.hub_cmd == "tick":
             return 0
         (sleep or time.sleep)(max(float(args.every), 1.0))
+
+
+def cmd_hub_shadow_compare(args) -> int:
+    """ga hub shadow-compare FILE: a baseline verdict list (JSON list or JSON lines of {id, rev, decision}) against
+    <ga dir>/hub/shadow.jsonl. Exit 1 on any false accept (or nothing to compare)."""
+    from .hub import read_jsonl, shadow_compare
+    if not args.file:
+        print("ga hub shadow-compare: give the baseline verdict list FILE", file=sys.stderr)
+        return 2
+    f = Path(args.file).expanduser()
+    try:
+        base = json.loads(f.read_text(encoding="utf-8"))
+        base = base if isinstance(base, list) else [base]
+    except ValueError:
+        base = read_jsonl(f)
+    out = shadow_compare([b for b in base if isinstance(b, dict)],
+                         read_jsonl(Path(args.shadow_file or Path(args.ga_dir) / "hub" / "shadow.jsonl")))
+    print(f"agreement {out['agree']}/{out['compared']}" + (f" ({out['agreement']})" if out["compared"] else "")
+          + f"; false accepts {len(out['false_accepts'])}; extra send-backs {len(out['extra_send_backs'])}"
+          + f"; missing in shadow {len(out['missing_in_shadow'])}")
+    print(json.dumps({k: v for k, v in out.items() if k != "rows"}, ensure_ascii=False))
+    return 0 if out["gate_ok"] else 1
 
 
 def cmd_sandbox(args) -> int:
@@ -657,7 +681,11 @@ def main(argv: list[str] | None = None) -> int:
     _add_do(sub)
     p = sub.add_parser("hub", help="the mail-driven hub tick: inbox -> ga judge -> verdict card -> one small-model "
                        "decision -> code integrates, records, mails (CMD-GA42)")
-    p.add_argument("hub_cmd", choices=["tick", "run"])
+    p.add_argument("hub_cmd", choices=["tick", "run", "shadow-compare"])
+    p.add_argument("file", nargs="?", help="shadow-compare: the baseline verdict list {id, rev, decision}")
+    p.add_argument("--shadow", action="store_true", help="judge, card and decision only; one line to "
+                   "<ga dir>/hub/shadow.jsonl, nothing integrated, mailed or recorded")
+    p.add_argument("--shadow-file", help="shadow-compare: shadow.jsonl (default <ga dir>/hub/shadow.jsonl)")
     p.add_argument("--config", default=".ga-hub.json", help="the hub config (JSON)")
     p.add_argument("--ga-dir", default=".ga")
     p.add_argument("--every", type=float, default=300.0, help="run: seconds between ticks")

@@ -10,6 +10,11 @@ GA_HOME is ``$GA_HOME`` or ``~/.ga``. A model may only PROPOSE. ``approve`` is c
 actions approve`` on a TTY after y/N, or GA Console's POST after its token check (``approve(name, approver="console")``);
 nothing read from mail, a report, a model turn or a proposal file approves anything. The one exception is a human-
 written policy pattern, matched exactly. A registry entry whose sha256 does not match its fields is refused.
+
+The sha256 is integrity, not authenticity: it catches an entry edited after approval, but anyone who can write
+actions.json can also compute a matching sha256 for an entry they wrote by hand. So ``run`` never trusts an entry's
+fields alone: at run time it re-runs the static check and refuses an argv that needs network unless the entry says
+``network: true`` (CMD-GA42 rev 2), and it refuses a script whose bytes changed since the approval.
 """
 from __future__ import annotations
 

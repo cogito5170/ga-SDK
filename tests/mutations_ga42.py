@@ -38,6 +38,20 @@ M = [  # (name, file, [(old, new), ...])
   [("if argv[:len(pre)] != pre or any(a not in allowed for a in argv[len(pre):]):", "if argv[:len(pre)] != pre:")]),
  ("approved script hash not checked", "ga/actions/registry.py", [("    if changed:\n        raise ActionError", "    if False:\n        raise ActionError")]),
  ("revoke keeps the entry", "ga/actions/registry.py", [("    del reg[name]\n", "    pass\n")]),
+ # rev 2 (BD-437): baseline's two survivors and the shadow mode
+ ("accept-with-needs", "ga/hub.py",
+  [('if decision == "ACCEPT" and not (j.cls == "success" and not j.needs):',
+    'if decision == "ACCEPT" and not (j.cls == "success"):')]),
+ ("network-unapproved (run-time check)", "ga/actions/registry.py", [("    if net and not e.get(\"network\"):", "    if False:")]),
+ ("shadow mode integrates", "ga/hub.py", [("        if self.shadow:  # decided exactly as above", "        if False:  #")]),
+ ("shadow mode mails", "ga/hub.py",
+  [("            self._shadow(m, did, head, directive, j, decision, lines)\n",
+    "            self._shadow(m, did, head, directive, j, decision, lines)\n"
+    "            self._mail(m.sender, self._verdict(j, \"continue\", \"shadow\", []))\n")]),
+ ("shadow mode marks read and saves state", "ga/hub.py",
+  [("            if self.shadow:  # nothing but shadow.jsonl", "            if False:  #")]),
+ ("shadow mode keeps the report under the ga dir", "ga/hub.py",
+  [("        if self.shadow:  # the report goes to a throwaway file", "        if False:  #")]),
 ]
 
 
@@ -48,7 +62,7 @@ def run(mutate):
             shutil.copytree(ROOT / d, tmp / d)
         shutil.copy(ROOT / "pyproject.toml", tmp / "pyproject.toml")
         mutate(tmp)
-        r = subprocess.run([PY, "-m", "unittest", "tests.test_ga42", "tests.test_ga42_actions"], cwd=tmp,
+        r = subprocess.run([PY, "-m", "unittest", "tests.test_ga42", "tests.test_ga42_actions", "tests.test_ga42_shadow"], cwd=tmp,
                            capture_output=True, text=True)
         return r.returncode, (r.stderr.strip().splitlines() or ["?"])[-1]
     finally:
