@@ -13,7 +13,7 @@ ga 0.9.0: GA Engine's model loop with a small model (gpt-oss-120b-medium through
   9,852 / 2,530-2,958; option `thinking` (claude_cli, agv, anthropic_http) and thinking tokens per turn.
 - `ga/paths.py`: real paths in `Hub.sandbox_paths`, hub ga dir, git worktree list, pool ws/repo paths.
 
-Tests: tests/test_ga41.py (40), tests/mutations_ga41.py 14/14 killed with a green control.
+Tests: tests/test_ga41.py (42), tests/mutations_ga41.py 16/16 killed with a green control.
 
 # STATE — CMD-GA36 rev 2, branch claude/ga36 (done)
 
