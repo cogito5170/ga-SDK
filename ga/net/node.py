@@ -38,6 +38,7 @@ from .router import ConfigError, NoRoute, Router, catalog_for
 from .state import State
 
 NODES = "nodes"
+PROGRESS_CAP = 50  # turn.progress events per turn (S7)
 ATTEMPTS = 3  # turns per job when the node sets no runs budget
 PEER_LOG_MAX = 50
 
@@ -117,6 +118,7 @@ class Node:
         self.box = mailbox or NodeMailbox(cfg.resolve(net["mailbox"]), self.dir / "cursor",
                                           remote=net.get("remote", "origin"))
         self.required: list[str] = list((self.task or {}).get("uses", []))
+        self.workdir: Path | None = Path(self.n["workdir"]) if self.n.get("workdir") else None  # CMD-GA34 S1
 
     # ------------------------------------------------------------------ files (only under .ga/nodes/<me>/)
     def _path(self, name: str) -> Path:
@@ -361,10 +363,18 @@ class Node:
         before = log_size(blog)
         res = TurnResult(ended=True)
         t0 = self.clock()
+        rid = f"{self.run_id}:{job['id']}"
+        item = (self.task or {}).get("id")
+        if self.pooled or self.n.get("progress"):  # a static node without the new keys logs exactly as before
+            self._l0(l0.event("turn.started", rid, source="ga_node", node=self.me, item=item, job=job["id"],
+                              backend=choice.backend, model=choice.model))
+        ctx = {"cwd": str(self.workdir or self.dir), "timeout_s": self.n.get("timeout_s", 600), "state_dir": str(self.dir)}
+        if self.n.get("tools") is not None:
+            ctx["tools"] = self.n["tools"]
+        if self.n.get("progress"):
+            ctx["on_progress"] = self._progress(rid, item)
         try:
-            runner = self.get_backend(choice.backend).create(choice.model, dict(choice.options),
-                                                             {"cwd": str(self.dir), "timeout_s": self.n.get("timeout_s", 600),
-                                                              "state_dir": str(self.dir)})
+            runner = self.get_backend(choice.backend).create(choice.model, dict(choice.options), ctx)
             if getattr(runner, "bare", False):  # bare: the fixed instructions are the system prompt, the pack the prompt
                 turn = runner.run_turn(pack.text, None, system=how)
             else:
@@ -382,7 +392,6 @@ class Node:
             res.error = f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200]
         if res.seconds is None:
             res.seconds = max(0.0, self.clock() - t0)
-        rid = f"{self.run_id}:{job['id']}"
         self._l0(l0.run_end(rid, res, decision_ref=job["id"], source="ga_node"))
         run["runs"][job["id"]] = run["runs"].get(job["id"], 0) + 1
         tokens = sum((res.usage or {}).values()) or None
@@ -511,6 +520,19 @@ class Node:
         out["sent"].append({"to": to, "kind": item["kind"], "ref": item.get("ref"), "msg_id": mid, "why": why})
         return mid
 
+    def _progress(self, rid: str, item: str | None) -> Callable[[dict], None]:
+        """S7 F10: relay a turn's tool uses to L0, tool name and path only, at most PROGRESS_CAP per turn."""
+        n = [0]
+
+        def relay(row: dict) -> None:
+            n[0] += 1
+            if n[0] <= PROGRESS_CAP:
+                data = {"node": self.me, "item": item, "tool": str(row.get("tool", "?"))[:64]}
+                if isinstance(row.get("path"), str):
+                    data["path"] = row["path"][:300]
+                self._l0(l0.event("turn.progress", rid, source="ga_node", **data))
+        return relay
+
     def _check(self, answer: str | None) -> bool:
         """The task's verifiable check: argv run in the node dir with the answer on stdin; none = answered is enough."""
         if answer is None:
@@ -518,7 +540,7 @@ class Node:
         argv = (self.task or {}).get("check")
         if not argv:
             return True
-        p = subprocess.run(argv, input=answer, capture_output=True, text=True, cwd=str(self.cfg.base_dir),
+        p = subprocess.run(argv, input=answer, capture_output=True, text=True, cwd=str(self.workdir or self.cfg.base_dir),
                            timeout=int(self.n.get("check_timeout_s", 120)))
         return p.returncode == 0
 

@@ -42,14 +42,18 @@ def _known(options: dict[str, Any], allowed: set[str], backend: str) -> None:
 
 
 def run_process(argv: list[str], *, cwd: str | None, env: dict[str, str], timeout_s: float,
-                on_wait: Callable[[float], None] | None = None, wait_every_s: float | None = None) -> tuple[str, str, int]:
-    """One host process: (stdout, stderr, exit code). ``on_wait(seconds)`` every ``wait_every_s`` while it runs."""
+                on_wait: Callable[[float], None] | None = None, wait_every_s: float | None = None,
+                on_line: Callable[[str], None] | None = None) -> tuple[str, str, int]:
+    """One host process: (stdout, stderr, exit code). ``on_wait(seconds)`` every ``wait_every_s`` while it runs;
+    ``on_line(line)`` for each stdout line as it arrives (a reader thread; the whole stdout is still returned)."""
     t0 = time.monotonic()
     try:
         p = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True)
     except FileNotFoundError:
         raise BackendError("cli_not_found") from None
+    if on_line is not None:
+        return _run_lines(p, t0, timeout_s, on_line)
     step = wait_every_s if on_wait is not None and wait_every_s else None
     while True:
         left = timeout_s - (time.monotonic() - t0)
@@ -63,6 +67,36 @@ def run_process(argv: list[str], *, cwd: str | None, env: dict[str, str], timeou
                 raise BackendError("timeout") from None
             if step:
                 on_wait(round(time.monotonic() - t0, 1))
+
+
+def _run_lines(p: subprocess.Popen, t0: float, timeout_s: float, on_line: Callable[[str], None]) -> tuple[str, str, int]:
+    import threading
+    lines: list[str] = []
+    err: list[str] = []
+
+    def read() -> None:
+        for ln in p.stdout:  # type: ignore[union-attr]
+            lines.append(ln)
+            try:
+                on_line(ln.rstrip("\n"))
+            except Exception:  # a relay never breaks the turn
+                pass
+
+    t = threading.Thread(target=read, daemon=True)
+    e = threading.Thread(target=lambda: err.append(p.stderr.read()), daemon=True)  # type: ignore[union-attr]
+    t.start()
+    e.start()
+    t.join(max(0.0, timeout_s - (time.monotonic() - t0)))
+    if t.is_alive():
+        p.kill()
+        p.wait()
+        t.join(5)
+        raise BackendError("timeout")
+    p.wait()
+    e.join(5)
+    for f in (p.stdout, p.stderr):
+        f.close()  # type: ignore[union-attr]
+    return "".join(lines), "".join(err), p.returncode
 
 
 # ---- agv (Antigravity; command agy) --------------------------------------------------------------------------------
@@ -147,6 +181,59 @@ GEMINI_CLI = _GeminiCli()
 _LIMIT = re.compile(r"(?i)\b(rate limit|usage limit|429|overloaded)\b")
 
 
+# CMD-GA34 S2: a role's tools for a claude_cli turn. Safe: the file tools that stay in the worktree (Read, Edit, Write,
+# MultiEdit, Glob, Grep, LS, NotebookEdit, TodoWrite) and Bash only with an allowlisted command prefix such as the
+# repo's test command ("Bash(python3 -m unittest:*)"). Not in the list, ever: network tools (WebFetch, WebSearch),
+# unscoped Bash, and Bash prefixes that reach the network or push (git, curl, wget, ssh, scp, nc). The permission mode is
+# never bypassPermissions (nor auto, whose classifier may approve tools outside the list).
+SAFE_TOOLS = {"Read", "Edit", "Write", "MultiEdit", "Glob", "Grep", "LS", "NotebookEdit", "TodoWrite"}
+PERMISSION_MODES = ("dontAsk", "acceptEdits", "plan", "manual")
+_BASH = re.compile(r"^Bash\((?P<cmd>[^()]+)\)$")
+_BASH_DENY = re.compile(r"^\s*(git|curl|wget|ssh|scp|nc|ncat|sftp|rsync|npm\s+publish|pip\s+install)\b")
+
+
+def tools_problems(tools: Any) -> list[str]:
+    """What is wrong with a role's ``tools`` = {allow: [names or Bash(prefix:*)], permission_mode?}."""
+    if not isinstance(tools, dict) or set(tools) - {"allow", "permission_mode"}:
+        return ["tools is {allow: [tool names], permission_mode?}"]
+    out = []
+    allow = tools.get("allow")
+    if not isinstance(allow, list) or not allow or not all(isinstance(x, str) for x in allow):
+        return ["tools.allow lists tool names"]
+    for t in allow:
+        m = _BASH.match(t)
+        if t in SAFE_TOOLS:
+            continue
+        if m and m["cmd"].strip() not in ("*", "") and not _BASH_DENY.match(m["cmd"]):
+            continue
+        out.append(f"tools.allow: {t!r} is not allowed (file tools, or Bash(<command prefix>) without network or git)")
+    mode = tools.get("permission_mode", "dontAsk")
+    if mode not in PERMISSION_MODES:
+        out.append(f"tools.permission_mode {mode!r} is refused (one of {', '.join(PERMISSION_MODES)}; never "
+                   "bypassPermissions)")
+    return out
+
+
+def progress_of(line: str) -> list[dict[str, str]]:
+    """The tool uses in one stream-json line: tool name and path only, never inputs, contents or text (S7 F10)."""
+    try:
+        ev = json.loads(line)
+    except ValueError:
+        return []
+    if not isinstance(ev, dict) or ev.get("type") != "assistant":
+        return []
+    out = []
+    for b in ((ev.get("message") or {}).get("content") or []):
+        if isinstance(b, dict) and b.get("type") == "tool_use":
+            inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+            path = next((inp[k] for k in ("file_path", "path", "notebook_path") if isinstance(inp.get(k), str)), None)
+            row = {"tool": str(b.get("name", "?"))[:64]}
+            if path:
+                row["path"] = path[:300]
+            out.append(row)
+    return out
+
+
 class ClaudeRunner:
     """``claude -p`` with ``--output-format json``. Bare by default (S5). The served model is every key of the result's
     ``modelUsage``; the usage is the result's ``usage`` (anthropic shape). No session is kept (--no-session-persistence),
@@ -156,13 +243,29 @@ class ClaudeRunner:
     usage_format = "anthropic"
 
     def __init__(self, command: list[str], model: str, *, bare: bool = True, cwd: str | None = None,
-                 timeout_s: float = 600.0, env: dict[str, str] | None = None):
+                 timeout_s: float = 600.0, env: dict[str, str] | None = None, tools: dict | None = None,
+                 on_progress: Callable[[dict], None] | None = None):
+        if tools is not None:
+            probs = tools_problems(tools)
+            if probs:
+                raise ConfigError("claude_cli: " + "; ".join(probs))
+            bare = False  # S2: a turn with tools runs non-bare, the tools scoped by the lists below
         self.command, self.model, self.bare, self.cwd, self.timeout_s = command, model, bare, cwd, timeout_s
         self.env = clean_env() if env is None else dict(env)
+        self.tools, self.on_progress = tools, on_progress
 
     def argv(self, prompt: str, system: str | None = None) -> list[str]:
-        a = self.command + ["-p", prompt, "--output-format", "json", "--model", self.model, "--no-session-persistence"]
-        if self.bare:
+        fmt = ["stream-json", "--verbose"] if self.on_progress is not None else ["json"]
+        a = self.command + ["-p", prompt, "--output-format", *fmt, "--model", self.model, "--no-session-persistence"]
+        if self.tools is not None:
+            if system is not None:
+                raise BackendError("not_bare")
+            allow = list(self.tools["allow"])
+            names = list(dict.fromkeys(t.split("(", 1)[0] for t in allow))
+            a += ["--tools", ",".join(names), "--allowedTools", ",".join(allow),
+                  "--permission-mode", self.tools.get("permission_mode", "dontAsk"),
+                  "--strict-mcp-config", "--disable-slash-commands"]
+        elif self.bare:
             if system is None:
                 raise BackendError("bare_without_system")
             a += ["--tools", "", "--strict-mcp-config", "--disable-slash-commands", "--system-prompt", system]
@@ -173,8 +276,12 @@ class ClaudeRunner:
     def run_turn(self, prompt: str, session_id: str | None = None, *, system: str | None = None,
                  on_wait: Callable[[float], None] | None = None, wait_every_s: float | None = None) -> BackendTurn:
         t0 = time.monotonic()
+        relay = None
+        if self.on_progress is not None:
+            cb = self.on_progress
+            relay = lambda ln: [cb(r) for r in progress_of(ln)]  # noqa: E731
         out, err, code = run_process(self.argv(prompt, system), cwd=self.cwd, env=self.env, timeout_s=self.timeout_s,
-                                     on_wait=on_wait, wait_every_s=wait_every_s)
+                                     on_wait=on_wait, wait_every_s=wait_every_s, on_line=relay)
         return parse_claude(out, code, self.model, round(time.monotonic() - t0, 3))
 
 
@@ -198,6 +305,7 @@ def parse_claude(stdout: str, code: int, model: str, seconds: float = 0.0) -> Ba
 
 
 class _ClaudeCli:
+    tools = True  # CMD-GA34 S2: takes ctx["tools"] and ctx["on_progress"]; the other built-ins do not
     catalog = CATALOG['claude_cli']  # CMD-GA31 S3: what the router may pick
     name, version, api = "claude_cli", "1", API_VERSION
     overhead = {"bare": True, "tokens": {"haiku": 945, "sonnet": 1197},
@@ -209,7 +317,8 @@ class _ClaudeCli:
         if not isinstance(options.get("bare", True), bool):
             raise ConfigError("claude_cli: options.bare must be true or false")
         return ClaudeRunner(_cli(options, ["claude"]), model, bare=options.get("bare", True), cwd=ctx.get("cwd"),
-                            timeout_s=ctx.get("timeout_s", 600.0))
+                            timeout_s=ctx.get("timeout_s", 600.0), tools=ctx.get("tools"),
+                            on_progress=ctx.get("on_progress"))
 
 
 CLAUDE_CLI = _ClaudeCli()

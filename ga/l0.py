@@ -47,6 +47,12 @@ def run_end(run_id: str, result: Any, *, decision_ref: str | None = None, source
             "reported_null": []}
 
 
+def event(typ: str, run_id: str, *, source: str = "ga_node", **data: Any) -> dict[str, Any]:
+    """A plain fact event in the run.end envelope (CMD-GA34 S7: ``turn.started``, ``turn.progress``)."""
+    return {"spec": SPEC, "id": f"{run_id}:{typ}", "type": typ, "run_id": run_id, "seq": 0, "source": source,
+            "at": None, "time_base": None, "data": data}
+
+
 def append(path: Path, event: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:

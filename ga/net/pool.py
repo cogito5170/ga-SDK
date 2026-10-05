@@ -18,24 +18,42 @@ One round (``Pool.round``): step every live node, take proposals under the limit
 the role through state.py's rules, fold edges into role-pair pi), then start nodes for queued items in queue order
 while live < max_live and starts this round < max_spawn_per_round. A node id is ``<role>_<n>`` (ga mail senders have
 no '-'). Every step is idempotent: a crash between two writes never starts two nodes for one item.
+
+Real repository work (CMD-GA34; every key is optional and a config without them behaves as before):
+
+    "pool": {..., "repo": {"path": "<local git repo>", "branch": "main", "judge"?: "<judge config path>"},
+             "roles": {"<role>": {..., "tools"?: {"allow": ["Read", "Edit", "Write"], "permission_mode"?: "dontAsk"},
+                                  "progress"?: true}}}
+    work/1 gains  "after": [item ids]  (start only when all are done; a failed one fails the item)
+                  "files": [globs]     (ownership: overlapping items never live together; the hand-in may touch only these)
+
+With ``repo`` a started node gets a worktree ``.ga/worktrees/<node>/`` on branch ``ga/<node>`` from the integration head
+(a done dependency is already in it), with the R3 pre-push hook of ga/adapters/git.py; its turns run there. A done
+item is handed in: the runtime commits what the node left uncommitted, checks ownership, merges a moved integration head
+into the node branch (never a rebase), runs ``ga judge`` (judge_commit) on the branch head against the integration
+branch and fast-forwards the integration branch only on pass (L0 work.integrated / work.rejected). Retire removes the
+worktree and keeps the branch.
 """
 from __future__ import annotations
 
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
 from .. import l0
+from ..adapters import git as G
 from ..forms import Problem, HARD
 from .state import State
 
-POOL_KEYS = ("max_live", "max_queue", "max_spawn_per_round", "max_depth", "idle_rounds", "roles")
+POOL_KEYS = ("max_live", "max_queue", "max_spawn_per_round", "max_depth", "idle_rounds", "roles", "repo")
 DEFAULTS = {"max_live": 3, "max_queue": 20, "max_spawn_per_round": 1, "max_depth": 2, "idle_rounds": 3}
 ROLE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.]{0,29}$")
-ITEM_ID = re.compile(r"^CMD-[A-Z]+\d+$")  # the id a node's report/2 head says it handled
-ITEM_KEYS = {"schema", "id", "role", "goal", "uses", "needs", "answer", "check", "parent", "depth", "origin"}
+ITEM_ID = re.compile(r"^(?:CMD-[A-Z]+\d+|[A-Z][A-Z0-9]*-[A-Z]+-\d+)$")  # CMD-X1, or <PREFIX>-<LETTERS>-<n> (W-FE-01)
+ITEM_KEYS = {"schema", "id", "role", "goal", "uses", "needs", "answer", "check", "parent", "depth", "origin",
+             "after", "files"}
 PROPOSAL_KEYS = {"role", "goal", "uses", "needs", "answer"}  # no check: a node never names a command to run
 ATTEMPTS = 3
 WORK_BLOCK = re.compile(r"^```work[ \t]*\n(.*?)\n```[ \t]*$", re.MULTILINE | re.DOTALL)
@@ -88,7 +106,68 @@ def problems_of(network: dict) -> list[Problem]:
             bad(p + ".budget", "must be {runs?, work?} (non-negative integers)")
         if "task" in n:
             bad(p + ".task", "a pool role takes its task from the work item")
+        if "tools" in n:
+            from ..backends.builtin import tools_problems
+            for m in tools_problems(n["tools"]):
+                bad(p + ".tools", m)
+            no = [b for b in n.get("backends") or [] if not _takes_tools(b)]
+            if no:
+                bad(p + ".tools", f"backend(s) {', '.join(map(str, no))} cannot run a turn with tools (claude_cli can)")
+        if "progress" in n and not isinstance(n["progress"], bool):
+            bad(p + ".progress", "must be true or false")
+    if "repo" in pool:
+        r = pool["repo"]
+        if not isinstance(r, dict) or set(r) - {"path", "branch", "judge"} or not isinstance(r.get("path"), str) \
+                or not isinstance(r.get("branch", "main"), str) or not isinstance(r.get("judge", ""), str):
+            bad("$.network.pool.repo", "must be {path, branch?, judge?} (a local git repository)")
+        elif not G.SAFE_NAME.match(r.get("branch", "main")):
+            bad("$.network.pool.repo.branch", "is not a safe branch name")
     return out
+
+
+def _takes_tools(name: Any) -> bool:
+    try:
+        from .. import backends
+        return bool(getattr(backends.get(name), "tools", False))
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------------------------------- ownership globs
+def _glob_re(g: str) -> re.Pattern:
+    """A path glob: ``**`` any depth (``**/`` also none), ``*`` and ``?`` within one path segment."""
+    out, i = "", 0
+    while i < len(g):
+        if g.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif g.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif g[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif g[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(g[i]), i + 1
+    return re.compile(out + r"\Z")
+
+
+def owned(path: str, globs: list[str]) -> bool:
+    return any(_glob_re(g).match(path) for g in globs)
+
+
+def _literal(g: str) -> str:
+    return re.split(r"[*?\[]", g, 1)[0]
+
+
+def overlap(a: list[str], b: list[str]) -> bool:
+    """Whether two ownerships may share a path (conservative: two globs overlap when one's literal prefix is a prefix
+    of the other's, or one glob matches the other written out)."""
+    for x in a:
+        for y in b:
+            px, py = _literal(x), _literal(y)
+            if px.startswith(py) or py.startswith(px) or owned(x, [y]) or owned(y, [x]):
+                return True
+    return False
 
 
 def item_problems(item: Any, roles: dict) -> list[str]:
@@ -100,7 +179,7 @@ def item_problems(item: Any, roles: dict) -> list[str]:
     if item.get("schema", "work/1") != "work/1":
         out.append("schema is work/1")
     if not isinstance(item.get("id"), str) or not ITEM_ID.match(item["id"]):
-        out.append("id is CMD-<PREFIX><number>")
+        out.append("id is CMD-<PREFIX><number> or <PREFIX>-<LETTERS>-<number>")
     if item.get("role") not in roles:
         out.append(f"unknown role {item.get('role')!r}")
     if not isinstance(item.get("goal"), str) or not item["goal"].strip():
@@ -119,7 +198,29 @@ def item_problems(item: Any, roles: dict) -> list[str]:
         out.append("depth is a non-negative integer")
     if "parent" in item and not isinstance(item["parent"], str):
         out.append("parent is an item id")
+    a = item.get("after", [])
+    if not isinstance(a, list) or not all(isinstance(x, str) and ITEM_ID.match(x) for x in a):
+        out.append("after lists item ids")
+    elif item.get("id") in a:
+        out.append("after names the item itself")
+    f = item.get("files", ["x"])
+    if not isinstance(f, list) or not f or not all(
+            isinstance(x, str) and x and not x.startswith("/") and ".." not in x.split("/") for x in f):
+        out.append("files lists relative path globs")
     return out
+
+
+def _cycle(graph: dict[str, list[str]], start: str) -> bool:
+    """Whether ``start`` reaches itself through ``after`` edges."""
+    seen, todo = set(), list(graph.get(start, []))
+    while todo:
+        x = todo.pop()
+        if x == start:
+            return True
+        if x not in seen:
+            seen.add(x)
+            todo += graph.get(x, [])
+    return False
 
 
 def work_blocks_in(text: str) -> list[Any]:
@@ -166,7 +267,10 @@ def node_spec(cfg: Any, ga_dir: Path, me: str) -> dict | None:
     for k, v in (("needs", needs), ("answer", it.get("answer")), ("check", it.get("check"))):
         if v is not None:
             task[k] = v
-    return {**{k: v for k, v in role.items() if k != "needs"}, "task": task}
+    spec = {**{k: v for k, v in role.items() if k != "needs"}, "task": task}
+    if live.get("ws"):
+        spec["workdir"] = live["ws"]["path"]  # S1: the turn's cwd; the node's own files stay in .ga/nodes/<id>/
+    return spec
 
 
 def peer_names(cfg: Any, ga_dir: Path) -> list[str]:
@@ -228,8 +332,13 @@ def expand_edges(role_pi: dict, peers: list[str], role_of: Callable[[str], str])
 
 # ---------------------------------------------------------------------------------------------------- the pool
 class Pool:
-    def __init__(self, cfg: Any, ga_dir: Path, *, clock: Callable[[], float] | None = None, **node_kw: Any):
+    def __init__(self, cfg: Any, ga_dir: Path, *, clock: Callable[[], float] | None = None,
+                 judge: Callable[..., Any] | None = None, **node_kw: Any):
         self.cfg, self.ga = cfg, Path(ga_dir)
+        r = cfg.network["pool"].get("repo")
+        self.repo = {"path": cfg.resolve(r["path"]).resolve(), "branch": r.get("branch", "main"),
+                     "judge": str(cfg.resolve(r["judge"])) if r.get("judge") else None} if r else None
+        self.judge = judge
         self.conf = {**DEFAULTS, **{k: v for k, v in cfg.network["pool"].items() if k in DEFAULTS}}
         self.roles: dict[str, dict] = cfg.network["pool"]["roles"]
         self.node_kw = dict(node_kw)
@@ -241,7 +350,7 @@ class Pool:
     def reg(self) -> dict:
         r = _read(self.ga / "pool.json") or {}
         return {"schema": "ga-pool/1", "round": r.get("round", 0), "n": r.get("n", {}), "roles": r.get("roles", {}),
-                "live": r.get("live", {}), "attempts": r.get("attempts", {})}
+                "live": r.get("live", {}), "attempts": r.get("attempts", {}), **({"blocked": r["blocked"]} if r.get("blocked") else {})}
 
     def save(self, reg: dict) -> None:
         _atomic(self.ga / "pool.json", reg)
@@ -287,11 +396,30 @@ class Pool:
             return False, "; ".join(probs)
         if item["id"] in self.ids():
             return False, f"item {item['id']!r} exists"
+        if item.get("after"):  # S3: a dependency is queued (live included) or done; never failed, unknown or a cycle
+            known = {p.name.split("-", 1)[1][:-5]: p for s in ("", "done") for p in self._files(s)}
+            unknown = [a for a in item["after"] if a not in known]
+            if unknown:
+                return False, f"after: unknown item(s) {', '.join(unknown)} (neither queued nor done)"
+            graph = {i: list((_read(q) or {}).get("after") or []) for i, q in known.items()}
+            graph[item["id"]] = list(item["after"])
+            if _cycle(graph, item["id"]):
+                return False, f"after: a dependency cycle through {item['id']}"
         if len(self._files()) >= int(self.conf["max_queue"]):
             return False, "queue full"
         seq = self._seq()
         _atomic(self.q / f"{seq:06d}-{item['id']}.json", {"schema": "work/1", **item})
         return True, f"{seq:06d}-{item['id']}"
+
+    def _state_of(self, item_id: str) -> str | None:
+        for sub in ("done", "failed", ""):
+            if any(p.name.split("-", 1)[1][:-5] == item_id for p in self._files(sub)):
+                return sub or "queued"
+        return None
+
+    def _fail(self, item_id: str, role: str, reason: str) -> None:
+        self._move(item_id, "failed")
+        self._l0("work.failed", item=item_id, role=role, reason=reason)
 
     def _move(self, item_id: str, sub: str) -> None:
         for p in self._files():
@@ -327,6 +455,8 @@ class Pool:
         reg["round"] += 1
         events: dict[str, list] = {"started": [], "retired": [], "work": []}
         for node in sorted(reg["live"]):  # recovery: a node claimed but not yet seeded/logged (crash between writes)
+            if self.repo and not reg["live"][node].get("retiring"):
+                self._workspace(reg, node)
             self._seed(node, reg["live"][node]["role"], reg)
             if not self._started_logged(node):
                 self._l0("node.started", node=node, role=reg["live"][node]["role"], item=reg["live"][node]["item"]["id"])
@@ -369,6 +499,17 @@ class Pool:
 
     def _retire(self, reg: dict, node: str) -> dict:
         live = reg["live"][node]
+        if self.repo and live.get("ws") and "handin" not in live:
+            if live["retiring"] == "done":
+                ok, why = self._hand_in(reg, node)
+                live["handin"] = why
+                if not ok:
+                    live["retiring"] = "failed"
+            else:
+                live["handin"] = self._commit_left(live, "wip")  # nothing is lost: the branch is kept
+            self.save(reg)
+        if self.repo and live.get("ws"):
+            self._drop_worktree(live["ws"])
         role, how, iid = live["role"], live["retiring"], live["item"]["id"]
         src = self.ga / "nodes" / node
         dst = self.ga / "nodes" / "_retired" / node
@@ -383,6 +524,8 @@ class Pool:
             self._move(iid, "done")
         elif how == "failed":
             self._move(iid, "failed")
+            if live.get("handin") and live["retiring"] == "failed" and self.repo:
+                self._l0("work.failed", item=iid, role=role, reason=str(live["handin"])[:500])
         else:
             reg["attempts"][iid] = reg["attempts"].get(iid, 0) + 1  # idle: the item waits for a new node
         if src.exists():
@@ -442,18 +585,112 @@ class Pool:
                 break
             role = item["role"]
             if reg["attempts"].get(item["id"], 0) >= self.limit(role):
-                self._move(item["id"], "failed")
-                self._l0("work.failed", item=item["id"], role=role, reason="runs budget exhausted")
+                self._fail(item["id"], role, "runs budget exhausted")
+                continue
+            deps = {a: self._state_of(a) for a in item.get("after") or []}  # S3
+            bad = sorted(a for a, st in deps.items() if st in ("failed", None))
+            if bad:
+                reg.get("blocked", {}).pop(item["id"], None)
+                self._fail(item["id"], role, f"dependency failed: {', '.join(bad)}")
+                continue
+            waiting = sorted(a for a, st in deps.items() if st != "done")
+            files = item.get("files")
+            if not waiting and files:  # S4: an overlapping owner is live; the later item waits
+                waiting = sorted(v["item"]["id"] for v in reg["live"].values()
+                                 if v["item"].get("files") and overlap(files, v["item"]["files"]))
+            if waiting:
+                blocked = reg.setdefault("blocked", {})
+                if item["id"] not in blocked:  # once per item while it waits
+                    self._l0("work.blocked", item=item["id"], waiting_on=waiting)
+                if blocked.get(item["id"]) != waiting:
+                    blocked[item["id"]] = waiting
+                    self.save(reg)
                 continue
             n = reg["n"][role] = reg["n"].get(role, 0) + 1
             node = f"{role}_{n}"
             reg["roles"][node] = role
             reg["live"][node] = {"role": role, "item": item, "since": reg["round"], "idle": 0, "children": 0}
+            reg.get("blocked", {}).pop(item["id"], None)
             self.save(reg)  # the claim: from here the item is not pending for anyone else
+            if self.repo:
+                self._workspace(reg, node)
             self._seed(node, role, reg)
             self._l0("node.started", node=node, role=role, item=item["id"])
             started.append({"node": node, "item": item["id"]})
         return started
+
+    # -- the node workspace and the integration step (S1, S4, S5)
+    def _workspace(self, reg: dict, node: str) -> None:
+        """The node's worktree on ga/<node> from the integration head, with the R3 pre-push hook (idempotent)."""
+        live = reg["live"][node]
+        rd, integ = self.repo["path"], self.repo["branch"]
+        if not live.get("ws"):
+            base = G.git(rd, "rev-parse", "--verify", f"refs/heads/{integ}^{{commit}}")
+            live["ws"] = {"path": str((self.ga / "worktrees" / node).resolve()), "branch": f"ga/{node}", "base": base}
+            self.save(reg)  # decided before created: a restart makes the same worktree
+        ws = live["ws"]
+        G.add_worktree(rd, Path(ws["path"]), ws["branch"], ws["base"])
+        G.install_pre_push_hook(rd, Path(ws["path"]), self.ga / "hooks" / node, node, rd.name, ws["branch"])
+
+    def _drop_worktree(self, ws: dict) -> None:
+        if Path(ws["path"]).exists():
+            G.git(self.repo["path"], "worktree", "remove", "--force", ws["path"])
+        G.git(self.repo["path"], "worktree", "prune", check=False)
+
+    def _commit_left(self, live: dict, what: str) -> str:
+        """Commit what the node left uncommitted in its worktree (the runtime's hand-in commit); the branch head."""
+        wt = live["ws"]["path"]
+        if G.git(wt, "status", "--porcelain"):
+            G.git(wt, "add", "-A")
+            G.git(wt, "-c", "user.name=ga-node", "-c", "user.email=ga-node@localhost", "commit", "--quiet", "--no-verify",
+                  "-m", f"{live['item']['id']}: {what}: {live['item']['goal'].splitlines()[0][:72]}")
+        return G.git(wt, "rev-parse", "HEAD")
+
+    def _outside(self, live: dict, base: str, head: str) -> list[str]:
+        files = live["item"].get("files")
+        return [f for f in G.changed_files(self.repo["path"], base, head)
+                if f == ".ga" or f.startswith(".ga/") or (files and not owned(f, files))]
+
+    def _hand_in(self, reg: dict, node: str) -> tuple[bool, str]:
+        """(integrated?, why). Own-files check, merge of a moved integration head, judge, fast-forward only."""
+        live = reg["live"][node]
+        rd, integ, ws = self.repo["path"], self.repo["branch"], live["ws"]
+        iid = live["item"]["id"]
+        from .. import judge as J
+        try:
+            head = self._commit_left(live, "hand-in")
+            bad = self._outside(live, ws["base"], head)
+            if bad:
+                return self._rejected(node, iid, head, "outside files: " + ", ".join(bad[:50]))
+            ih = G.git(rd, "rev-parse", "--verify", f"refs/heads/{integ}^{{commit}}")
+            if head == ih or G.is_ancestor(rd, head, ih):
+                self._l0("work.integrated", node=node, item=iid, sha=ih, branch=ws["branch"], nothing=True)
+                return True, "nothing to integrate"
+            if not G.is_ancestor(rd, ih, head):  # the integration head moved: merge it in (never a rebase), judge again
+                m = subprocess.run(["git", "-c", "user.name=ga-node", "-c", "user.email=ga-node@localhost", "merge",
+                                    "--no-edit", "--quiet", "--no-verify", ih], cwd=ws["path"], capture_output=True)
+                if m.returncode:
+                    G.git(ws["path"], "merge", "--abort", check=False)
+                    return self._rejected(node, iid, head, "merge conflict with " + integ)
+                head = G.git(ws["path"], "rev-parse", "HEAD")
+                bad = self._outside(live, ih, head)
+                if bad:
+                    return self._rejected(node, iid, head, "outside files: " + ", ".join(bad[:50]))
+            jf = self.judge or J.judge_commit
+            j = jf(rd, head, integ, config=self.repo["judge"])
+            if j.cls != "success" or not j.ff:
+                red = list(getattr(j, "failing", []) or [])
+                return self._rejected(node, iid, head, f"judge {j.cls}" + (": " + ", ".join(red[:20]) if red else "")
+                                      + ("" if red else "; " + "; ".join(j.notes[-2:])), failing=red)
+            G.fast_forward_local(rd, integ, head)  # refuses a non-fast-forward; never forces
+        except (G.GitError, J.JudgeError, OSError, subprocess.SubprocessError) as e:
+            return self._rejected(node, iid, None, f"integration error: {e}"[:300])
+        self._l0("work.integrated", node=node, item=iid, sha=head, branch=ws["branch"], tests=j.tests.get(j.repo))
+        return True, f"integrated {head[:12]}"
+
+    def _rejected(self, node: str, iid: str, head: str | None, why: str, failing: list | None = None) -> tuple[bool, str]:
+        self._l0("work.rejected", node=node, item=iid, sha=head, reason=why[:500], failing=(failing or [])[:50])
+        return False, why
 
     # -- status
     def status(self) -> dict:
@@ -466,6 +703,6 @@ class Pool:
         return {"caps": dict(self.conf), "round": reg["round"],
                 "live": {n: {"role": v["role"], "item": v["item"]["id"], "idle": v.get("idle", 0)}
                          for n, v in sorted(reg["live"].items())},
-                "queue": [it["id"] for _, it in self.pending(reg)],
+                "queue": [it["id"] for _, it in self.pending(reg)], **({"blocked": dict(reg["blocked"])} if reg.get("blocked") else {}),
                 "done": [p.name.split("-", 1)[1][:-5] for p in self._files("done")],
                 "failed": [p.name.split("-", 1)[1][:-5] for p in self._files("failed")], "roles": roles}

@@ -14,6 +14,11 @@ The per-repo config is JSON (default ``<repo>/.ga-judge.json``, read from the lo
      "pinned": ["dep"], "pip_args": ["--no-index"], "pythonpath": ["."], "python": "/usr/bin/python3",
      "repo": "owner/name", "timeout": 1800}
 
+Beyond pip (CMD-GA34 S6): ``"setup": [["npm", "ci"], ...]`` instead of ``dist`` runs each argv in the fresh clone
+(network allowed: it installs) and skips step (3); ``"junit": "<path in the clone>"`` reads the counts and the failing
+test ids from that JUnit XML file (vitest, jest, playwright and pytest --junitxml all write one). Without ``junit`` the
+output is read by the unittest / pytest parsers and the vitest, jest and playwright summary parsers.
+
 The mutation spec is a JSON list of ``{"file", "find", "replace", "tests": [names...], "id"?}``.
 """
 from __future__ import annotations
@@ -136,11 +141,60 @@ def parse_counts(out: str) -> dict[str, int] | None:
         c = {k: int(v) for v, k in re.findall(r"(\d+) (passed|failed|errors?|skipped)", m.group(1))}
         return {"passed": c.get("passed", 0), "failed": c.get("failed", 0) + c.get("error", 0) + c.get("errors", 0),
                 "skipped": c.get("skipped", 0)}
+    return _js_counts(out)
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+_VITEST = re.compile(r"^\s*Tests\s{2,}(.*?)\s*\((\d+)\)\s*$", re.M)  # " Tests  1 failed | 11 passed (12)"
+_JEST = re.compile(r"^Tests:\s+(.*?\d+ total)\s*$", re.M)  # "Tests:       1 failed, 11 passed, 12 total"
+_PW = re.compile(r"^\s+(\d+) (passed|failed|flaky|skipped|did not run|interrupted)(?: \([\d.]+m?s\))?\s*$", re.M)
+
+
+def _js_counts(out: str) -> dict[str, int] | None:
+    """vitest, jest or playwright summary lines (CMD-GA34 S6); None when none is found."""
+    out = _ANSI.sub("", out)
+    for rx in (_VITEST, _JEST):
+        m = rx.search(out)
+        if m:
+            c = {k: int(v) for v, k in re.findall(r"(\d+) (passed|failed|skipped|todo|pending)", m.group(1))}
+            return {"passed": c.get("passed", 0), "failed": c.get("failed", 0),
+                    "skipped": c.get("skipped", 0) + c.get("todo", 0) + c.get("pending", 0)}
+    rows = _PW.findall(out)
+    if any(k in ("passed", "failed") for _, k in rows):
+        c: dict[str, int] = {}
+        for v, k in rows:
+            c[k] = c.get(k, 0) + int(v)
+        return {"passed": c.get("passed", 0) + c.get("flaky", 0), "failed": c.get("failed", 0) + c.get("interrupted", 0),
+                "skipped": c.get("skipped", 0) + c.get("did not run", 0)}
     return None
+
+
+def parse_junit(path: Path) -> tuple[dict[str, int], list[str]] | None:
+    """(counts, failing test ids "classname.name") from a JUnit XML file; None when it is missing or not JUnit."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.parse(str(path)).getroot()
+    except (OSError, ET.ParseError):
+        return None
+    if root.tag not in ("testsuites", "testsuite"):
+        return None
+    c, failing = {"passed": 0, "failed": 0, "skipped": 0}, set()
+    for tc in root.iter("testcase"):
+        tid = ".".join(x for x in (tc.get("classname"), tc.get("name")) if x)
+        if tc.find("failure") is not None or tc.find("error") is not None:
+            c["failed"] += 1
+            failing.add(tid)
+        elif tc.find("skipped") is not None:
+            c["skipped"] += 1
+        else:
+            c["passed"] += 1
+    return c, sorted(failing)
 
 
 _UT_RE = re.compile(r"^(?:FAIL|ERROR): (\S.*?)(?: \(\w+=.*\))?\s*$", re.M)
 _PT_RE = re.compile(r"^(?:FAILED|ERROR) (\S+?::\S+|\S+\.py)(?: - .*)?$", re.M)
+_VT_RE = re.compile(r"^\s*(?:FAIL|×|✗)\s+(\S+\.[cm]?[jt]sx? > .+?)(?: \d+m?s)?\s*$", re.M)  # vitest
+_PWF_RE = re.compile(r"^\s+\d+\) (\[[^\]]+\] › .+?)\s*$", re.M)  # playwright "  1) [chromium] › a.spec.ts:3:5 › t"
 
 
 def failing_tests(out: str) -> list[str]:
@@ -153,6 +207,9 @@ def failing_tests(out: str) -> list[str]:
         ids.add(inner[1] if inner else t)
     for m in _PT_RE.finditer(out):
         ids.add(m[1])
+    clean = _ANSI.sub("", out)
+    for rx in (_VT_RE, _PWF_RE):
+        ids.update(m[1] for m in rx.finditer(clean))
     return sorted(ids)
 
 
@@ -173,8 +230,16 @@ def load_config(repo: Path, path: str | None) -> dict[str, Any]:
         cfg = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         raise JudgeError(f"judge config {p}: {e}") from None
-    if not isinstance(cfg, dict) or not cfg.get("dist") or not isinstance(cfg.get("test"), list):
-        raise JudgeError(f"judge config {p}: needs \"dist\" and a \"test\" argv list")
+    if not isinstance(cfg, dict) or not isinstance(cfg.get("test"), list):
+        raise JudgeError(f"judge config {p}: needs \"dist\" (or \"setup\") and a \"test\" argv list")
+    setup = cfg.get("setup")
+    if setup is not None and not (isinstance(setup, list) and all(
+            isinstance(a, list) and a and all(isinstance(x, str) for x in a) for a in setup)):
+        raise JudgeError(f"judge config {p}: \"setup\" is a list of argv lists")
+    if not cfg.get("dist") and setup is None:
+        raise JudgeError(f"judge config {p}: needs \"dist\" (or \"setup\") and a \"test\" argv list")
+    if "junit" in cfg and not isinstance(cfg["junit"], str):
+        raise JudgeError(f"judge config {p}: \"junit\" is a path in the clone")
     return cfg
 
 
@@ -222,7 +287,7 @@ def fetch(repo: Path, remote: str, sha: str, branch: str | None = None) -> bool:
 
 def pick_commit(head: dict[str, Any], cfg: dict[str, Any], repo: Path) -> dict[str, str]:
     commits = [c for c in head.get("commits") or [] if isinstance(c, dict)]
-    names = {cfg.get("repo"), repo.resolve().name, cfg["dist"]} - {None}
+    names = {cfg.get("repo"), repo.resolve().name, cfg.get("dist")} - {None}
     mine = [c for c in commits if c.get("repo") in names or str(c.get("repo", "")).rsplit("/", 1)[-1] in names]
     if len(mine) == 1:
         return mine[0]
@@ -344,6 +409,32 @@ def judge(report: str, repo: str | Path, base: str, *, mutations: str | None = N
     return j
 
 
+def judge_commit(repo: str | Path, sha: str, base: str, *, config: str | None = None, mutations: str | None = None,
+                 seed: int | None = None, k: int = 1) -> Judgement:
+    """Steps (2)-(5) on a local commit, no report (CMD-GA34 S5: the pool judges a node's branch head against the
+    integration branch). Both are refs of the local repository ``repo``; nothing is fetched."""
+    repo = Path(repo).resolve()
+    cfg = load_config(repo, config)
+    j = Judgement(base=base)
+    j.seed = random.SystemRandom().randrange(2**32) if seed is None else seed
+    sha = git(repo, "rev-parse", f"{sha}^{{commit}}", check=True).stdout.strip()
+    base_sha = git(repo, "rev-parse", f"{base}^{{commit}}", check=True).stdout.strip()
+    j.sha, j.repo = sha, cfg.get("repo") or repo.name
+    j.heads = {j.repo: sha}
+    j.ff, conflicts = merge_state(repo, base_sha, sha)
+    if not j.ff:
+        j.worse("failure", "integration")
+        j.notes.append(f"non-ff: {sha[:7]} does not fast-forward {base}" + (f"; conflicts in {', '.join(conflicts)}"
+                                                                             if conflicts else ""))
+        return j
+    work = Path(tempfile.mkdtemp(prefix="ga-judge-"))
+    try:
+        _measure(j, cfg, repo, sha, {}, work, mutations, k, base_sha)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    return j
+
+
 def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict[str, Any], work: Path,
              mutations: str | None, k: int, base_sha: str = "") -> None:
     timeout = cfg.get("timeout", 1800)
@@ -353,45 +444,12 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
     git(src, "fetch", "--quiet", str(repo), sha, check=True)  # a fetch (not a push) also works from a shallow repo
     git(src, "update-ref", "refs/heads/judge", sha, check=True)
 
-    # (3) empty venv, install, pip list, pip check
-    vdir = work / "venv"
-    venv.create(vdir, with_pip=True, clear=True, symlinks=os.name != "nt")
-    vpy = str(vdir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
-    dist, extras = cfg["dist"], cfg.get("extras") or []
-    req = f"{dist}{'[' + ','.join(extras) + ']' if extras else ''} @ git+file://localhost{src}@{sha}"  # pip needs a host in the URL
-    p = run([vpy, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *cfg.get("pip_args", []), req],
-            timeout=timeout)
-    installed = p.returncode == 0
-    if not installed:
-        j.worse("failure", "implementation")
-        j.notes.append(f"pip install failed: {(p.stderr or p.stdout).strip().splitlines()[-1:] or ['?']}"[:200])
+    if cfg.get("setup") is not None:  # CMD-GA34 S6: no pip dist; the setup argv lists install in the clone
+        installed, vpy = False, sys.executable
+        j.notes.append("setup mode: no pip install (" + "; ".join(" ".join(a) for a in cfg["setup"]) + ")"
+                       if cfg["setup"] else "setup mode: nothing to install")
     else:
-        show = run([vpy, "-m", "pip", "show", dist]).stdout
-        req_line = next((x for x in show.splitlines() if x.startswith("Requires:")), "Requires:")
-        names = {n.strip().lower().replace("_", "-") for n in req_line.split(":", 1)[1].split(",") if n.strip()}
-        names |= {dist.lower().replace("_", "-"), *[x.lower().replace("_", "-") for x in cfg.get("pinned", [])]}
-        pl = json.loads(run([vpy, "-m", "pip", "list", "--format=json", "--disable-pip-version-check"]).stdout or "[]")
-        got = {x["name"].lower().replace("_", "-"): x["version"] for x in pl if x["name"].lower().replace("_", "-") in names}
-        j.notes.append("pip list: " + ", ".join(f"{n}=={v}" for n, v in sorted(got.items())))
-        pc = run([vpy, "-m", "pip", "check", "--disable-pip-version-check"])
-        if pc.returncode:
-            j.worse("failure", "dependency")
-            j.notes.append(f"pip check failed: {pc.stdout.strip().splitlines()[0] if pc.stdout.strip() else pc.stderr.strip()[:150]}")
-        else:
-            j.notes.append("pip check: ok")
-        measured = got.get(dist.lower().replace("_", "-"))
-        for r in head.get("results") or []:
-            m = re.match(r"^(?:version[: ](\S+)|(\S+?)[ _]version)$", str(r.get("name", "")))
-            if m:
-                want = (m[1] or m[2]).lower().replace("_", "-")
-                have_v = got.get(want)
-                if have_v is None or str(r["value"]) != have_v:
-                    j.claims.append(f"version {want}: claimed {r['value']}, measured {have_v}")
-                    j.needs.append(f"claim mismatch: version {want} claimed {r['value']}, measured {have_v}")
-                else:
-                    j.claims.append(f"version {want} {have_v}: ok")
-        if measured is None:
-            j.notes.append(f"{dist} missing from pip list")
+        installed, vpy = _pip_step(j, cfg, src, sha, head, work, timeout)
 
     # (4) fresh clone, the repo's test command, network blocked
     clone = work / "clone"
@@ -400,27 +458,49 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
     guard = work / "guard"
     guard.mkdir()
     (guard / "sitecustomize.py").write_text(_GUARD, encoding="utf-8")
-    py = vpy if installed else sys.executable
+    py = vpy if installed or cfg.get("setup") is not None else sys.executable
+
+    def setup_in(cwd: Path) -> bool:
+        for a in cfg.get("setup") or []:
+            sp = run(expand(a, py), cwd=cwd, timeout=timeout)
+            if sp.returncode:
+                j.worse("failure", "dependency")
+                j.notes.append(f"setup {' '.join(a)} failed (exit {sp.returncode}): "
+                               f"{(sp.stderr or sp.stdout).strip().splitlines()[-1:] or ['?']}"[:200])
+                return False
+        return True
 
     def run_tests(argv: list[str], cwd: Path = clone) -> tuple[subprocess.CompletedProcess, str]:
+        if cfg.get("junit"):  # never read a file the commit carries or an earlier run left
+            (cwd / cfg["junit"]).unlink(missing_ok=True)
         wrapped, how = netless(expand(argv, py))
         env_here = make_env(guard, [str(cwd / x) for x in cfg.get("pythonpath", [])])
         return run(wrapped, cwd=cwd, env=env_here, timeout=timeout), how
 
+    def counted(p: subprocess.CompletedProcess, cwd: Path = clone) -> tuple[dict[str, int] | None, list[str]]:
+        """(counts, failing ids): from the JUnit file when the config names one, else from the output."""
+        if cfg.get("junit"):
+            got = parse_junit(cwd / cfg["junit"])
+            return got if got else (None, [])
+        out = p.stdout + "\n" + p.stderr
+        return parse_counts(out), failing_tests(out)
+
+    if not setup_in(clone):
+        return
     p, how = run_tests(cfg["test"])
-    counts = parse_counts(p.stdout + "\n" + p.stderr)
+    counts, names = counted(p)
     j.notes.append(f"tests run in fresh clone, PYTHONDONTWRITEBYTECODE=1, network blocked ({how})")
     if counts is None:
         j.worse("insufficient", "measurement")
-        j.notes.append(f"tests: no counts in output (exit {p.returncode})")
+        j.notes.append(f"tests: no counts in {'JUnit file ' + cfg['junit'] if cfg.get('junit') else 'output'} "
+                       f"(exit {p.returncode})")
     else:
         j.tests[j.repo] = counts
         j.notes.append(f"tests: {counts['passed']} passed, {counts['failed']} failed, {counts['skipped']} skipped (exit {p.returncode})")
         if counts["failed"] or p.returncode:
-            names = failing_tests(p.stdout + "\n" + p.stderr)
             base_names: list[str] = []
             if base_sha and names:
-                base_names = _base_failures(j, cfg, repo, src, base_sha, work, run_tests)
+                base_names = _base_failures(j, cfg, repo, src, base_sha, work, run_tests, setup_in, counted)
             new, pre, unnamed = split_failures(names, base_names, counts["failed"])
             j.failing, j.preexisting = new, pre
             if new:
@@ -468,8 +548,7 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
         finally:
             path.write_text(orig, encoding="utf-8")
             git(clone, "checkout", "--quiet", "--", mu["file"])
-        out = p.stdout + p.stderr
-        c = parse_counts(out)
+        c, _ = counted(p)
         if p.returncode and c is not None and c["failed"]:
             j.notes.append(f"mutation {label}: killed ({c['failed']} failed)")
         elif p.returncode and c is None:
@@ -480,7 +559,53 @@ def _measure(j: Judgement, cfg: dict[str, Any], repo: Path, sha: str, head: dict
             j.needs.append(f"mutation {label} survived: tests {' '.join(mu['tests'])} do not cover it")
 
 
-def _base_failures(j: Judgement, cfg: dict[str, Any], repo: Path, src: Path, base_sha: str, work: Path, run_tests) -> list[str]:
+def _pip_step(j: Judgement, cfg: dict[str, Any], src: Path, sha: str, head: dict[str, Any], work: Path,
+              timeout: Any) -> tuple[bool, str]:
+    """(3) empty venv, pip install of the dist at the sha, pip list, pip check: (installed?, the venv's python)."""
+    vdir = work / "venv"
+    venv.create(vdir, with_pip=True, clear=True, symlinks=os.name != "nt")
+    vpy = str(vdir / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+    dist, extras = cfg["dist"], cfg.get("extras") or []
+    req = f"{dist}{'[' + ','.join(extras) + ']' if extras else ''} @ git+file://localhost{src}@{sha}"  # pip needs a host in the URL
+    p = run([vpy, "-m", "pip", "install", "--quiet", "--disable-pip-version-check", *cfg.get("pip_args", []), req],
+            timeout=timeout)
+    installed = p.returncode == 0
+    if not installed:
+        j.worse("failure", "implementation")
+        j.notes.append(f"pip install failed: {(p.stderr or p.stdout).strip().splitlines()[-1:] or ['?']}"[:200])
+    else:
+        show = run([vpy, "-m", "pip", "show", dist]).stdout
+        req_line = next((x for x in show.splitlines() if x.startswith("Requires:")), "Requires:")
+        names = {n.strip().lower().replace("_", "-") for n in req_line.split(":", 1)[1].split(",") if n.strip()}
+        names |= {dist.lower().replace("_", "-"), *[x.lower().replace("_", "-") for x in cfg.get("pinned", [])]}
+        pl = json.loads(run([vpy, "-m", "pip", "list", "--format=json", "--disable-pip-version-check"]).stdout or "[]")
+        got = {x["name"].lower().replace("_", "-"): x["version"] for x in pl if x["name"].lower().replace("_", "-") in names}
+        j.notes.append("pip list: " + ", ".join(f"{n}=={v}" for n, v in sorted(got.items())))
+        pc = run([vpy, "-m", "pip", "check", "--disable-pip-version-check"])
+        if pc.returncode:
+            j.worse("failure", "dependency")
+            j.notes.append(f"pip check failed: {pc.stdout.strip().splitlines()[0] if pc.stdout.strip() else pc.stderr.strip()[:150]}")
+        else:
+            j.notes.append("pip check: ok")
+        measured = got.get(dist.lower().replace("_", "-"))
+        for r in head.get("results") or []:
+            m = re.match(r"^(?:version[: ](\S+)|(\S+?)[ _]version)$", str(r.get("name", "")))
+            if m:
+                want = (m[1] or m[2]).lower().replace("_", "-")
+                have_v = got.get(want)
+                if have_v is None or str(r["value"]) != have_v:
+                    j.claims.append(f"version {want}: claimed {r['value']}, measured {have_v}")
+                    j.needs.append(f"claim mismatch: version {want} claimed {r['value']}, measured {have_v}")
+                else:
+                    j.claims.append(f"version {want} {have_v}: ok")
+        if measured is None:
+            j.notes.append(f"{dist} missing from pip list")
+
+    return installed, vpy
+
+
+def _base_failures(j: Judgement, cfg: dict[str, Any], repo: Path, src: Path, base_sha: str, work: Path, run_tests,
+                   setup_in=None, counted=None) -> list[str]:
     """The tests that fail on the base head: the same suite, the same venv and guards, a clone of the base sha."""
     if git(src, "fetch", "--quiet", str(repo), base_sha).returncode:
         j.notes.append(f"base {base_sha[:7]} not fetchable: failures not compared")
@@ -488,8 +613,10 @@ def _base_failures(j: Judgement, cfg: dict[str, Any], repo: Path, src: Path, bas
     bclone = work / "baseclone"
     git(work, "clone", "--quiet", "--no-checkout", str(src), str(bclone), check=True)
     git(bclone, "checkout", "--quiet", "--detach", base_sha, check=True)
+    if setup_in is not None and not setup_in(bclone):
+        return []
     p, _ = run_tests(cfg["test"], bclone)
-    names = failing_tests(p.stdout + "\n" + p.stderr)
+    names = counted(p, bclone)[1] if counted is not None else failing_tests(p.stdout + "\n" + p.stderr)
     j.notes.append(f"base {base_sha[:7]} run: {len(names)} failing test(s) named")
     return names
 

@@ -358,6 +358,36 @@ ga run --every 30
   queue is under `max_queue`, and the proposing node's `budget.work` (default 2) has room; otherwise it is dropped and
   the reason is recorded. A node never starts a node.
 
+### Real repository work (CMD-GA34, ga 0.7.0)
+
+All keys are optional; a config without them behaves as in 0.6.
+
+```json
+"pool": {"repo": {"path": "../app", "branch": "main", "judge": "../app/.ga-judge.json"},
+         "roles": {"dev": {"backends": ["claude_cli"], "progress": true,
+                           "tools": {"allow": ["Read", "Edit", "Write", "Glob", "Grep", "Bash(python3 -m unittest:*)"],
+                                     "permission_mode": "dontAsk"}}}}
+```
+
+- **Worktree per node** (`pool.repo`): a started node gets `.ga/worktrees/<node>/` on branch `ga/<node>` from the
+  integration head, with the R3 pre-push hook of `ga/adapters/git.py` (push only its own branch, never force). Its turns
+  run there; its own files stay in `.ga/nodes/<id>/`. Retire removes the worktree and keeps the branch.
+- **Tools** (`roles.<r>.tools`): claude_cli runs non-bare with `--tools <names> --allowedTools <list> --permission-mode
+  <mode>` (default `dontAsk`) plus `--strict-mcp-config --disable-slash-commands`. Safe: Read, Edit, Write, MultiEdit,
+  Glob, Grep, LS, NotebookEdit, TodoWrite, and `Bash(<command prefix>)` such as the repo's test command. Refused by the
+  config check: `bypassPermissions` and `auto`, WebFetch / WebSearch, unscoped `Bash`, and Bash prefixes that reach the
+  network or push (git, curl, wget, ssh, scp, nc, rsync, npm publish, pip install). Other backends refuse `tools`.
+- **`after: [ids]`** on a work item: started only when every dependency is done; a failed dependency fails the item;
+  `ga work add` refuses ids neither queued nor done, and cycles. L0 `work.blocked` once per waiting item.
+- **`files: [globs]`**: two items whose globs overlap are never live together; the hand-in may touch only matching paths
+  (never `.ga/`), else the item fails with the paths.
+- **Integration**: a done item's worktree is committed by the runtime (what the node left), the moved integration head is
+  merged into the node branch (never a rebase), `ga judge` (`judge_commit`) runs on the branch head against the integration
+  branch, and only a pass fast-forwards it. L0 `work.integrated` / `work.rejected` (with the red tests).
+- **L0**: every pool-node turn writes `turn.started` (node, item, backend, model) before `run.end`; with `progress: true`
+  the claude_cli stream-json tool uses are relayed as `turn.progress` (tool name and path only, at most 50 per turn).
+- **Item ids**: `CMD-<LETTERS><n>` or `<PREFIX>-<LETTERS>-<n>` (e.g. `W-FE-01`).
+
 ## 시험
 
 ```sh
@@ -378,6 +408,12 @@ It prints a `verdict/1` draft head (`dump_wire`), the `needs_judgement` list (de
 mismatches, surviving or stale mutations, non-ff merges, a missing mutation spec), a DECISION_LOG row and a BASELINE section
 13 line. Exit 0: clean success candidate; 1: something for judgement or not success; 2: error; 3: `--apply` refused.
 `--apply` fast-forwards the base branch to the sha and pushes, only when the class is success and `needs_judgement` is empty.
+
+Beyond pip (CMD-GA34): `.ga-judge.json` may give `"setup": [["npm", "ci"], ...]` instead of `dist` (each argv runs in the
+fresh clone before the tests; no venv, no pip check), and `"junit": "<path>"` to read the counts and failing test ids from
+a JUnit XML file (vitest, jest, playwright, pytest `--junitxml`). Without `junit` the output is read by the unittest and
+pytest parsers and by summary parsers for vitest, jest and playwright. Pre-existing failures on the base are still told
+apart by test id.
 Classes: red test → failure/implementation; install failure → failure/implementation; `pip check` failure →
 failure/dependency; surviving mutation or no test counts or a bad report head → insufficient/measurement.
 

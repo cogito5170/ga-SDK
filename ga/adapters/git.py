@@ -116,6 +116,64 @@ def git(cwd: str | Path, *args: str, check: bool = True, input: bytes | None = N
     return p.stdout.decode(errors="replace").strip()
 
 
+def is_ancestor(rd: str | Path, a: str, b: str) -> bool:
+    return subprocess.run(["git", "merge-base", "--is-ancestor", a, b], cwd=str(rd), capture_output=True).returncode == 0
+
+
+def changed_files(rd: str | Path, base: str, head: str) -> list[str]:
+    return [l for l in git(rd, "diff", "--name-only", "--no-renames", base, head).splitlines() if l]
+
+
+def checked_out_at(rd: str | Path, branch: str) -> Path | None:
+    """The worktree that has ``branch`` checked out, else None."""
+    path = None
+    for line in git(rd, "worktree", "list", "--porcelain").splitlines():
+        if line.startswith("worktree "):
+            path = Path(line[len("worktree "):])
+        elif line == f"branch refs/heads/{branch}" and path is not None:
+            return path
+    return None
+
+
+def fast_forward_local(rd: str | Path, branch: str, new: str) -> str:
+    """Move the local ``branch`` to ``new`` only as a fast-forward (R4): a checked-out branch by ``merge --ff-only``,
+    else by a compare-and-swap ``update-ref``. Never forces."""
+    local_old = git(rd, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False) or None
+    if local_old is not None and not is_ancestor(rd, local_old, new):
+        raise GitError(f"{new[:7]} is not a fast-forward of {branch}@{local_old[:7]}")
+    wt = checked_out_at(rd, branch)
+    if wt is not None:
+        git(wt, "merge", "--ff-only", "--quiet", new)
+    else:
+        git(rd, "update-ref", f"refs/heads/{branch}", new, local_old or "0" * 40)
+    return new
+
+
+def add_worktree(rd: str | Path, wt: Path, branch: str, start: str | None) -> Path:
+    """A worktree at ``wt`` on ``branch``: the existing branch, or a new one from ``start``."""
+    if wt.exists():
+        return wt
+    wt.parent.mkdir(parents=True, exist_ok=True)
+    if git(rd, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False):
+        git(rd, "worktree", "add", "--quiet", str(wt), branch)
+    else:
+        if start is None:
+            raise GitError(f"{rd}: no start for new branch {branch}")
+        git(rd, "worktree", "add", "--quiet", "-b", branch, str(wt), start)
+    return wt
+
+
+def install_pre_push_hook(rd: str | Path, wt: Path, hooks: Path, who: str, repo: str, branch: str) -> Path:
+    """The R3 pre-push hook in ``hooks``, made the worktree's own ``core.hooksPath`` (per-worktree config)."""
+    hooks.mkdir(parents=True, exist_ok=True)
+    hook = hooks / "pre-push"
+    hook.write_text(PRE_PUSH.format(session=who, repo=repo, ref=f"refs/heads/{branch}"), encoding="utf-8")
+    hook.chmod(0o755)
+    git(rd, "config", "extensions.worktreeConfig", "true")
+    git(wt, "config", "--worktree", "core.hooksPath", str(hooks.resolve()))
+    return hook
+
+
 class GitVcs:
     def __init__(self, cfg: Config, ga_dir: str | Path):
         self.cfg = cfg
@@ -176,12 +234,10 @@ class GitVcs:
         return self.ref(repo, self.cfg.sessions[session].branch_for(repo))
 
     def is_ancestor(self, repo: str, a: str, b: str) -> bool:
-        p = subprocess.run(["git", "merge-base", "--is-ancestor", a, b], cwd=str(self.repo_dir(repo)), capture_output=True)
-        return p.returncode == 0
+        return is_ancestor(self.repo_dir(repo), a, b)
 
     def changed_files(self, repo: str, base: str, head: str) -> list[str]:
-        out = git(self.repo_dir(repo), "diff", "--name-only", "--no-renames", base, head)
-        return [l for l in out.splitlines() if l]
+        return changed_files(self.repo_dir(repo), base, head)
 
     def added_lines(self, repo: str, base: str, head: str) -> str:
         """Lines added between base and head (what R6 scans)."""
@@ -212,14 +268,7 @@ class GitVcs:
     # ------------------------------------------------------------------ hub side
 
     def _checked_out_at(self, repo: str, branch: str) -> Path | None:
-        out = git(self.repo_dir(repo), "worktree", "list", "--porcelain")
-        path = None
-        for line in out.splitlines():
-            if line.startswith("worktree "):
-                path = Path(line[len("worktree "):])
-            elif line == f"branch refs/heads/{branch}" and path is not None:
-                return path
-        return None
+        return checked_out_at(self.repo_dir(repo), branch)
 
     def fast_forward(self, repo: str, new: str) -> str:
         """Move the integration branch to ``new`` (must be a fast-forward) and push it if there is a remote
@@ -237,12 +286,7 @@ class GitVcs:
             git(rd, "fetch", "--quiet", remote)
         local_old = git(rd, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False) or None
         if local_old is None or self.is_ancestor(repo, local_old, new):
-            wt = self._checked_out_at(repo, branch)
-            if wt is not None:
-                git(wt, "merge", "--ff-only", "--quiet", new)
-            else:
-                args = ["update-ref", f"refs/heads/{branch}", new] + ([local_old] if local_old else ["0" * 40])
-                git(rd, *args)
+            fast_forward_local(rd, branch, new)
         return new
 
     # ------------------------------------------------------------------ session side (G9)
@@ -259,15 +303,11 @@ class GitVcs:
         if self.cloned:
             return self._ensure_session_clone(session, repo, branch, wt)
         if not wt.exists():
-            wt.parent.mkdir(parents=True, exist_ok=True)
             has_local = git(rd, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", check=False)
-            if has_local:
-                git(rd, "worktree", "add", "--quiet", str(wt), branch)
-            else:
-                start = self.ref(repo, branch) or self.integration_head(repo)
-                if start is None:
-                    raise GitError(f"{repo}: neither {branch} nor {self.cfg.integration_branch} exists")
-                git(rd, "worktree", "add", "--quiet", "-b", branch, str(wt), start)
+            start = None if has_local else (self.ref(repo, branch) or self.integration_head(repo))
+            if not has_local and start is None:
+                raise GitError(f"{repo}: neither {branch} nor {self.cfg.integration_branch} exists")
+            add_worktree(rd, wt, branch, start)
         self.install_pre_push(session, repo)
         if self._remote(repo):
             # every push from this worktree names its session to the remote's pre-receive hook
@@ -329,13 +369,6 @@ class GitVcs:
         return hook
 
     def install_pre_push(self, session: str, repo: str) -> Path:
-        branch = self.cfg.sessions[session].branch_for(repo)
-        hooks = self.ga_dir / "hooks" / session / repo
-        hooks.mkdir(parents=True, exist_ok=True)
-        hook = hooks / "pre-push"
-        hook.write_text(PRE_PUSH.format(session=session, repo=repo, ref=f"refs/heads/{branch}"), encoding="utf-8")
-        hook.chmod(0o755)
-        rd = self.repo_dir(repo)
-        git(rd, "config", "extensions.worktreeConfig", "true")
-        git(self.session_worktree(session, repo), "config", "--worktree", "core.hooksPath", str(hooks.resolve()))
-        return hook
+        return install_pre_push_hook(self.repo_dir(repo), self.session_worktree(session, repo),
+                                     self.ga_dir / "hooks" / session / repo, session, repo,
+                                     self.cfg.sessions[session].branch_for(repo))
