@@ -13,7 +13,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1]))
 
-from world import ROUTES, serve, world  # noqa: E402
+from con3_world import ROUTES, serve, world  # noqa: E402
 from ga.console.judge import _launch  # noqa: E402
 
 

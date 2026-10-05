@@ -78,7 +78,7 @@ class Browser(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        from world import FakeEngine, serve, world
+        from con3_world import FakeEngine, serve, world
         from playwright.sync_api import sync_playwright
         cls.FakeEngine = FakeEngine
         cls.w = world()
@@ -315,7 +315,7 @@ class Offline(unittest.TestCase):
     comes back on the same port and token and the banner goes."""
 
     def test_d1_stale_banner_error_state_and_reconnect(self):
-        from world import serve, world
+        from con3_world import serve, world
         from playwright.sync_api import sync_playwright
         w = world()
         self.addCleanup(shutil.rmtree, w.tmp, True)
