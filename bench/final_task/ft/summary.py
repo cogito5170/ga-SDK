@@ -38,6 +38,21 @@ def ratio(a, b):
     return None if a is None or b in (None, 0) else a / b
 
 
+def table(rows: list[dict]) -> list[str]:
+    L = ["| arm | model | context | runs | accuracy | total_tokens | quota_usd | max_call_input | quota_per_correct | repeated_information | llm_calls |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
+    g: dict[tuple, list] = defaultdict(list)
+    for r in rows:
+        g[(r["arm"], r["model"], r["mode"])].append(r)
+    for (arm, model, mode), rs in sorted(g.items(), key=lambda kv: (kv[0][2] != "bulk", kv[0][0], kv[0][1])):
+        a = agg(rs)
+        L.append(f"| {arm} | {SHORT[model]} | {mode}{' (1 rep)' if mode == 'bulk' else ''} | {a['n']} | {a['correct']}/{a['n']} | "
+                 f"{mr([r['total_tokens'] for r in rs])} | {mr([r['quota_usd'] for r in rs], '{:.4f}')} | "
+                 f"{mr([r['max_call_input'] for r in rs])} | {f(a['qpc'])} | {mr([r['repeated_information'] for r in rs], '{:.1f}')} | "
+                 f"{mr([r['llm_calls'] for r in rs], '{:.1f}')} |")
+    return L
+
+
 def render(rows: list[dict], ledger: list[dict], stopped: str | None = None) -> str:
     L = ["# FINAL_TASK results (CMD-FT1)", ""]
     calls, usd = len(ledger), sum(r["quota_usd"] for r in ledger)
@@ -55,19 +70,14 @@ def render(rows: list[dict], ledger: list[dict], stopped: str | None = None) -> 
     if errs:
         L += [f"- runs ended by a failed call: {len(errs)} (" + ", ".join(r["run_id"] for r in errs) + ")", ""]
 
-    L += ["## 1. Per arm x model x context", "",
-          "| arm | model | context | runs | accuracy | total_tokens | quota_usd | max_call_input | quota_per_correct | repeated_information | llm_calls |",
-          "|---|---|---|---|---|---|---|---|---|---|---|"]
-    g: dict[tuple, list] = defaultdict(list)
-    for r in rows:
-        g[(r["arm"], r["model"], r["mode"])].append(r)
-    for (arm, model, mode), rs in sorted(g.items(), key=lambda kv: (kv[0][2] != "bulk", kv[0][0], kv[0][1])):
-        a = agg(rs)
-        L.append(f"| {arm} | {SHORT[model]} | {mode}{' (1 rep)' if mode == 'bulk' else ''} | {a['n']} | {a['correct']}/{a['n']} | "
-                 f"{mr([r['total_tokens'] for r in rs])} | {mr([r['quota_usd'] for r in rs], '{:.4f}')} | "
-                 f"{mr([r['max_call_input'] for r in rs])} | {f(a['qpc'])} | {mr([r['repeated_information'] for r in rs], '{:.1f}')} | "
-                 f"{mr([r['llm_calls'] for r in rs], '{:.1f}')} |")
-
+    L += ["## 1. Per arm x model x context", ""] + table(rows)
+    L += ["", "## 1b. Same, T2 excluded (T2 is void: its fixture test file imports only the old names, so no answer's test could call slugify; see STATE.md)", ""]
+    L += table([r for r in rows if r["task"] != "T2"])
+    cu = sum(r["total_cost_usd_sum"] for r in rows)
+    qu = sum(r["quota_usd"] for r in rows)
+    L += ["", f"- Sum over runs: quota_usd from `usage` ${qu:.4f}; claude -p `total_cost_usd` ${cu:.4f}. total_cost_usd is priced from `modelUsage`, "
+          "which also counts a small internal Haiku call per `claude -p` that `usage` does not list (see ledger.jsonl model_usage); "
+          "so claude -p's own figure is higher, most for the cheap selective calls."]
     L += ["", "## 2. Per task (selective)", "", "| arm | model | task | runs | correct | quota_usd | total_tokens | calls | tool/peer |",
           "|---|---|---|---|---|---|---|---|---|"]
     gt: dict[tuple, list] = defaultdict(list)
