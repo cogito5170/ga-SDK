@@ -599,6 +599,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--read-max", type=int, default=20000000); p.add_argument("--ctx-grow", type=int, default=50000)
     p.add_argument("--json", action="store_true"); p.add_argument("--fail", action="store_true", help="exit 1 on an alarm")
     p.set_defaults(fn=cmd_usage)
+    from .act.cli import add_parser as act_parser  # CMD-GA38: ga act
+    act_parser(sub)
     sub.add_parser("rlo", add_help=False, help="rlo Autonomy commands (ga.rlo, owned by GR)")  # listed here, run above
     from .intake.cli import add_parser as _add_do  # CMD-GA37: ga do
     _add_do(sub)

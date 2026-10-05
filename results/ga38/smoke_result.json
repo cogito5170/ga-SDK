@@ -1,0 +1,49 @@
+{
+ "result": {
+  "schema": "act/1",
+  "id": "CMD-SM38",
+  "status": "done",
+  "reason": "done_when passes",
+  "turns": 1,
+  "failing": [],
+  "tokens": {
+   "input": 1041,
+   "output": 576,
+   "cache_read": 0,
+   "cache_creation": 0,
+   "estimated": 0,
+   "total": 1617
+  },
+  "changed": [
+   "stats.py"
+  ]
+ },
+ "claude_p_runs": 1,
+ "per_turn": [
+  {
+   "turn": 1,
+   "model": "claude-haiku-4-5",
+   "served": "claude-haiku-4-5",
+   "input": 1041,
+   "output": 576,
+   "cache_read": 0,
+   "cache_creation": 0,
+   "seconds": 7.456,
+   "card_tokens": 473,
+   "prefix_tokens": 294,
+   "applied": 1,
+   "rejected": 0,
+   "commands": [
+    "test"
+   ],
+   "failing": [],
+   "error": null
+  }
+ ],
+ "stats_py_after": "def mean(xs):\n    \"\"\"The arithmetic mean of a non-empty list.\"\"\"\n    return sum(xs) / len(xs)\n\n\ndef spread(xs):\n    return max(xs) - min(xs)\n",
+ "total_tokens": 1617,
+ "rw1_average_item": {
+  "cache_read": 3826000,
+  "note": "RW1: 126,260,219 cache-read tokens over 33 items"
+ }
+}
