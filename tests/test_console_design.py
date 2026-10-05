@@ -1,10 +1,13 @@
 """CMD-CON1: GA Console design -- DTCG tokens, golden screens, the V judge. 0 model calls, 0 network beyond 127.0.0.1.
 
-D1  tokens.css is exactly the generator's output of tokens.json; the token pairs meet WCAG AA by math; every golden
-    page passes the judge at 375 and 1440 px (when Chromium is here); the judge fails pages planted with overflow,
-    low contrast, an external request, a JS error, an unnamed button, a skipped heading level, an animation running
-    under reduced motion, ~10 % accent pixels, 11 px text at 375 and a > 512 KB stylesheet -- each page fails exactly
-    the one check it plants.
+D1  tokens.css is exactly the generator's output of tokens.json; the token pairs meet WCAG AA by math on the dark
+    ground; every golden page passes the judge at 375 and 1440 px (when Chromium is here); the judge fails pages
+    planted with overflow, low contrast (gross and just under 4.5), an external request, a JS error, an unnamed
+    button, a skipped heading level, an animation running under reduced motion, a red block (monochrome), a
+    decorative <hr> / bordered card / 1 px rule (display-line), 11 px text at 375 and a > 512 KB stylesheet -- each
+    page fails exactly the one check it plants; a progress bar marked data-line="functional" passes.
+D2  (rev 2) the mutants named in the directive die: monochrome disabled, display-line accepting any border, the
+    functional allowlist widened to every element, the contrast threshold lowered.
 """
 import functools
 import http.server
@@ -49,7 +52,7 @@ class Tokens(unittest.TestCase):
     def test_check_catches_a_hand_edit(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "tokens.css"
-            out.write_text(T.css(self.t).replace("#fbfaf7", "#ffffff"), encoding="utf-8")
+            out.write_text(T.css(self.t).replace("#0b0b0b", "#000000"), encoding="utf-8")
             orig = T.OUT
             T.OUT = out
             try:
@@ -71,13 +74,21 @@ class Tokens(unittest.TestCase):
         self.assertEqual([v["$value"] for _, v in T._leaves(self.t["space"])],
                          ["0.25rem", "0.5rem", "0.75rem", "1rem", "1.5rem", "2.5rem", "4rem", "6.5rem"])
 
-    def test_gentle_monster_grammar(self):
+    def test_dark_monochrome_grammar(self):
         c = {k: v["$value"] for k, v in T._leaves(self.t["color"])}
-        self.assertEqual({k: c[k] for k in ("bg", "surface", "ink", "sub", "line", "accent", "accent-text", "on-accent")},
-                         {"bg": "#fbfaf7", "surface": "#ecece9", "ink": "#060c13", "sub": "#63666a", "line": "#b6b7b7",
-                          "accent": "#D9480F", "accent-text": "#cc440e", "on-accent": "#000000"})
-        # status keeps the single hot accent: every state colour is an existing ink, or the accent itself, or a tint
-        palette = {c[k].lower() for k in ("ink", "sub", "line", "accent")}
+        for k, v in c.items():                                       # no chromatic colour at all: R == G == B
+            self.assertEqual(len({v[1:3], v[3:5], v[5:7]}), 1, f"{k} {v} is not a gray")
+        self.assertLess(_lum(c["bg"]), 0.01)                          # near-black ground, near-white ink: dark is the theme
+        self.assertGreater(_lum(c["ink"]), 0.85)
+        self.assertGreater(_lum(c["inverse-bg"]), 0.85)               # attention is inversion
+        self.assertLess(_lum(c["inverse-ink"]), 0.01)
+        self.assertFalse([k for k in c if "accent" in k or "tint" in k], "the accent and its tints are gone")
+        # line tokens exist only for lines that carry function; no plain `line` / hairline / divider token
+        self.assertEqual(sorted(k for k in c if k.startswith("line-")),
+                         sorted(f"line-{x}" for x in ("track", "fill", "current", "focus", "control", "chart", "live")))
+        self.assertNotIn("line", c)
+        self.assertFalse([k for k in c if any(w in k for w in ("hairline", "divider", "rule", "decor", "border"))])
+        palette = {c[k].lower() for k in ("ink", "sub", "line-track")}
         for k in ("state-ok", "state-live", "state-wait", "state-off", "state-fail"):
             self.assertIn(c[k].lower(), palette, k)
         fam = self.t["fontFamily"]
@@ -97,8 +108,13 @@ class Tokens(unittest.TestCase):
     def test_token_pairs_meet_aa_by_math(self):
         c = {k: v["$value"] for k, v in T._leaves(self.t["color"])}
         for fg, bg, need in (("ink", "bg", 7), ("sub", "bg", 4.5), ("sub", "surface", 4.5), ("ink", "surface", 7),
-                             ("accent-text", "bg", 4.5), ("on-accent", "accent", 4.5), ("ink", "state-fail-tint", 7),
-                             ("sub", "state-fail-tint", 4.5)):
+                             ("inverse-ink", "inverse-bg", 7), ("inverse-sub", "inverse-bg", 4.5),
+                             ("inverse-ink", "inverse-surface", 7), ("inverse-sub", "inverse-surface", 4.5),
+                             # functional lines are UI components: >= 3:1 against what they sit on (WCAG 1.4.11)
+                             ("line-track", "bg", 3), ("line-control", "bg", 3), ("line-chart", "bg", 3),
+                             ("line-fill", "line-track", 3), ("line-focus", "bg", 3), ("line-current", "bg", 3),
+                             ("line-live", "bg", 3), ("state-wait", "bg", 3), ("state-off", "bg", 3),
+                             ("inverse-line-track", "inverse-bg", 3), ("inverse-line-control", "inverse-bg", 3)):
             self.assertGreaterEqual(contrast(c[fg], c[bg]), need, f"{fg} on {bg}")
 
 
@@ -111,7 +127,7 @@ class GoldenStatic(unittest.TestCase):
             self.assertIn('<html lang="ko">', html, s)
             self.assertEqual(html.count('aria-current="page"'), 1, s)
             self.assertEqual(html.count("<h1"), 1, s)
-            self.assertEqual(html.count('class="hot"'), 1, s)     # one protagonist, one hot rule
+            self.assertEqual(html.count('class="hot"'), 1, s)     # markup kept for CON3; rev 2 renders it as space only
             for word in NAV:
                 self.assertIn(f">{word}<", html, f"{s}: nav {word}")
 
@@ -123,6 +139,21 @@ class GoldenStatic(unittest.TestCase):
             self.assertNotIn("@import", text, f.name)
         css = (GOLDEN / "golden.css").read_text(encoding="utf-8")
         self.assertEqual(re.findall(r"#[0-9a-fA-F]{3,6}\b", css), [], "golden.css takes colours from tokens only")
+
+    def test_lines_only_where_they_carry_function(self):
+        css = (GOLDEN / "golden.css").read_text(encoding="utf-8")
+        body = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        self.assertNotIn("var(--accent", body)
+        self.assertNotIn("var(--line)", body)
+        self.assertNotRegex(body, r"(^|[;{\s])hr[\s,{]")
+        # every border / outline that draws takes a functional line token (or is transparent / removed)
+        for prop, val in re.findall(r"(?<![-\w])(border(?:-(?:top|right|bottom|left))?(?:-color)?|outline):([^;}]+)", body):
+            self.assertRegex(val, r"var\(--(line-|state-)|transparent|^\s*(0|none)\s*$", f"{prop}:{val}")
+        for s in SCREENS:
+            html = (GOLDEN / f"{s}.html").read_text(encoding="utf-8")
+            for cls in ("track", "bars", "mark live", "mark wait", "mark off"):
+                self.assertEqual(html.count(f'class="{cls}"'), html.count(f'class="{cls}" data-line="functional"'), f"{s}: {cls}")
+            self.assertNotIn("<hr", html, s)
 
     def test_breath_only_without_reduced_motion(self):
         css = (GOLDEN / "golden.css").read_text(encoding="utf-8")
@@ -137,18 +168,29 @@ SKIP = J.available()
 
 PLANTS = {
     "overflow-375": '<p style="width:900px">이 줄은 폰 화면보다 넓게 박혀 있어서 옆으로 넘칩니다</p>',
-    "contrast": '<p style="color:#c8c8c8">흐린 글씨는 읽기 어렵습니다</p>',
+    "contrast": '<p style="color:#333333">흐린 글씨는 읽기 어렵습니다</p>',
     "offline": '<img src="https://example.invalid/pixel.png" alt="바깥 그림" width="1" height="1">',
     "js-errors": '<script>throw new Error("planted")</script>',
     "names": '<button type="button"></button>',
     "headings": "<h4>건너뛴 제목</h4>",
-    "reduced-motion": ('<div id="spin" style="width:24px;height:24px;background:#060c13"></div>'
+    "reduced-motion": ('<div id="spin" style="width:24px;height:24px;background:#f2f2f2"></div>'
                        "<script>document.getElementById('spin').animate([{transform:'rotate(0)'},"
                        "{transform:'rotate(360deg)'}],{duration:1000,iterations:Infinity})</script>"),
-    "accent": '<div style="height:200px;background:#D9480F"></div>',
+    "monochrome": '<div style="height:40px;background:#c0392b"></div>',
+    "display-line": "<hr>",
     "min-font-375": '<p style="font-size:11px">아주 작은 글씨는 폰에서 읽기 어렵습니다</p>',
     "weight": '<link rel="stylesheet" href="heavy.css">',    # heavy.css: > 512 KB, written in setUpClass
 }
+# more plants that fail exactly one check: (check, snippet)
+MORE = (
+    ("contrast", '<p style="color:#757575">4.27 대 1: 4.5 에 조금 못 미칩니다</p>'),
+    ("display-line", '<div style="border:1px solid #a3a3a3;padding:1rem"><p>꾸밈 테두리만 있는 카드</p></div>'),
+    ("display-line", '<div style="height:1px;background:#a3a3a3"></div>'),
+)
+FUNCTIONAL = ('<div data-line="functional" aria-hidden="true" style="height:8px;border:1px solid #8c8c8c">'
+              '<i style="display:block;width:40%;height:100%;background:#f2f2f2"></i></div>'
+              '<div data-line="functional" aria-hidden="true" style="height:2px;background:#6b6b6b">'
+              '<i style="display:block;width:60%;height:2px;background:#f2f2f2"></i></div>')
 
 
 @unittest.skipIf(SKIP, f"judge unavailable: {SKIP}")
@@ -173,7 +215,8 @@ class Judge(unittest.TestCase):
                 r = J.measure(str(GOLDEN / f"{s}.html"), shots=self.shots)
                 self.assertTrue(r["pass"], json.dumps({"failed": r["failed"], "facts": r["facts"]}, ensure_ascii=False))
                 self.assertEqual(r["facts"]["external"], [])
-                self.assertTrue(0.003 <= r["facts"]["accent-share"] <= 0.04)
+                self.assertEqual(r["facts"]["display-lines"], [])
+                self.assertLessEqual(max(r["facts"]["chroma-share"].values()), J.CHROMA_SHARE)
                 self.assertGreaterEqual(r["facts"]["running-with-motion"], 0)
                 for w in J.WIDTHS:
                     self.assertTrue((self.shots / f"{s}-{w}.png").stat().st_size > 1000)
@@ -187,12 +230,61 @@ class Judge(unittest.TestCase):
                 r = J.measure(str(page))
                 self.assertFalse(r["pass"])
                 self.assertEqual(r["failed"], [check], json.dumps(r["facts"], ensure_ascii=False)[:600])
-                if check == "accent":
-                    self.assertGreater(r["facts"]["accent-share"], 0.04)
+                if check == "monochrome":
+                    self.assertGreater(r["facts"]["max-chroma"], 100)
+                if check == "display-line":
+                    self.assertEqual(r["facts"]["display-lines"][0]["el"], "hr")
                 if check == "min-font-375":
                     self.assertEqual(r["facts"]["min-font-375"], 11)
                 if check == "weight":
                     self.assertGreater(r["facts"]["bytes"], 600 * 1024)
+
+    def _plant(self, name: str, snippet: str) -> dict:
+        page = self.root / "golden" / f"plant-{name}.html"
+        base = (self.root / "golden" / "now.html").read_text(encoding="utf-8")
+        page.write_text(base.replace("</main>", snippet + "\n</main>"), encoding="utf-8")
+        return J.measure(str(page))
+
+    def test_more_plants_fail_exactly_their_check(self):
+        for i, (check, snippet) in enumerate(MORE):
+            with self.subTest(check=check, i=i):
+                r = self._plant(f"more-{i}", snippet)
+                self.assertEqual(r["failed"], [check], json.dumps(r["facts"], ensure_ascii=False)[:600])
+
+    def test_functional_progress_bar_passes(self):
+        r = self._plant("functional", FUNCTIONAL)
+        self.assertTrue(r["pass"], r["failed"])
+        r = self._plant("functional-bare", FUNCTIONAL.replace(' data-line="functional"', ""))
+        self.assertEqual(r["failed"], ["display-line"])            # the same bar without the mark is decoration
+
+    def _caught(self, check: str, snippet: str, **patch) -> bool:
+        """Does the plant fail exactly its check (under the mutant, when module attributes are patched)?"""
+        saved = {k: getattr(J, k) for k in patch}
+        for k, v in patch.items():
+            setattr(J, k, v)
+        try:
+            r = self._plant("mutant", snippet)
+        finally:
+            for k, v in saved.items():
+                setattr(J, k, v)
+        return r["failed"] == [check]
+
+    def test_mutants_die(self):
+        lines = J._JS_LINES
+        mutants = {
+            "monochrome disabled": ("monochrome", PLANTS["monochrome"], {"CHROMA_SHARE": 1.0}),
+            "monochrome threshold raised to 255": ("monochrome", PLANTS["monochrome"], {"CHROMA": 255}),
+            "display-line accepts any border": ("display-line", MORE[1][1],
+                                                {"_JS_LINES": lines.replace("kinds.push('border-'", "void ('border-'")}),
+            "functional allowlist widened to every element": ("display-line", PLANTS["display-line"],
+                                                              {"LINE_OK": {"self": "*", "inside": "*"}}),
+            "contrast threshold lowered to 4.2": ("contrast", MORE[0][1], {"CONTRAST": (4.2, 3.0)}),
+            "contrast threshold lowered to 1.5": ("contrast", PLANTS["contrast"], {"CONTRAST": (1.5, 1.5)}),
+        }
+        for name, (check, snippet, patch) in mutants.items():
+            with self.subTest(mutant=name):
+                self.assertTrue(self._caught(check, snippet), "the plant must fail its check under the real judge")
+                self.assertFalse(self._caught(check, snippet, **patch), f"mutant survived: {name}")
 
     def test_url_target_and_same_origin(self):
         handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(self.root))
