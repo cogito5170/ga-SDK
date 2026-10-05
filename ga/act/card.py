@@ -28,9 +28,10 @@ class CardError(ValueError):
 
 
 def prefix(item_id: str, goal: str, done_when: list[str], globs: list[str], owned_files: list[str],
-           commands: dict[str, list[str]]) -> str:
-    """The stable prefix: built once per item."""
+           commands: dict[str, list[str]], actions: dict[str, str] | None = None) -> str:
+    """The stable prefix: built once per item. Approved GA Actions (CMD-GA42) show as name + one-line about."""
     cmd_lines = [f"- {n}" for n in sorted(commands)] or ["- (none)"]
+    cmd_lines += [f"- {n} (action): {a}" for n, a in sorted((actions or {}).items()) if n not in commands]
     lines = [SPEC.rstrip("\n"), "", f"## 2 item {item_id}", goal.strip(), "", "## 3 done_when (code runs it)",
              json.dumps(done_when), "", "## 4 files you may edit (globs, then the files that exist now)",
              *[f"- {g}" for g in globs], *[f"  {f}" for f in owned_files[:60]],

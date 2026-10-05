@@ -91,6 +91,23 @@ def cmd_tick(args) -> int:
     return 0
 
 
+def cmd_hub(args, sleep=None) -> int:
+    """ga hub tick | run --every S (CMD-GA42 S1). A tick with nothing new prints and writes nothing."""
+    import time
+
+    from .hub import MailHub
+    conf = json.loads(Path(args.config).expanduser().read_text(encoding="utf-8"))
+    hub = MailHub(conf, ga_dir=args.ga_dir)
+    while True:
+        res = hub.tick(dry_run=args.dry_run)
+        if not res.quiet:
+            print(json.dumps({"sent": res.sent, "integrated": res.integrated, "plan": res.plan}, ensure_ascii=False),
+                  flush=True)
+        if args.hub_cmd == "tick":
+            return 0
+        (sleep or time.sleep)(max(float(args.every), 1.0))
+
+
 def cmd_sandbox(args) -> int:
     """Manual mode: run a person's shell (or a command) for one session inside the same write sandbox."""
     import os
@@ -635,6 +652,16 @@ def main(argv: list[str] | None = None) -> int:
                    "agent; CMD-GA41)")
     from .intake.cli import add_parser as _add_do  # CMD-GA37: ga do
     _add_do(sub)
+    p = sub.add_parser("hub", help="the mail-driven hub tick: inbox -> ga judge -> verdict card -> one small-model "
+                       "decision -> code integrates, records, mails (CMD-GA42)")
+    p.add_argument("hub_cmd", choices=["tick", "run"])
+    p.add_argument("--config", default=".ga-hub.json", help="the hub config (JSON)")
+    p.add_argument("--ga-dir", default=".ga")
+    p.add_argument("--every", type=float, default=300.0, help="run: seconds between ticks")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(fn=cmd_hub)
+    from .actions.cli import add_parser as _add_actions  # CMD-GA42: ga actions
+    _add_actions(sub)
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
         ap.error("prompt needs SESSION or --hub")
