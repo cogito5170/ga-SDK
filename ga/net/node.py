@@ -31,7 +31,7 @@ from ..adapters.base import TurnResult
 from ..backends.base import BackendError, ModelMismatch, RateLimited
 from ..forms import hard, minify
 from ..mailbox import Mailbox, MailError
-from . import PeerModeOff, dc, msg
+from . import PeerModeOff, dc, msg, pool
 from .checkpoint import CHECKPOINT_INSTRUCTION, Continuation, budget_stop, log_size
 from .pi import Edges, NetConfig
 from .router import ConfigError, NoRoute, Router, catalog_for
@@ -99,12 +99,14 @@ class Node:
         if not cfg.peer_mode:
             raise PeerModeOff("peer mode is off: set \"network\": {\"mode\": \"peer\", ...} in the config (PROTOCOL 1a)")
         net = cfg.network
-        if me not in net.get("nodes", {}):
-            raise ConfigError(f"no node {me!r} in network.nodes")
+        spec = net["nodes"][me] if me in net.get("nodes", {}) else pool.node_spec(cfg, Path(ga_dir), me)
+        if spec is None:
+            raise ConfigError(f"no node {me!r} in network.nodes" + (" or the live pool" if pool.configured(net) else ""))
+        self.pooled = me not in net.get("nodes", {})
         if get_backend is None:
             from .. import backends
             get_backend = backends.get
-        self.cfg, self.me, self.net, self.n = cfg, me, net, net["nodes"][me]
+        self.cfg, self.me, self.net, self.n = cfg, me, net, spec
         self.ga_dir = Path(ga_dir)
         self.dir = self.ga_dir / NODES / me
         self.clock, self.get_backend = clock, get_backend
@@ -150,9 +152,13 @@ class Node:
     def router(self, saved: dict | None) -> Router:
         return Router(self.entries, saved)
 
+    def peer_names(self) -> list[str]:
+        """Static nodes plus the live pool nodes (static-only configs read no registry)."""
+        return pool.peer_names(self.cfg, self.ga_dir)
+
     def exports(self) -> dict[str, dict]:
         out = {}
-        for j in sorted(self.net.get("nodes", {})):
+        for j in self.peer_names():
             f = self.ga_dir / NODES / j / "export.json"
             if j != self.me and f.exists():
                 try:
@@ -181,7 +187,7 @@ class Node:
         run["steps"] += 1
         self.run_id = f"{self.me}:s{run['steps']}"
         self.run = run
-        peers = sorted(j for j in self.net.get("nodes", {}) if j != self.me)
+        peers = [j for j in self.peer_names() if j != self.me]
         self.budget = EdgeBudget(self.net.get("edge_budget", {}), [f"{self.me}->{j}" for j in peers],
                                  run.get("governor"), self.clock)
         out: dict[str, Any] = {"node": self.me, "step": run["steps"], "received": 0, "rejected": 0, "sent": [],
@@ -389,7 +395,13 @@ class Node:
             return result
         text = res.answer or ""
         items = msg.blocks_in(text)
-        ans, why = ctxpack.parse_answer(msg.strip_blocks(text), self.me,
+        body = msg.strip_blocks(text)
+        if self.pooled:  # S4: a ```work block is a Proposal; the pool takes it under its limits, never the node
+            for w in pool.work_blocks_in(text):
+                run["work_n"] = run.get("work_n", 0) + 1
+                run.setdefault("work_out", []).append({"n": run["work_n"], "p": w})
+            body = pool.strip_work(body)
+        ans, why = ctxpack.parse_answer(body, self.me,
                                         state_max_tokens=int(self.n.get("state_max_tokens", 500)))
         from .. import rules
         if ans is not None and hard(rules.r6_secrets(self.cfg, text, f"answer of {self.me}")):
@@ -524,7 +536,7 @@ class Node:
     def _finish(self, st: State, edges: Edges, run: dict, rt: Router) -> None:
         now = self.clock()
         exports = self.exports()
-        for j in sorted(self.net.get("nodes", {})):
+        for j in self.peer_names():
             if j != self.me:
                 edges.pi(j, self.required, [r for r in self.required if dc.covers(exports.get(j), r, self.ref_needs(r))],
                          now, self.netcfg)
@@ -551,6 +563,8 @@ def run_loop(cfg: Any, ga_dir: Path, *, every: float, steps: int | None = None, 
         if cfg.peer_mode:
             for me in nodes or sorted(cfg.network.get("nodes", {})):
                 out.append(Node(cfg, me, ga_dir=ga_dir, **kw).step())
+            if nodes is None and pool.configured(cfg.network):
+                out += pool.Pool(cfg, ga_dir, **kw).round()
         elif tick is not None:
             out.append({"tick": tick()})
         n += 1

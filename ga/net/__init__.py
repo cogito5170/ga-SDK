@@ -110,6 +110,9 @@ def problems_of(network: Any) -> list[Problem]:
                     bad(p + ".task.check", "must be an argv list")
         if not isinstance(n.get("facts", {}), dict):
             bad(p + ".facts", "must map refs to {value, evidence}")
+    if "pool" in network:
+        from . import pool
+        out += pool.problems_of(network)
     return out
 
 

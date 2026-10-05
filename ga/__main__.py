@@ -383,6 +383,51 @@ def cmd_node(args) -> int:
     return 0
 
 
+def _pool(args):
+    from .net import PeerModeOff, pool
+    cfg = gacfg.load(args.config)
+    if not cfg.peer_mode:
+        raise PeerModeOff("peer mode is off: set \"network\": {\"mode\": \"peer\", ...} in the config")
+    if not pool.configured(cfg.network):
+        raise PeerModeOff("no network.pool in the config")
+    return pool.Pool(cfg, _ga_dir(args, cfg))
+
+
+def cmd_work(args) -> int:
+    """ga work add <file|-> / ga work ls (CMD-GA33 S1): the pool's append-only work queue (.ga/queue/)."""
+    from .net import PeerModeOff
+    try:
+        pl = _pool(args)
+        if args.work_cmd == "add":
+            text = sys.stdin.read() if args.file == "-" else Path(args.file).read_text(encoding="utf-8")
+            try:
+                item = json.loads(text)
+            except json.JSONDecodeError as e:
+                print(f"ga work add: not JSON: {e}", file=sys.stderr)
+                return 2
+            ok, why = pl.add(item)
+            print(("queued " if ok else "ga work add: ") + why, file=sys.stdout if ok else sys.stderr)
+            return 0 if ok else 2
+        st = pl.status()
+        print(json.dumps({k: st[k] for k in ("queue", "done", "failed")} | {"live": {n: v["item"] for n, v in st["live"].items()}},
+                         sort_keys=True))
+        return 0
+    except PeerModeOff as e:
+        print(f"ga work: {e}", file=sys.stderr)
+        return 2
+
+
+def cmd_pool(args) -> int:
+    """ga pool status (CMD-GA33 S5): live nodes, queue, role States, caps (one JSON line)."""
+    from .net import PeerModeOff
+    try:
+        print(json.dumps(_pool(args).status(), sort_keys=True))
+        return 0
+    except PeerModeOff as e:
+        print(f"ga pool: {e}", file=sys.stderr)
+        return 2
+
+
 def cmd_run(args) -> int:
     """ga run --every S [--steps N] (CMD-GA31 S5): the always-on runner with only git, local CLIs and HTTP backends.
     Peer mode steps every node; hub mode runs ga tick (unchanged). From cron: --steps 1."""
@@ -538,6 +583,14 @@ def main(argv: list[str] | None = None) -> int:
     nsub = p.add_subparsers(dest="node_cmd", required=True)
     n = nsub.add_parser("step", help="one step: inbox -> rules -> decide -> at most one fresh turn -> ga mail")
     n.add_argument("me"); n.set_defaults(fn=cmd_node)
+    p = sub.add_parser("work", help="the pool's work queue (CMD-GA33; peer mode with network.pool)")
+    wsub = p.add_subparsers(dest="work_cmd", required=True)
+    w = wsub.add_parser("add", help="check a work/1 item (JSON file or -) and enqueue it under .ga/queue/")
+    w.add_argument("file"); w.set_defaults(fn=cmd_work)
+    w = wsub.add_parser("ls", help="live items, the queue, done and failed"); w.set_defaults(fn=cmd_work)
+    p = sub.add_parser("pool", help="the node pool (CMD-GA33)")
+    psub = p.add_subparsers(dest="pool_cmd", required=True)
+    w = psub.add_parser("status", help="live nodes, queue, role States, caps"); w.set_defaults(fn=cmd_pool)
     p = sub.add_parser("run", help="the always-on runner: every node (peer mode) or ga tick (hub mode) every S seconds")
     p.add_argument("--every", type=float, required=True); p.add_argument("--steps", type=int)
     p.add_argument("--node", action="append", help="only these nodes (peer mode)"); p.set_defaults(fn=cmd_run)

@@ -319,6 +319,45 @@ modes: the state is kept, the work stays open and continues in a new fresh turn;
 in a row, or a second stop without a state block, stop with needs_judgement; continuations count against the runs
 budget. `python tests/mutations_ga31.py` applies the D2 mutations.
 
+## Peer mode: a node pool and a work queue (CMD-GA33)
+
+Static `network.nodes` stay as they are. Add `network.pool` and peer mode allocates nodes per work item, bounded: the
+runtime starts a node for a queued item while `live < max_live`, retires it when the item is answered and checked (or
+failed, or the node idled `idle_rounds` rounds), and keeps what it learnt as role State that the next node of that
+role starts from. A node is never a standing seat; `ga run --every S` steps the static nodes, then the pool.
+
+```json
+"network": {"mode": "peer", "mailbox": "mail", "refs": {"doc.title": {"input": "NETWORK.md"}},
+  "pool": {"max_live": 3, "max_queue": 20, "max_spawn_per_round": 1, "max_depth": 2, "idle_rounds": 3,
+           "roles": {"reader": {"backends": ["claude_p"], "budget": {"runs": 3, "work": 2},
+                                "facts": {"repo.name": {"value": "ga-sdk", "evidence": "README.md#L1"}}},
+                     "writer": {"backends": ["claude_p"], "needs": {"tier": "R1"}}}}}
+```
+
+```
+echo '{"id":"CMD-W1","role":"reader","goal":"the document title","uses":["doc.title"],"answer":"doc.title"}' | ga work add -
+ga work ls                 # live items, queue, done, failed
+ga pool status             # live nodes, queue, role States (facts, uncertain), caps
+ga run --every 30
+```
+
+- **Work item** `work/1` = `{id: CMD-<PREFIX><n>, role, goal, uses?, needs?, answer?, check?, parent?, depth}`. `ga work add`
+  checks it and writes one file `.ga/queue/<seq>-<id>.json`; the queue is append-only (a finished item's file moves to
+  `done/` or `failed/`, nothing is rewritten). `max_queue` bounds what waits.
+- **Registry** `.ga/pool.json` (atomic writes) lists the live nodes `<role>_<n>` with the item each claimed, so a crash
+  between two writes never starts two nodes for one item; a restart finishes a half-done retire. Peers, exports and pi
+  edges come from the static nodes plus the registry.
+- **Role State** `.ga/roles/<role>/state.json` and `pi.json`. A new node starts from it (a ref already valid answers an
+  item with 0 turns, 0 tool calls, 0 peer messages). On retire the node's State merges into the role's through the State
+  rules (accept; a contradicting value makes the fact uncertain, never an overwrite; dedupe by evidence), its edges fold
+  into role-pair pi, its dir moves to `.ga/nodes/_retired/`, and L0 (`.ga/pool/telemetry.jsonl`) records `node.started`,
+  `node.retired` (facts only). An idle node's item goes back to the queue; after the role's `budget.runs` idle
+  attempts it is failed, not started again.
+- **Node-proposed work**: a turn may emit a ```` ```work ```` block (`{role, goal, uses?, needs?, answer?}`; never `check`).
+  It is a Proposal: the pool accepts it only if the role exists, the child depth (parent + 1) is below `max_depth`, the
+  queue is under `max_queue`, and the proposing node's `budget.work` (default 2) has room; otherwise it is dropped and
+  the reason is recorded. A node never starts a node.
+
 ## 시험
 
 ```sh
