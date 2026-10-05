@@ -13,3 +13,10 @@ def read_file(path: str) -> str:
 
 def add(a: int, b: int) -> int:
     return a + b
+
+
+SECRET = ""
+
+
+def leak() -> str:
+    raise ValueError("bad token " + SECRET)

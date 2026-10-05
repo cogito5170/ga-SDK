@@ -38,6 +38,9 @@ M = [  # (name, file, [(old, new), ...])
   [('"protect": list(dict.fromkeys(real(p) for p in protect)), "writable": [real(p) for p in writable]',
     '"protect": [str(p) for p in protect], "writable": [str(p) for p in writable]'),
    ("        self.ga = real_path(ga_dir)", "        self.ga = Path(os.path.abspath(ga_dir))")]),
+ ("tool error result carries the raw exception text", "ga/gemini.py",
+  [("value = f\"{rec['tool']} failed: {label}\"\n", "value = f\"{rec['tool']} failed: {label}: {e}\"\n")]),
+ ("tool error label not redacted", "ga/gemini.py", [("    return redact(text)[0][:200]", "    return text[:200]")]),
  ("quota treated as transient", "ga/adapters/agy_cli.py",
   [("        if o.quota:\n            raise AgyQuota(\"quota\")", "        if False:\n            raise AgyQuota(\"quota\")"),
    ("            c = transient_code(o.error_text", "            c = 500 if o.quota else transient_code(o.error_text")]),
@@ -49,6 +52,7 @@ def run(mutate):
     try:
         for d in ("ga", "tests"):
             shutil.copytree(ROOT / d, tmp / d)
+        shutil.copy(ROOT / "pyproject.toml", tmp / "pyproject.toml")  # tests.test_ga41.Version reads it
         mutate(tmp)
         r = subprocess.run([PY, "-m", "unittest", "tests.test_ga41"], cwd=tmp, capture_output=True, text=True)
         return r.returncode, (r.stderr.strip().splitlines() or ["?"])[-1]

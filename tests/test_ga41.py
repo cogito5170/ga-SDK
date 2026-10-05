@@ -84,10 +84,11 @@ class Loop(unittest.TestCase):
         p.start()
         self.addCleanup(p.stop)
 
-    def supervise(self, cli=None, backend="agv", options=None, **extra):
+    def supervise(self, cli=None, backend="agv", options=None, tools_override=None, **extra):
         path = self.dir / "ga-supervise.json"
         path.write_text(json.dumps({"schema": G.SUPERVISE_SCHEMA, "backend": backend, "model": MODEL,
-                                    "options": options or {"cli": FAKE_AGY}, "tools": TOOLS, **extra}))
+                                    "options": options or {"cli": FAKE_AGY}, "tools": tools_override or TOOLS,
+                                    **extra}))
         self.clock, self.out = FakeClock(), io.StringIO()
         sup = G.Supervisor(G.load_config(path), cli=cli, clock=self.clock, sleep=self.clock.sleep, out=self.out)
         ok = sup.start(TASK)
@@ -195,6 +196,22 @@ class ToolErrors(Loop):
         label = G.tool_error_label(ValueError("bad token sk-ant-api03-" + "A" * 40 + "\n  at line 3"))
         self.assertNotIn("sk-ant-api03-AAAA", label)
         self.assertNotIn("line 3", label)
+
+    def test_a_secret_in_a_tool_error_never_reaches_the_model_or_the_stored_result(self):
+        key = "sk-" + "ant-api03-" + "Z" * 40  # built at runtime: a fake key-shaped string
+        p1 = plan([{"id": "s", "tool": "leak", "args": {}}], {"prompt": "go on", "after": ["s"]})
+        cli = TextCli([fenced(p1), fenced(DONE_PLAN)])
+        tools = dict(TOOLS, leak={"python": "ga41_tools:leak", "about": "raises"})
+        with mock.patch.object(ga41_tools, "SECRET", key, create=True):
+            sup, ok = self.supervise(cli, tools_override=tools)
+        self.assertTrue(ok, self.out.getvalue())
+        stored = "".join(p.read_text() for p in (sup.dir / "results").glob("*.json"))
+        seen = cli.calls[1]["prompt"]
+        for text in (seen, stored, sup.log_file.read_text(), sup.state_file.read_text(), self.out.getvalue()):
+            self.assertNotIn(key, text)
+            self.assertNotIn("Z" * 40, text)
+        self.assertIn("leak failed: ValueError: bad token (withheld)", seen)
+        self.assertIn("(withheld)", stored)
 
     def test_a_good_tool_still_runs(self):
         cli = TextCli([fenced(ADD_PLAN), fenced(DONE_PLAN)])
@@ -323,6 +340,10 @@ class TransientOtherBackends(unittest.TestCase):
         self.assertEqual((t.error, len(cli.calls)), ("transient:500", 2))
 
 
+from ga.act import commands as _K  # noqa: E402
+real_run_fn = _K.run
+
+
 # ---- ga act: repair, transient, tool errors -------------------------------------------------------------------------
 
 CALC = "def add(a, b):\n    return a - b\n"
@@ -387,6 +408,25 @@ class Act(unittest.TestCase):
     def test_transient_twice_blocks_as_transient(self):
         res, cli = self.run_act([Transient(500), Transient(500), FIX], transient_backoff_s=1)
         self.assertEqual((res.status, res.reason, len(cli.calls), self.sleeps), ("blocked", "transient:500", 2, [1]))
+
+    def test_a_secret_in_a_raising_retriever_or_command_never_reaches_the_card(self):
+        from ga.act import commands as K
+        from ga.act import retrieve as R
+        key = "sk-" + "ant-api03-" + "Z" * 40
+
+        def run(name, *a, **k):
+            if name == "boom":
+                raise ValueError("bad token " + key)
+            return real_run_fn(name, *a, **k)
+        with mock.patch.object(R, "grep", mock.Mock(side_effect=ValueError("bad token " + key))), \
+                mock.patch.object(K, "run", run):
+            res, cli = self.run_act(["NEED grep anything\nRUN boom\n", FIX])
+        self.assertEqual(res.status, "done", res.reason)
+        card = cli.calls[1]["prompt"] + (cli.calls[1]["system"] or "")
+        self.assertNotIn(key, card)
+        self.assertNotIn("Z" * 40, card)
+        self.assertIn("NEED grep anything failed: ValueError: bad token (withheld)", card)
+        self.assertIn("RUN boom failed: ValueError: bad token (withheld)", card)
 
     def test_a_command_that_cannot_start_is_a_note_not_a_crash(self):
         res, cli = self.run_act(["RUN boom\n", FIX])
