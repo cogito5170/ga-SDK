@@ -16,7 +16,12 @@ V -- invariants (after gentleMonster's engine judge). Every one must hold; unkno
                                    canvas are named
     headings                       html[lang] set, exactly one h1, the first heading is h1, no skipped level
     reduced-motion                 with prefers-reduced-motion: reduce, no animation or transition is running
-    accent                         pixels within 40 of the hot accent are 0.3-4 % of the full page at 1440 px
+    monochrome                     no chromatic colour: pixels whose chroma (max-min of R, G, B) is above CHROMA are at
+                                   most CHROMA_SHARE of the full page, at 375 and at 1440 px (antialiasing tolerated)
+    display-line                   no decorative line: every visible border, outline, <hr> and 1-3 px line element (a
+                                   box 1-3 px thick, >= 6 px long, with a background) is on a control (button, input,
+                                   select, textarea, a), on [aria-current] or :focus-visible, or inside [role=progressbar]
+                                   or [data-line=functional]; everything else must be separated by space and weight
     weight                         everything the page loads (document, css, js, images) <= 512 KB
 
 The page is opened three times: 375 and 1440 px with reduced motion (all V), 1440 px with motion (reported only).
@@ -32,12 +37,15 @@ from urllib.parse import urlsplit
 
 WIDTHS = (375, 1440)
 MAX_BYTES = 512 * 1024
-ACCENT = "#D9480F"
-ACCENT_BAND = (0.003, 0.04)
+CONTRAST = (4.5, 3.0)                 # need for normal / large text
+CHROMA = 24                           # a pixel is chromatic when max(R,G,B) - min(R,G,B) > CHROMA
+CHROMA_SHARE = 0.0002                 # ... and the page fails when more than this share of its pixels are
+LINE_OK = {"self": "button,input,select,textarea,a,[aria-current],:focus-visible",
+           "inside": "[role=progressbar],[data-line=functional]"}
 CHECKS = ("overflow-375", "overflow-1440", "contrast", "min-font-375", "offline", "js-errors", "names", "headings",
-          "reduced-motion", "accent", "weight")
+          "reduced-motion", "monochrome", "display-line", "weight")
 
-_JS_TEXT = r"""() => {
+_JS_TEXT = r"""([NEED, NEED_LARGE]) => {
  const P = s => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null;
    const p = m[1].split(/[\s,\/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
  const over = (t, b) => { const a = t[3]; return [t[0]*a + b[0]*(1-a), t[1]*a + b[1]*(1-a), t[2]*a + b[2]*(1-a), 1]; };
@@ -74,7 +82,7 @@ _JS_TEXT = r"""() => {
    let op = 1; for (let a = el; a; a = a.parentElement) op *= parseFloat(getComputedStyle(a).opacity);
    fg = over([fg[0], fg[1], fg[2], fg[3] * op], bg);
    const large = fs >= 24 || (fs >= 18.66 && fw >= 700);
-   out.items.push({text: own.slice(0, 40), ratio: Math.round(ratio(fg, bg) * 100) / 100, need: large ? 3 : 4.5, px: fs});
+   out.items.push({text: own.slice(0, 40), ratio: Math.round(ratio(fg, bg) * 100) / 100, need: large ? NEED_LARGE : NEED, px: fs});
  }
  return out;
 }"""
@@ -106,13 +114,39 @@ _JS_DOC = r"""() => {
          running: document.getAnimations().filter(a => a.playState === 'running').map(a => a.animationName || a.constructor.name)};
 }"""
 
-_JS_PIXELS = r"""async ([src, rgb]) => {
+_JS_PIXELS = r"""async ([src, limit]) => {
  const img = new Image(); img.src = src; await img.decode();
  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
- const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
- for (let i = 0; i < d.length; i += 4) { const a = d[i]-rgb[0], b = d[i+1]-rgb[1], e = d[i+2]-rgb[2]; if (a*a + b*b + e*e < 1600) n++; }
- return n / (d.length / 4);
+ const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0, worst = 0;
+ for (let i = 0; i < d.length; i += 4) {
+   const ch = Math.max(d[i], d[i+1], d[i+2]) - Math.min(d[i], d[i+1], d[i+2]);
+   if (ch > limit) n++; if (ch > worst) worst = ch;
+ }
+ return {share: n / (d.length / 4), max: worst};
+}"""
+
+_JS_LINES = r"""([SELF, INSIDE]) => {
+ const P = s => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return 0;
+   const p = m[1].split(/[\s,\/]+/).filter(Boolean).map(Number); return p.length > 3 ? p[3] : 1; };
+ const bad = [];
+ for (const el of document.body.querySelectorAll('*')) {
+   if (['SCRIPT','STYLE','NOSCRIPT','TEMPLATE','BR'].includes(el.tagName)) continue;
+   const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+   if (cs.display === 'none' || cs.visibility === 'hidden' || (r.width === 0 && r.height === 0)) continue;
+   const kinds = [];
+   if (el.tagName === 'HR') kinds.push('hr');
+   for (const side of ['Top','Right','Bottom','Left'])
+     if (parseFloat(cs['border'+side+'Width']) > 0 && !['none','hidden'].includes(cs['border'+side+'Style']) && P(cs['border'+side+'Color']) > 0) { kinds.push('border-' + side.toLowerCase()); break; }
+   if (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && P(cs.outlineColor) > 0) kinds.push('outline');
+   const thin = Math.min(r.width, r.height), long = Math.max(r.width, r.height);
+   if (thin >= 0.5 && thin <= 3.5 && long >= 6 && (P(cs.backgroundColor) > 0 || cs.backgroundImage !== 'none')) kinds.push('thin-' + Math.round(thin) + 'px');
+   if (!kinds.length) continue;
+   if (el.matches(SELF) || el.closest(INSIDE)) continue;
+   bad.push({el: el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''),
+             line: kinds.join(' '), text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30)});
+ }
+ return bad;
 }"""
 
 
@@ -143,12 +177,13 @@ def _launch(p):
     """Playwright's own Chromium, else $GA_CHROMIUM, else $PLAYWRIGHT_BROWSERS_PATH/chromium (a pinned build of
     another Playwright version -- the managed containers ship one), else the error of the first try."""
     import os
+    args = ["--disable-lcd-text"]       # grayscale antialiasing: LCD subpixel fringes are not the page's colour
     try:
-        return p.chromium.launch()
+        return p.chromium.launch(args=args)
     except Exception as first:  # noqa: BLE001
         for exe in (os.environ.get("GA_CHROMIUM"), os.path.join(os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers"), "chromium")):
             if exe and os.path.exists(exe):
-                return p.chromium.launch(executable_path=exe)
+                return p.chromium.launch(executable_path=exe, args=args)
         raise first
 
 
@@ -159,11 +194,6 @@ def _target(t: str) -> "tuple[str, callable]":
         home = (o.scheme, o.hostname, o.port)
         return t, lambda u: u.startswith(("data:", "blob:")) or (urlsplit(u).scheme, urlsplit(u).hostname, urlsplit(u).port) == home
     return Path(t).resolve().as_uri(), lambda u: u.startswith(("file:", "data:", "blob:"))
-
-
-def _rgb(h: str) -> list:
-    h = h.lstrip("#")
-    return [int(h[i:i + 2], 16) for i in (0, 2, 4)]
 
 
 def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200) -> dict:
@@ -208,15 +238,15 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
             key = f"{w}-{motion}"
             raw[key] = {"doc": pg.evaluate(_JS_DOC)}
             if motion == "reduce":
-                raw[key]["text"] = pg.evaluate(_JS_TEXT)
+                raw[key]["text"] = pg.evaluate(_JS_TEXT, list(CONTRAST))
+                raw[key]["lines"] = pg.evaluate(_JS_LINES, [LINE_OK["self"], LINE_OK["inside"]])
                 png = pg.screenshot(full_page=True)
                 if shots:
                     (shots / f"{stem}-{w}.png").write_bytes(png)
-                if w == 1440:
-                    src = "data:image/png;base64," + base64.b64encode(png).decode()
-                    blank = ctx.new_page()
-                    raw[key]["accent"] = blank.evaluate(_JS_PIXELS, [src, _rgb(ACCENT)])
-                    blank.close()
+                src = "data:image/png;base64," + base64.b64encode(png).decode()
+                blank = ctx.new_page()
+                raw[key]["chroma"] = blank.evaluate(_JS_PIXELS, [src, CHROMA])
+                blank.close()
             ctx.close()
         b.close()
     if url.startswith("file:"):           # file: responses carry no body in every Chromium; count the files on disk
@@ -231,7 +261,8 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
     low = sorted((x for x in items if x["ratio"] < x["need"]), key=lambda x: x["ratio"])
     unm = m["text"]["unmeasured"] + d["text"]["unmeasured"]
     weight = sum(sizes.values())
-    acc = d["accent"]
+    chroma = {"375": m["chroma"], "1440": d["chroma"]}
+    lines = m["lines"] + [x for x in d["lines"] if x not in m["lines"]]
     v = {"overflow-375": m["doc"]["overflow"] <= 1 and not m["text"]["cut"],
          "overflow-1440": d["doc"]["overflow"] <= 1 and not d["text"]["cut"],
          "contrast": bool(items) and not low and not unm,
@@ -241,7 +272,8 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
          "names": not m["doc"]["unnamed"] and not d["doc"]["unnamed"],
          "headings": d["doc"]["lang"] != "" and d["doc"]["h1"] == 1 and d["doc"]["first"] == 1 and not d["doc"]["skips"],
          "reduced-motion": not m["doc"]["running"] and not d["doc"]["running"],
-         "accent": ACCENT_BAND[0] <= acc <= ACCENT_BAND[1],
+         "monochrome": all(c["share"] <= CHROMA_SHARE for c in chroma.values()),
+         "display-line": not lines,
          "weight": 0 < weight <= MAX_BYTES}
     failed = [k for k in CHECKS if not v[k]]
     return {"pass": not failed, "target": target, "V": v, "failed": failed,
@@ -254,7 +286,8 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
                       "headings": {"lang": d["doc"]["lang"], "h1": d["doc"]["h1"], "first": d["doc"]["first"], "skips": d["doc"]["skips"]},
                       "running-reduced": m["doc"]["running"] + d["doc"]["running"],
                       "running-with-motion": len(raw["1440-no-preference"]["doc"]["running"]),
-                      "accent-share": round(acc, 4), "bytes": weight, "requests": len(sizes),
+                      "chroma-share": {k: round(c["share"], 6) for k, c in chroma.items()},
+                      "max-chroma": max(c["max"] for c in chroma.values()), "display-lines": lines[:6], "bytes": weight, "requests": len(sizes),
                       "seconds": round(time.time() - t0, 1)}}
 
 

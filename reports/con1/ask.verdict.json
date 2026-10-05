@@ -11,12 +11,13 @@
   "names": true,
   "headings": true,
   "reduced-motion": true,
-  "accent": true,
+  "monochrome": true,
+  "display-line": true,
   "weight": true
  },
  "failed": [],
  "facts": {
-  "min-contrast": 4.88,
+  "min-contrast": 6.9,
   "low-contrast": [],
   "unmeasured": [],
   "min-font-375": 14.0803,
@@ -37,9 +38,14 @@
   },
   "running-reduced": [],
   "running-with-motion": 0,
-  "accent-share": 0.0095,
-  "bytes": 15991,
+  "chroma-share": {
+   "375": 0,
+   "1440": 0
+  },
+  "max-chroma": 0,
+  "display-lines": [],
+  "bytes": 17135,
   "requests": 3,
-  "seconds": 2.3
+  "seconds": 2.2
  }
 }
