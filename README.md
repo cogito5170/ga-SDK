@@ -556,3 +556,25 @@ Kinds and project state (rev 2):
 
 Progress goes to stderr while a turn runs. Exit codes: 0 ready, 1 blocked, 2 config error.
 Tests: `tests/test_ga37.py` (golden set: `tests/fixtures/ga37/golden.json`); mutations: `tests/mutations_ga37.py`.
+
+## ga hub and GA Actions (CMD-GA42, 0.10.0)
+
+- **`ga hub tick` / `ga hub run --every S`** (`ga/hub.py` `MailHub`, a `Hub` subclass: same quiet writes, same
+  directive rev+1). Per new report/2 in the hub's mailbox: `ga judge` (no apply) → a verdict card of at most 6 KB
+  (directive goal + done_when, report items, judge class, failing tests, surviving mutants, diff stat, files outside
+  the directive's `owned` globs, earlier verdicts on the id) → one model turn (`backend`/`model` in `.ga-hub.json`)
+  answering `ACCEPT` | `SEND_BACK` + up to 6 `- ` lines | `ASK_HUMAN <question>`. Code acts: ACCEPT only on a judge
+  success with nothing left for judgement (else ASK_HUMAN) → `ga judge --apply` (ff, never force) → one DECISION_LOG
+  row before `| BD-60 |`, one `- <n> 회차:` line, the `ops/tokmon/sessions.txt` line, commit + push (never force) in the
+  baseline repo; SEND_BACK → verdict/1 + directive/2 rev+1 by mail (cap 3 per id, then ASK_HUMAN); ASK_HUMAN → a
+  verdict/1 with `next: ask_user` to the human inbox. Every turn goes to `.ga/hub/ledger/<day>.jsonl` and
+  `.ga/telemetry/hub.jsonl` (`ga usage`); `daily_turns` (default 20) caps them. Nothing new: no write, no model call.
+- **GA Actions** (`ga/actions/`). A model may only propose: `PROPOSE <name>` + one JSON line `{argv, why, example, cwd,
+  timeout_s, writes}` in `ga act`, or in a supervise turn (TOOL_NEEDED lines are recorded too, refused until a person
+  writes an argv). Code checks (allowlisted executable or a project file; no shell, `-c`, `eval`, metacharacters;
+  placeholders `{path}` `{name}` only; no secret path, symlinks resolved; network flagged) and trial-runs it once in a
+  throwaway worktree; the record is `~/.ga/actions/proposals/<name>.json`. Approval is a human act only: `ga actions
+  approve <name>` at a TTY (y/N), or GA Console through `ga.actions.approve(name, approver="console")` after its token
+  check; a human-written `~/.ga/actions-policy.json` pattern may auto-approve an exact match. Registry
+  `~/.ga/actions.json` entries carry a sha256; a mismatch is refused. Approved actions are `RUN <name> path=...` in
+  `ga act` and the one table tool `action` in `ga supervise`; models see names and one-line abouts only.

@@ -31,7 +31,7 @@ from . import check as C
 OUT_CAP = 4000
 TOOL_NEEDED = re.compile(r"^\s*TOOL_NEEDED:\s*(.+?)\s*$", re.M)
 PROPOSE = re.compile(r"^PROPOSE[ \t]+(\S+)[ \t]*\n[ \t]*(\{.*\})[ \t]*$", re.M)
-HASHED = ("argv", "cwd", "timeout_s", "writes", "network", "about")
+HASHED = ("argv", "cwd", "timeout_s", "writes", "network", "about", "files")
 
 
 class ActionError(ValueError):
@@ -72,6 +72,21 @@ def proposal_path(name: str, h: Path | None = None) -> Path:
     return (h or home()) / "actions" / "proposals" / f"{name}.json"
 
 
+def _file_hashes(argv: list[str], root: Path) -> dict[str, str]:
+    """sha256 of every argv element that is a file in the project (the script an approval covers)."""
+    out = {}
+    for a in argv:
+        if a.startswith("-") or "{" in a:
+            continue
+        try:
+            q = (Path(root) / a).resolve()
+            if q.is_file() and Path(root).resolve() in q.parents:
+                out[a] = hashlib.sha256(q.read_bytes()).hexdigest()
+        except (OSError, ValueError):
+            continue
+    return out
+
+
 def digest(entry: dict[str, Any]) -> str:
     body = json.dumps({k: entry.get(k) for k in HASHED}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
@@ -102,7 +117,8 @@ def trial(p: dict[str, Any], root: Path) -> dict[str, Any]:
         ex = p.get("example", {})
         if isinstance(ex, str):
             ex = {"path": ex} if "{path}" in p["argv"] else {"name": ex}
-        argv, why = C.fill(p["argv"], ex, work)
+        used = {x.strip("{}") for x in C.PLACEHOLDERS if any(x in a for a in p["argv"])}
+        argv, why = C.fill(p["argv"], {k: v for k, v in ex.items() if str(k).strip("{}") in used}, work)
         if argv is None:
             return {"ran": False, "reason": why}
         if "/" in argv[0]:
@@ -207,7 +223,8 @@ def _register(rec: dict[str, Any], approver: str, h: Path, allow_network: bool =
     p = rec["proposal"]
     entry = {"argv": list(p["argv"]), "cwd": p.get("cwd", ".") or ".", "timeout_s": float(p.get("timeout_s", 60)),
              "writes": list(p.get("writes", [])), "network": bool(rec["check"]["network"] and allow_network),
-             "about": str(p.get("why", "") or "")[:120].replace("\n", " ")}
+             "about": str(p.get("why", "") or "")[:120].replace("\n", " "),
+             "files": _file_hashes(list(p["argv"]), Path(rec.get("root", ".")))}
     entry.update(approved_by=approver, at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), sha256=digest(entry))
     reg = registry(h)
     reg[rec["name"]] = entry
@@ -271,6 +288,10 @@ def run(name: str, values: dict[str, Any] | None, root: Path, *, h: Path | None 
         raise ActionError(f"{name!r}: refused now: {'; '.join(reasons)[:300]}")
     if net and not e.get("network"):
         raise ActionError(f"{name!r}: needs network and the approval does not allow it")
+    now = _file_hashes(list(e["argv"]), root)
+    changed = [a for a, sha in (e.get("files") or {}).items() if now.get(a) != sha]
+    if changed:
+        raise ActionError(f"{name!r}: {', '.join(changed)} changed since the approval; a person approves it again")
     argv, why = C.fill(e["argv"], values or {}, root)
     if argv is None:
         raise ActionError(f"{name!r}: {why}")

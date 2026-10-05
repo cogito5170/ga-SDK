@@ -81,6 +81,14 @@ def _pathlike(s: str) -> bool:
         or s.startswith(("~", "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"))
 
 
+def _exists(root: Path, v: str) -> bool:
+    try:
+        q = root / v
+        return q.is_symlink() or q.exists()
+    except (OSError, ValueError):
+        return False
+
+
 def network(argv: list[str]) -> bool:
     exe = Path(argv[0]).name
     if exe in NET_TOOLS or any("://" in a or a.startswith("git@") for a in argv):
@@ -126,7 +134,7 @@ def check(p: dict[str, Any], root: Path, executables: list[str] | tuple[str, ...
         if meta:
             why.append(f"argv[{i}] {a!r} has shell metacharacter(s) {''.join(meta)!r}")
         for v in ([rest.split("=", 1)[1]] if rest.startswith("-") and "=" in rest else [rest]):
-            if v and not v.startswith("-") and (_pathlike(v) or i == 0):
+            if v and not v.startswith("-") and (_pathlike(v) or i == 0 or _exists(root, v)):
                 if i == 0 and "/" not in v:
                     continue  # a bare executable name: the allowlist decides
                 r = confined(root, v)

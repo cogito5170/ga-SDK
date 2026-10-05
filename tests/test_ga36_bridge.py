@@ -59,6 +59,8 @@ class BridgeTest(unittest.TestCase):
     def setUp(self):
         self.w = World()
         self.logs = []
+        os.environ["GA_HOME"] = str(self.w.tmp / "ga-home")  # CMD-GA42: TOOL_NEEDED proposals land here, not in ~/.ga
+        self.addCleanup(os.environ.pop, "GA_HOME", None)
 
     def pass_(self, runner):
         return bridge.one_pass(self.w.cfg, box=self.w.mac, runner=runner, log=self.logs.append)
