@@ -10,6 +10,8 @@
     ga check   FILE...                           validate form texts and the shell commands in them (R13)
     ga render                                    re-render the Markdown records
     ga judge   --report R --repo DIR --base B    the deterministic verdict script (CMD-GA30); no model call
+    ga judge   --sha C --repo DIR --base B       the same steps on any commit, a hub-side merge too (CMD-GA39)
+    ga verify  mutations --base B --head H        a mutation spec from the diff; ga verify item ITEM lints a code item
 
 Common: --config PATH (default ga.json), --ga-dir PATH (default <config dir>/.ga).
 """
@@ -244,12 +246,16 @@ def cmd_judge(args) -> int:
             print(f"ga judge: {e}", file=sys.stderr)
             return 2
         return 0
-    if not (args.report and args.repo and args.base):
-        print("ga judge: --report, --repo and --base are required (or --template <CMD>)", file=sys.stderr)
+    if not ((args.report or args.sha) and args.repo and args.base) or (args.report and args.sha):
+        print("ga judge: --report or --sha (one), --repo and --base are required (or --template <CMD>)", file=sys.stderr)
         return 2
     try:
-        j = judge.judge(args.report, args.repo, args.base, mutations=args.mutations, seed=args.seed, k=args.k,
-                        config=args.judge_config, remote=args.remote)
+        if args.sha:  # CMD-GA39 S2: any commit, a hub-side merge too; same steps after the report check
+            j = judge.judge_commit(args.repo, args.sha, args.base, mutations=args.mutations, seed=args.seed, k=args.k,
+                                   config=args.judge_config, remote=args.remote)
+        else:
+            j = judge.judge(args.report, args.repo, args.base, mutations=args.mutations, seed=args.seed, k=args.k,
+                            config=args.judge_config, remote=args.remote)
         sys.stdout.write(judge.render(j))
         if args.apply:
             print(judge.apply(j, args.repo, args.remote))
@@ -552,13 +558,17 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_notify)
     p = sub.add_parser("judge", help="deterministic verdict draft for a report: checks, install, tests, mutations (CMD-GA30)")
     p.add_argument("--report", help="a file, or <repo>@<sha>:<path> read from --repo")
+    p.add_argument("--sha", help="judge this commit instead of a report's (a hub-side merge too; CMD-GA39)")
     p.add_argument("--repo", help="local clone of the repository"); p.add_argument("--base", help="integration branch")
     p.add_argument("--template", metavar="CMD", help="print a valid report/2 head skeleton for directive CMD and exit (no install needed)")
-    p.add_argument("--mutations", help="mutation spec (JSON list of {file, find, replace, tests})")
+    p.add_argument("--mutations", help="mutation spec (JSON list of {file, find, replace, tests}), or auto (ga verify "
+                                        "mutations against --base)")
     p.add_argument("--seed", type=int, help="mutation pick seed (default random; always printed)"); p.add_argument("--k", type=int, default=1)
     p.add_argument("--judge-config", help="per-repo judge config (default <repo>/.ga-judge.json)"); p.add_argument("--remote", default="origin")
     p.add_argument("--apply", action="store_true", help="only when success and nothing for judgement: ff base to the sha and push")
     p.set_defaults(fn=cmd_judge)
+    from .verify.cli import add_parser as _verify_parser
+    _verify_parser(sub)
     p = sub.add_parser("inbox", help="the one read path: new messages since the local cursor, heads only (GA27 S4)")
     p.add_argument("channel", help="github:<owner>/<repo>#<issue>, the issue URL, or mail:<NAME>")
     p.add_argument("--repo", default=".", help="the git repository whose git dir keeps the cursor (and, for mail:, the mailbox)")
