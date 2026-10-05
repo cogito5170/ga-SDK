@@ -581,8 +581,8 @@ class Thinking(unittest.TestCase):
 class Version(unittest.TestCase):
     def test_0_9_0(self):
         import ga
-        self.assertEqual(ga.__version__, "0.9.0")
-        self.assertIn('version = "0.9.0"', (TESTS.parent / "pyproject.toml").read_text())
+        self.assertGreaterEqual(tuple(map(int, ga.__version__.split("."))), (0, 9, 0))  # CON2 moved it on to 0.10.0
+        self.assertIn(f'version = "{ga.__version__}"', (TESTS.parent / "pyproject.toml").read_text())
 
 
 if __name__ == "__main__":
