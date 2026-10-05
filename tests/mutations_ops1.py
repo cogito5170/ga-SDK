@@ -20,6 +20,9 @@ M = [
  ("dirty/diverged checkout reset", C, '"merge", "--ff-only", f"origin/{branch}"', '"reset", "--hard", f"origin/{branch}"'),
  ("a credential file read", C, "    r = runner or Runner()\n    problems: list[str] = []\n",
   "    r = runner or Runner()\n    problems: list[str] = []\n    try:\n        (home / \".git-credentials\").read_text()\n    except OSError:\n        pass\n"),
+ ("not-a-checkout guard dropped", C, 'if rc != 0 or Path(top.strip()).resolve() != repo.resolve():', 'if False:'),
+ ("parent repo accepted as the checkout", C, ' or Path(top.strip()).resolve() != repo.resolve():', ':'),
+ ("failing git status treated as clean", C, "    if rc != 0 or out.strip():\n", "    if out.strip():\n"),
  ("hub enabled without --shadow", C, 'return rc == 0 and "--shadow" in out', "return True"),
 ]
 

@@ -168,7 +168,8 @@ def plan_repo(r: Runner, repo: Path) -> str:
     """'clone', or 'update' for a clean checkout; VmError for a dirty one or a folder that is not a checkout."""
     if not repo.exists():
         return "clone"
-    if _git(r, repo, "rev-parse", "--git-dir")[0] != 0:
+    rc, top = _git(r, repo, "rev-parse", "--show-toplevel")  # a plain folder inside a git home would answer for the parent
+    if rc != 0 or Path(top.strip()).resolve() != repo.resolve():
         raise VmError(f"{repo} exists but is not a git checkout — not touched")
     rc, out = _git(r, repo, "status", "--porcelain")
     if rc != 0 or out.strip():

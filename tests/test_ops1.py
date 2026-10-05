@@ -273,6 +273,48 @@ class Install(Base):
         self.assertTrue((c / "mine.txt").is_file())
         self.assertFalse((c / "up.txt").exists())
 
+    def test_plain_folder_refused_and_untouched(self):
+        d = self.home / "baseline"
+        d.mkdir()
+        (d / "mine.txt").write_text("m")
+        rc, r = self.inst()
+        self.assertEqual(rc, 1)
+        self.assertIn("not a git checkout", self.out)
+        self.assertEqual([p.name for p in d.iterdir()], ["mine.txt"])
+        self.assertEqual(r.pip_tmp, [])
+        self.assertFalse((self.home / "ga-sdk").exists())
+
+    def test_plain_folder_in_a_git_home_leaves_the_parent_repo_alone(self):
+        sh("git", "init", "-q", "-b", "main", str(self.home))
+        (self.home / "keep.txt").write_text("k")
+        sh("git", "-C", str(self.home), "add", ".")
+        sh("git", "-C", str(self.home), "commit", "-qm", "home")
+        (self.home / "baseline").mkdir()
+        (self.home / "baseline" / "mine.txt").write_text("m")
+        head = subprocess.run(["git", "-C", str(self.home), "rev-parse", "HEAD"], capture_output=True, text=True).stdout
+        rc, r = self.inst()
+        self.assertEqual(rc, 1)
+        self.assertIn("not a git checkout", self.out)
+        self.assertEqual(subprocess.run(["git", "-C", str(self.home), "rev-parse", "HEAD"], capture_output=True, text=True).stdout, head)
+        self.assertFalse([c for c in r.calls if c[:1] == ["git"] and c[1:2] in (["-C"],) and any(x in c for x in ("checkout", "merge", "reset", "fetch"))])
+        self.assertEqual((self.home / "baseline" / "mine.txt").read_text(), "m")
+
+    def test_failing_git_status_stops_install(self):
+        self.inst()
+
+        class Bad(FakeRunner):
+            def run(self, argv, **kw):
+                if argv[:1] == ["git"] and "status" in argv:
+                    self.calls.append(list(argv))
+                    return 128, "fatal"
+                return super().run(argv, **kw)
+        before = self.snap()
+        rc, r = self.inst(Bad())
+        self.assertEqual(rc, 1)
+        self.assertIn("local changes", self.out)
+        self.assertEqual(self.snap(), before)
+        self.assertEqual(r.pip_tmp, [])
+
     def test_low_disk_stops_before_any_write(self):
         self.free = 1 * GB
         before = set(os.listdir(self.home))
