@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서비스 · GA Console</title>
+<link rel="stylesheet" href="../static/tokens.css">
+<link rel="stylesheet" href="golden.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span>127.0.0.1:8765 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="now.html">지금</a></li>
+      <li><a href="work.html">작업<span class="n">4</span></a></li>
+      <li><a href="branches.html">브랜치</a></li>
+      <li><a href="services.html" aria-current="page">서비스<span class="n">3/4</span></a></li>
+      <li><a href="tokens.html">토큰</a></li>
+      <li><a href="ask.html">묻기</a></li>
+      <li><a href="decisions.html">결정</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="mast">
+  <p class="cap">서비스 · <b>Token</b> 과 브리지</p>
+  <h1>3<span class="unit">/ 4 도는 중</span></h1>
+  <span class="hot" aria-hidden="true"></span>
+  <p class="lede">worker 가 멈췄습니다. 아래 기록의 마지막 줄이 이유예요.</p>
+</div>
+
+<main id="main">
+  <section aria-labelledby="h-svc">
+    <h2 id="h-svc">켜고 끄기</h2>
+    <ul class="items">
+      <li>
+        <div class="row"><h3>api</h3><span class="state"><span class="mark live" aria-hidden="true"></span>도는 중</span><span class="state"><span class="mark ok" aria-hidden="true"></span>응답 좋음</span></div>
+        <p class="meta"><span>포트 <b>8000</b></span><span>13:02 부터</span><span>pid 48211</span></p>
+        <div class="actions"><button type="button">멈추기 api</button><button type="button">다시 켜기 api</button></div>
+      </li>
+      <li class="fail">
+        <div class="row"><h3>worker</h3><span class="state"><span class="mark fail" aria-hidden="true"></span>실패</span><span class="state"><span class="mark off" aria-hidden="true"></span>응답 없음</span></div>
+        <p class="meta"><span>포트 —</span><span>14:29 에 멈춤</span><span>종료 코드 1</span></p>
+        <div class="actions"><button type="button">켜기 worker</button><button type="button">기록 보기 worker</button></div>
+      </li>
+      <li>
+        <div class="row"><h3>web</h3><span class="state"><span class="mark live" aria-hidden="true"></span>도는 중</span><span class="state"><span class="mark ok" aria-hidden="true"></span>응답 좋음</span></div>
+        <p class="meta"><span>포트 <b>5173</b></span><span>13:02 부터</span><span>pid 48230</span></p>
+        <div class="actions"><button type="button">멈추기 web</button><button type="button">다시 켜기 web</button></div>
+      </li>
+      <li>
+        <div class="row"><h3>브리지</h3><span class="state"><span class="mark live" aria-hidden="true"></span>도는 중</span><span class="state"><span class="mark wait" aria-hidden="true"></span>확인 중</span></div>
+        <p class="meta"><span>포트 —</span><span>09:40 부터</span><span>pid 31007</span><span>마지막 편지 12초 전</span></p>
+        <div class="actions"><button type="button">멈추기 브리지</button><button type="button" disabled>다시 켜기 브리지 (확인 중)</button></div>
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-log">
+    <h2 id="h-log">worker 기록 <span class="sub">마지막 8줄 · stderr 는 굵게</span></h2>
+    <ol class="log" aria-label="worker 기록">
+      <li><span class="ln">412</span><span class="at">14:28:58</span><span class="tx">job usage.rollup picked (day=2026-10-05)</span></li>
+      <li><span class="ln">413</span><span class="at">14:28:58</span><span class="tx">reading 1,204 rows from ledger.jsonl</span></li>
+      <li><span class="ln">414</span><span class="at">14:28:59</span><span class="tx">grouped into 3 local days</span></li>
+      <li><span class="ln">415</span><span class="at">14:29:00</span><span class="tx">writing usage_daily …</span></li>
+      <li class="err"><span class="ln">416</span><span class="at">14:29:00</span><span class="tx">sqlite3.OperationalError: database is locked</span></li>
+      <li class="err"><span class="ln">417</span><span class="at">14:29:00</span><span class="tx">  at token/worker/rollup.py:88 in write_daily</span></li>
+      <li><span class="ln">418</span><span class="at">14:29:01</span><span class="tx">retry 3/3 failed; giving up</span></li>
+      <li class="err"><span class="ln">419</span><span class="at">14:29:01</span><span class="tx">worker exited with code 1</span></li>
+    </ol>
+    <p class="note">데이터베이스가 잠겨 있었어요(다른 프로그램이 쓰는 중). api 를 멈추고 worker 를 켠 뒤 api 를 다시 켜 보세요.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>버튼은 이 Mac 의 프로세스만 켜고 끕니다. 무엇을 눌렀는지는 ~/.ga/console.log 에 남습니다.</p>
+</footer>
+</body>
+</html>

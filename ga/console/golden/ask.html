@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>묻기 · GA Console</title>
+<link rel="stylesheet" href="../static/tokens.css">
+<link rel="stylesheet" href="golden.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span>127.0.0.1:8765 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="now.html">지금</a></li>
+      <li><a href="work.html">작업<span class="n">4</span></a></li>
+      <li><a href="branches.html">브랜치</a></li>
+      <li><a href="services.html">서비스<span class="n">3/4</span></a></li>
+      <li><a href="tokens.html">토큰</a></li>
+      <li><a href="ask.html" aria-current="page">묻기</a></li>
+      <li><a href="decisions.html">결정</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="mast">
+  <p class="cap">묻기 · <b>ga ask</b> · <b>ga do</b></p>
+  <h1>무엇을 할까요?</h1>
+  <span class="hot" aria-hidden="true"></span>
+  <p class="lede">먼저 비용을 보여 드리고, 확인을 누르면 그때 돌립니다.</p>
+</div>
+
+<main id="main">
+  <div class="two">
+    <section aria-labelledby="h-box">
+      <h2 id="h-box">새 물음</h2>
+      <form class="field" action="#" onsubmit="return false">
+        <fieldset class="choice">
+          <legend>종류</legend>
+          <label><input type="radio" name="kind" value="ask" checked> 묻기 — 읽기만</label>
+          <label><input type="radio" name="kind" value="do"> 하기 — 고칠 수 있음</label>
+        </fieldset>
+        <label for="q">물음</label>
+        <textarea id="q" name="q">Token worker 가 database is locked 로 멈춘 이유와 고칠 방법</textarea>
+        <div class="actions"><button type="submit">비용 보기</button></div>
+      </form>
+    </section>
+
+    <section aria-labelledby="h-cost">
+      <h2 id="h-cost">비용 먼저</h2>
+      <div class="cost">
+        <dl class="figs">
+          <div><dt>예상 토큰</dt><dd>~12,400</dd></div>
+          <div><dt>대략 비용</dt><dd>$0.04</dd></div>
+          <div><dt>모델 호출</dt><dd>1</dd></div>
+        </dl>
+        <p class="say">읽기만 합니다. 파일은 고치지 않아요. 읽을 것: <span class="mono">token/worker/rollup.py</span>, 기록 마지막 200줄.</p>
+        <div class="actions"><button type="button" class="primary">확인하고 돌리기</button><button type="button">취소</button></div>
+      </div>
+    </section>
+  </div>
+
+  <section aria-labelledby="h-past">
+    <h2 id="h-past">지난 물음 <span class="sub">최근 3</span></h2>
+    <ol class="items">
+      <li><div class="row"><span class="state"><span class="mark ok" aria-hidden="true"></span>답함</span><h3>CMD-GA38 은 통합됐나?</h3></div>
+        <p class="say">네. 어제 21:40 에 공용 브랜치에 합쳐졌습니다(5558f39).</p>
+        <p class="meta"><span>묻기</span><span>0 토큰 · 기록만 읽음</span><span>13:12</span></p></li>
+      <li><div class="row"><span class="state"><span class="mark ok" aria-hidden="true"></span>답함</span><h3>오늘 토큰을 가장 많이 쓴 작업</h3></div>
+        <p class="say">CMD-TK12, 182,440 토큰. 돌려보낸 뒤 다시 하느라 24턴.</p>
+        <p class="meta"><span>묻기</span><span>0 토큰 · 장부만 읽음</span><span>12:02</span></p></li>
+      <li><div class="row"><span class="state"><span class="mark wait" aria-hidden="true"></span>취소함</span><h3>web 의 빌드 경고 고치기</h3></div>
+        <p class="say">비용을 보고 돌리지 않았습니다(예상 48,000 토큰).</p>
+        <p class="meta"><span>하기</span><span>0 토큰</span><span>11:30</span></p></li>
+    </ol>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>확인 없이 모델을 부르는 버튼은 없습니다. 기록만 읽어 답할 수 있으면 0 토큰으로 답합니다.</p>
+</footer>
+</body>
+</html>
