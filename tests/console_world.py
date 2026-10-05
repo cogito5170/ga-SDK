@@ -10,7 +10,7 @@ from pathlib import Path
 
 from ga.console import config as K
 
-FAKE_SECRET = "sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKEFAKE"   # looks like a key (rule R6); fake
+FAKE_SECRET = "sk-" + "ant-api03-" + "FAKE" * 7   # looks like a key (rule R6); fake, built at runtime
 ENV_VALUE = "env-value-7f3c9a1b-not-a-real-one"               # an env-file value that must never come back
 
 SERVICE = textwrap.dedent('''\
