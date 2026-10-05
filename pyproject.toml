@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ga-sdk"
-version = "0.7.0"
+version = "0.8.0"
 description = "Hub loop SDK: directive / report / verdict forms, integration, rules, gates, records"
 requires-python = ">=3.10"
 # the source of these pins is ga/_pins.py; this list must say the same (tests/test_pins.py)
@@ -38,4 +38,4 @@ ga = "ga.__main__:main"
 include = ["ga*"]
 
 [tool.setuptools.package-data]
-ga = ["specs/*.pspec", "specs/forms/*.pspec"]  # the supervisor's prompt spec (GA26, GA28), the form specs (GA27)
+ga = ["specs/*.pspec", "specs/forms/*.pspec", "ui/*.html", "ui/*.js", "ui/*.css"]  # the supervisor's prompt spec (GA26, GA28), the form specs (GA27), GA UI's page (GA36)

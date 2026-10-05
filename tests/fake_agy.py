@@ -9,6 +9,8 @@
       {"error": true}                     -> "AGY_ERROR: agent failed", exit 3 (V)
       {"crash": true}                     -> no output, exit 1
       {"set_usage": "<text>"}             -> (with any entry) usage.txt becomes <text> after this turn
+      CMD-GA36: {"capacity": true} -> "AGY_ERROR: 503 MODEL_CAPACITY_EXHAUSTED", exit 3; {"sleep": s} waits s seconds
+      first; {"text": "..."} answers that text instead of a plan; {"usage": {...}} is printed with the answer (json)
 Every call appends a row to calls.jsonl.
 """
 import json
@@ -32,6 +34,7 @@ row = {"kind": "usage" if prompt.strip() == "/usage" else "turn", "model": opt("
        "stdin_eof": (sys.stdin.read() == "") if not sys.stdin.isatty() else False,
        "credits_arg": any("credit" in a.lower() for a in argv), "resume_arg": "--resume" in argv,
        "has_task": "Task:" in prompt, "has_protocol": "ga-gemini-plan/1" in prompt or "ga-plan/1" in prompt, "has_results": "Results:" in prompt}
+row["argv"] = argv  # CMD-GA36: the whole argv (flags and prompt), for the tools-off and prompt-size checks
 with open(calls, "a") as f:
     f.write(json.dumps(row) + "\n")
 if row["kind"] == "usage":
@@ -43,8 +46,14 @@ script = json.loads((d / "script.json").read_text())
 entry = script[n] if n < len(script) else {"crash": True}
 if "set_usage" in entry:
     (d / "usage.txt").write_text(entry["set_usage"])
+if entry.get("sleep"):
+    import time
+    time.sleep(float(entry["sleep"]))
 if entry.get("crash"):
     sys.exit(1)
+if entry.get("capacity"):
+    print("AGY_ERROR: 503 MODEL_CAPACITY_EXHAUSTED: no capacity for this model right now", file=sys.stderr)
+    sys.exit(3)
 if entry.get("quota"):
     print("AGY_ERROR: You have reached the quota limit for Gemini models.", file=sys.stderr)
     sys.exit(3)
@@ -56,13 +65,15 @@ if entry.get("error"):
     print("AGY_ERROR: agent failed", file=sys.stderr)
     sys.exit(3)
 model = entry["model"] if "model" in entry else opt("--model")
-text = "```json\n" + json.dumps(entry["plan"]) + "\n```\n"
+text = entry["text"] if "text" in entry else "```json\n" + json.dumps(entry["plan"]) + "\n```\n"
 if entry.get("format") == "json":
     out = {"response": text}
     if model is not None:
         out["model"] = model
     if entry.get("denied"):
         out["denied_actions"] = entry["denied"]
+    if entry.get("usage"):
+        out["usage"] = entry["usage"]
     print(json.dumps(out))
     sys.exit(0)
 ev = [{"type": "init"} | ({"model": model} if model is not None else {})]

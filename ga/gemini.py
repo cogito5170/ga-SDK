@@ -850,6 +850,7 @@ class Supervisor:
         fmt = getattr(turn, "usage_format", None) or ("otel" if usage else None)
         self.log("turn", step=sid, ok=True, served=turn.served, model=self.model, seconds=turn.seconds,
                  tokens=usage.get("total_tokens"), input_tokens=usage.get("input_tokens"),
+                 output_tokens=usage.get("output_tokens", usage.get("completion_tokens")),  # GA36: ga ask --solve lines
                  provider_prompt_tokens=provider_prompt_tokens(usage, fmt), usage_format=fmt, bare=bare,
                  prompt_est=est(prompt) + (est(system) if system else 0), prompt_mode=self.cfg.prompt_mode)
         denied = list(getattr(turn, "denied", []) or [])

@@ -1,0 +1,19 @@
+:root { color-scheme: light dark; --fg: #1d1d1f; --bg: #fafafa; --muted: #666; --line: #ddd; --accent: #2a62c9; }
+@media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #161616; --muted: #aaa; --line: #333; --accent: #7aa7ff; } }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 860px; padding: 16px; font: 15px/1.5 -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+h1 { margin: 0; font-size: 22px; }
+h2 { font-size: 17px; margin: 24px 0 8px; }
+#today { color: var(--muted); margin: 4px 0 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row.small { font-size: 13px; margin: 8px 0; }
+input, textarea, button { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+#q { flex: 1 1 260px; }
+textarea { width: 100%; }
+button { cursor: pointer; border-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chips button { font-size: 13px; }
+.chips button[data-cost="model"]::after { content: " · 토큰"; color: var(--muted); }
+.chips button[data-cost="mail"]::after { content: " · 메일"; color: var(--muted); }
+pre { white-space: pre-wrap; word-break: break-word; border: 1px solid var(--line); border-radius: 6px; padding: 10px; min-height: 120px; max-height: 50vh; overflow: auto; }
+dialog { border: 1px solid var(--line); border-radius: 8px; color: var(--fg); background: var(--bg); max-width: 560px; }

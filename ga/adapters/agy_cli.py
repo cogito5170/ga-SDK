@@ -43,6 +43,9 @@ from .gemini_cli import GeminiError, GeminiRateLimited, GeminiTurn, ModelMismatc
 
 DEFAULT_MODEL = "gemini-3.8-flash-high"
 CREDITS = re.compile(r"(?i)\bAI credits\b")  # V: "Use AI Credits" / "Your AI credits balance is too low to continue"
+# AGY_FACTS (CMD-GA36): a 503 MODEL_CAPACITY_EXHAUSTED ends the turn with exit 3 and is retryable (a 30 s retry
+# succeeded) — the server's capacity, not the user's quota
+CAPACITY = re.compile(r"MODEL_CAPACITY_EXHAUSTED|\b503\b.{0,40}\bcapacity|\bcapacity\b.{0,40}\b503\b", re.I)
 QUOTA_WORDS = re.compile(r"(?i)\b(quota|usage limit|rate limit|limit reached|reached (?:the|your) limit|exhausted)\b")
 
 
@@ -248,6 +251,8 @@ class AgyCLI:
         t0 = time.monotonic()
         stdout, stderr, code = self._run(self.argv(prompt), on_wait, wait_every_s)
         o = parse_output(stdout, stderr)
+        if code != 0 and CAPACITY.search(stdout + "\n" + stderr):
+            raise GeminiError("capacity")  # GA36: retryable; ga bridge retries once, then reports capacity (not quota)
         if o.credits:  # never accept paid credits: the plan quota is spent
             raise AgyQuota("credits")
         if o.quota:

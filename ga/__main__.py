@@ -491,12 +491,35 @@ def _rlo_argv(argv: list[str]) -> list[str] | None:
     return None
 
 
+# CMD-GA36: GA CLI entries with their own argument parsers (handed the rest of the command line, like rlo)
+OWN_PARSER = {"ask": "ga.ask:main", "bridge": "ga.bridge:main", "ui": "ga.ui:main"}
+
+
+def _own_argv(argv: list[str]) -> tuple[str, list[str]] | None:
+    """(command, its arguments) when the command is one of OWN_PARSER (past ga's own --config / --ga-dir), else None."""
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--config", "--ga-dir"):
+            i += 2
+        elif a.startswith(("--config=", "--ga-dir=")):
+            i += 1
+        else:
+            return (a, argv[i + 1:]) if a in OWN_PARSER else None
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
     rest = _rlo_argv(argv)
     if rest is not None:  # before argparse, so `ga rlo --help` and every other option reach ga.rlo.cli unchanged
         return cmd_rlo(rest)
-    ap = argparse.ArgumentParser(prog="ga", description="ga-SDK hub loop (local edition)")
+    own = _own_argv(argv)
+    if own is not None:
+        mod, fn = OWN_PARSER[own[0]].split(":")
+        return int(getattr(importlib.import_module(mod), fn)(own[1]) or 0)
+    ap = argparse.ArgumentParser(prog="ga", description="GA Engine — GA CLI (ga-sdk's GA Core underneath). New here? "
+                                 "ga ask \"뭐 할 수 있어?\" or ga ui")
     ap.add_argument("--config", default="ga.json")
     ap.add_argument("--ga-dir", default=None)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -600,6 +623,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--json", action="store_true"); p.add_argument("--fail", action="store_true", help="exit 1 on an alarm")
     p.set_defaults(fn=cmd_usage)
     sub.add_parser("rlo", add_help=False, help="rlo Autonomy commands (ga.rlo, owned by GR)")  # listed here, run above
+    sub.add_parser("ask", add_help=False, help="GA CLI: ask in Korean or English; local rules pick the action, cost "
+                   "shown and y/N before tokens or mail (CMD-GA36)")  # listed here, run above
+    sub.add_parser("bridge", add_help=False, help="GA CLI: the agy bridge — the hub's directives through ga supervise, "
+                   "report/2 back (CMD-GA36)")
+    sub.add_parser("ui", add_help=False, help="GA UI: a local browser page over the same engine as ga ask (CMD-GA36)")
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
         ap.error("prompt needs SESSION or --hub")

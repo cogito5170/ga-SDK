@@ -1,8 +1,30 @@
-# ga-SDK
+# ga-SDK — GA Core of GA Engine
 
 허브 세션 하나가 지시와 보고로 작업 세션 여럿을 굴리는 고리를 기계로 돌린다. 명세는 [`METHOD.md`](METHOD.md)(baseline 소유)에 있고, 짓는 방법은 [`DESIGN.md`](DESIGN.md)에 있다.
 
 1판(0.1)은 로컬에서만 돈다. 쓰는 것은 파일 우편함, git worktree, venv, 수동 Runner뿐이다. 원격 세션, GitHub, LLM, 네트워크 없이 돌아간다. Python 3.10 이상이 필요하고, 핵심은 표준 라이브러리만으로 짓는다.
+
+## 빠른 시작: GA CLI와 GA UI (Mac, CMD-GA36)
+
+이 저장소(ga-sdk)는 **GA Engine**의 **GA Core**(라이브러리, `import ga`)입니다. 사람이 쓰는 입구는 **GA CLI**(`ga ...`)와 **GA UI**(`ga ui`, 로컬 브라우저 페이지)입니다. 명령을 외울 필요 없이 물어보면 됩니다.
+
+```sh
+python3 -m venv ~/ga-venv && source ~/ga-venv/bin/activate
+pip install "git+https://github.com/cogito5170/ga-sdk"
+ga ask "뭐 할 수 있어?"        # 할 수 있는 것 목록 (모델 안 씀)
+ga ui                          # 같은 기능을 브라우저에서 (127.0.0.1에서만 열림)
+```
+
+- `ga ask "<한국어나 영어 질문>"`: 질문을 정해진 동작 하나로 바꿉니다. 고르는 것은 모델이 아니라 ga의 규칙(키워드)입니다. 맞는 것이 없으면 가까운 셋을 보여 주고, 추측해서 실행하지 않습니다.
+  - 무료: 도움말, 상태(새 메일 · 마지막 실행 · 오늘 토큰), 다음 지시, 사용량(`ga ask "오늘 얼마나 썼어?"`), 진단(`ga ask "왜 안 돼?"`), 멈추기.
+  - 확인 필요: 다음 지시 실행(agy 토큰 사용), 보고서 보내기(메일). 실행 전에 무엇을 돌리는지, agy 턴 수, 예상 토큰(턴당 약 1만, 측정값이 있으면 그 값)을 보여 주고 y/N을 묻습니다. `--yes`는 메일에만 통하고 토큰을 쓰는 동작에는 통하지 않습니다.
+  - 하루 agy 턴 한도는 10입니다(`~/.ga-ask/ask.json`의 `daily_agy_turns`로 바꿀 수 있음).
+- `ga ask --model "질문"`: agy 1턴, 도구 끔, 질문과 문맥 1,500토큰 이하. 확인 후 실행합니다.
+- `ga ask --solve "풀 문제"`: ga가 바깥에서 `ga supervise` 루프 하나를 돌립니다(기본 agv `gpt-oss-120b-medium`, 턴 한도 8, 도구는 ga의 표에 있는 것만). 턴마다 입력·출력 토큰과 초를 한 줄씩 보여 주고, 끝에 합계와 고정 오버헤드 비중을 날짜별 기록(`~/.ga-ask/ledger.jsonl`)에 남깁니다. `--backend openai_http --base-url http://127.0.0.1:8080/v1`로 로컬 서버도 쓸 수 있습니다.
+- `ga bridge --config ~/agy-bridge.json [--once]`: 허브의 지시를 agy로 돌리고 보고를 돌려보냅니다(기존 `~/agy-bridge.json` 그대로). 503 용량 부족은 한 번 다시 해 보고, 그래도 안 되면 `capacity`로 보고합니다(할당량과 구분).
+- 기다리는 일은 코드가 합니다: 실행 기록 파일을 읽어 진행을 보여 줄 뿐, 기다리는 동안 모델을 부르지 않습니다.
+
+> **Antigravity 채팅으로 ga 루프를 돌리지 마세요.** 채팅 모델은 기다리거나 상태를 볼 때마다 대화 전체를 다시 읽어 주간 할당량을 크게 씁니다(BD-386: 작은 일 두 개에 약 60%). 일반 터미널에서 `ga ask`/`ga bridge`를 쓰거나 `ga ui`를 여세요. Antigravity 터미널 샌드박스가 `~/ga-venv/bin/ga`를 막으면(`operation not permitted`) Terminal.app에서 실행하세요.
 
 ## 설치
 

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GA UI</title>
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>GA UI</h1>
+  <p id="today" aria-live="polite">오늘 사용량 불러오는 중…</p>
+</header>
+<main>
+  <section aria-labelledby="ask-h">
+    <h2 id="ask-h">물어보기</h2>
+    <form id="ask-form">
+      <label for="q">질문 (한국어나 영어)</label>
+      <div class="row">
+        <input id="q" name="q" autocomplete="off" placeholder="예: 뭐 할 수 있어? · 새 메일 왔어? · 오늘 얼마나 썼어?">
+        <button type="submit">묻기</button>
+      </div>
+    </form>
+    <p id="answer" aria-live="polite"></p>
+    <div id="intents" class="chips" aria-label="바로 실행"></div>
+  </section>
+  <section aria-labelledby="solve-h">
+    <h2 id="solve-h">문제 풀기 (Solve)</h2>
+    <form id="solve-form">
+      <label for="sq">풀 문제</label>
+      <textarea id="sq" rows="3" placeholder="예: README를 읽고 설치 방법을 세 줄로 정리해 줘"></textarea>
+      <div class="row small">
+        <label>백엔드 <input id="sbackend" size="12"></label>
+        <label>모델 <input id="smodel" size="22"></label>
+        <label>턴 한도 <input id="scap" size="3" inputmode="numeric"></label>
+        <label>base_url <input id="sbase" size="24" placeholder="openai_http일 때"></label>
+      </div>
+      <button type="submit">계획 보기</button>
+    </form>
+  </section>
+  <section aria-labelledby="log-h">
+    <h2 id="log-h">실행 기록 <span id="run-id"></span></h2>
+    <pre id="log" aria-live="polite"></pre>
+  </section>
+</main>
+<dialog id="confirm">
+  <h2>실행할까요?</h2>
+  <ul id="confirm-lines"></ul>
+  <div class="row">
+    <button id="confirm-yes" type="button">실행</button>
+    <button id="confirm-no" type="button">취소</button>
+  </div>
+</dialog>
+</body>
+</html>
