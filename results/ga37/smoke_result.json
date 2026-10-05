@@ -1,0 +1,257 @@
+{
+ "model": "claude-haiku-4-5-20251001",
+ "backend": "claude_cli (bare)",
+ "claude_p_runs": 3,
+ "runs": [
+  {
+   "request": "할 일 목록에 완료 항목 숨기기 토글을 추가해줘",
+   "exit": 0,
+   "status": "paused",
+   "turns": 2,
+   "tokens": {
+    "input": 2647,
+    "output": 6828,
+    "cache_read": 0,
+    "cache_creation": 0
+   },
+   "summary_tokens": 60,
+   "valid_task1": true,
+   "notes": [
+    "[soft] task:review $.acceptance[3].kind: review: only for what no command, file or observable can check"
+   ],
+   "spec": {
+    "acceptance": [
+     {
+      "check": "npm run build",
+      "id": "A1",
+      "kind": "command"
+     },
+     {
+      "check": "npm test",
+      "id": "A2",
+      "kind": "command"
+     },
+     {
+      "check": "src/TodoList.tsx",
+      "id": "A3",
+      "kind": "file"
+     },
+     {
+      "check": "토글 버튼이 렌더링되고 클릭 시 완료 항목의 표시 상태가 변경됨",
+      "id": "A4",
+      "kind": "review",
+      "rubric": [
+       "토글 버튼이 화면에 표시된다",
+       "토글을 클릭하면 완료된 항목이 숨겨진다",
+       "다시 클릭하면 완료된 항목이 표시된다"
+      ]
+     }
+    ],
+    "assumptions": [
+     {
+      "default": "completed (boolean 타입)",
+      "text": "항목 객체의 완료 상태 속성명"
+     },
+     {
+      "default": "React useState 훅 사용",
+      "text": "토글 상태 관리 방식"
+     }
+    ],
+    "constraints": [
+     "TypeScript 타입 사용",
+     "React 함수형 컴포넌트 스타일 유지",
+     "기존 코드 구조와 호환성 유지"
+    ],
+    "deliverables": [
+     {
+      "id": "V1",
+      "what": "완료 항목 필터 상태와 필터링 로직이 적용된 TodoList 컴포넌트",
+      "where": "src/TodoList.tsx"
+     },
+     {
+      "id": "V2",
+      "what": "토글 버튼이 포함된 App 컴포넌트",
+      "where": "src/App.tsx"
+     }
+    ],
+    "goal": "할 일 목록에 완료 항목을 표시/숨기는 토글 기능을 추가합니다.",
+    "id": "T-eac2fe49",
+    "non_goals": [
+     "추가 필터 옵션 구현",
+     "토글 상태 로컬 스토리지 저장",
+     "UI 스타일 변경"
+    ],
+    "questions": [],
+    "repo": {
+     "build_cmds": [
+      "npm run build"
+     ],
+     "languages": {
+      "typescript": 3
+     },
+     "test_cmds": [
+      "npm test"
+     ]
+    },
+    "request": "할 일 목록에 완료 항목 숨기기 토글을 추가해줘",
+    "risks": [
+     "기존 테스트 케이스가 새로운 필터링 로직에 대응 필요",
+     "페이지 새로고침 시 토글 상태 초기화됨 (별도 persist 메커니즘 없는 경우)"
+    ],
+    "schema": "task/1"
+   },
+   "stderr": [
+    "ga do: claude_cli claude-haiku-4-5-20251001 (by flag); repo summary first",
+    "ga do: turn 1 (intake) on claude_cli claude-haiku-4-5-20251001 ...",
+    "ga do: ... still waiting on claude_cli (5.0s)",
+    "ga do: ... still waiting on claude_cli (10.0s)",
+    "ga do: ... still waiting on claude_cli (15.0s)",
+    "ga do: ... still waiting on claude_cli (20.0s)",
+    "ga do: ... still waiting on claude_cli (25.0s)",
+    "ga do: turn 1 in 965 / out 3302 tokens",
+    "ga do: turn 2 (repair) on claude_cli claude-haiku-4-5-20251001 ...",
+    "ga do: ... still waiting on claude_cli (5.0s)",
+    "ga do: ... still waiting on claude_cli (10.0s)",
+    "ga do: ... still waiting on claude_cli (15.0s)",
+    "ga do: ... still waiting on claude_cli (20.0s)",
+    "ga do: ... still waiting on claude_cli (25.0s)",
+    "ga do: ... still waiting on claude_cli (30.0s)",
+    "ga do: turn 2 in 1682 / out 3526 tokens",
+    "ga do: ready; /tmp/ga37-smoke-xr4j3_gr/.ga/tasks/T-eac2fe49/summary.md; tokens in 2647 out 6828 cache_read 0 over 2 turn(s)"
+   ]
+  },
+  {
+   "request": "add a due date field to each todo item",
+   "exit": 1,
+   "status": "blocked",
+   "turns": 1,
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0
+   },
+   "summary_tokens": 60,
+   "valid_task1": false,
+   "notes": [],
+   "spec": null,
+   "stderr": [
+    "ga do: claude_cli claude-haiku-4-5-20251001 (by flag); repo summary first",
+    "ga do: turn 1 (intake) on claude_cli claude-haiku-4-5-20251001 ...",
+    "ga do: turn 1 failed: smoke budget: 2 claude -p runs",
+    "ga do: blocked; /tmp/ga37-smoke-xr4j3_gr/.ga/tasks/T-ca6b5834/summary.md; tokens in 0 out 0 cache_read 0 over 1 turn(s)"
+   ]
+  }
+ ],
+ "raw_usage": [
+  {
+   "usage": {
+    "input_tokens": 965,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 3302,
+    "output_tokens_details": {
+     "thinking_tokens": 2544
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 0,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+     {
+      "input_tokens": 965,
+      "output_tokens": 3302,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "total_cost_usd": 0.017475,
+   "duration_ms": 25875,
+   "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+     "inputTokens": 965,
+     "outputTokens": 3302,
+     "cacheReadInputTokens": 0,
+     "cacheCreationInputTokens": 0,
+     "webSearchRequests": 0,
+     "costUSD": 0.017475,
+     "contextWindow": 200000,
+     "maxOutputTokens": 32000,
+     "thinkingTokens": 2544,
+     "canonicalModel": "claude-haiku-4-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   }
+  },
+  {
+   "usage": {
+    "input_tokens": 1682,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 3526,
+    "output_tokens_details": {
+     "thinking_tokens": 2768
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 0,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+     {
+      "input_tokens": 1682,
+      "output_tokens": 3526,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "total_cost_usd": 0.019312,
+   "duration_ms": 33705,
+   "modelUsage": {
+    "claude-haiku-4-5-20251001": {
+     "inputTokens": 1682,
+     "outputTokens": 3526,
+     "cacheReadInputTokens": 0,
+     "cacheCreationInputTokens": 0,
+     "webSearchRequests": 0,
+     "costUSD": 0.019312,
+     "contextWindow": 200000,
+     "maxOutputTokens": 32000,
+     "thinkingTokens": 2768,
+     "canonicalModel": "claude-haiku-4-5",
+     "provider": "firstParty",
+     "costBasis": "list"
+    }
+   }
+  }
+ ],
+ "ledger_rows": 3
+}

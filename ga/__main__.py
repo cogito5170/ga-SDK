@@ -600,6 +600,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--json", action="store_true"); p.add_argument("--fail", action="store_true", help="exit 1 on an alarm")
     p.set_defaults(fn=cmd_usage)
     sub.add_parser("rlo", add_help=False, help="rlo Autonomy commands (ga.rlo, owned by GR)")  # listed here, run above
+    from .intake.cli import add_parser as _add_do  # CMD-GA37: ga do
+    _add_do(sub)
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
         ap.error("prompt needs SESSION or --hub")

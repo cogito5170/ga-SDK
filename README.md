@@ -420,3 +420,36 @@ failure/dependency; surviving mutation or no test counts or a bad report head �
 Per-repo config: `<repo>/.ga-judge.json` (`dist`, `extras`, `test`, `test_named`, `pinned`, `pip_args`, `pythonpath`, `repo`,
 `timeout`; `{python}` is the venv interpreter). Mutation spec: a JSON list of `{id, file, find, replace, tests}`; this repo's
 is `.ga-judge.mutations.json`.
+
+## `ga do`: a request becomes a checked task/1 spec, on any backend (CMD-GA37, BD-394)
+
+```
+ga do "가격 페이지에 연간 요금 토글을 추가해줘"          # backend/model: --backend/--model, else <repo>/ga-do.json, else the router
+ga do --dry-run "fix the flaky login test"             # the repo summary and its token count; no model
+```
+
+1. Code summarizes the repo (ga/intake/summary.py): languages by file count, test/build commands from package.json,
+   pyproject.toml, Makefile, Cargo.toml, go.mod, the top-level tree, the README head, and the backend/model keys of a ga
+   config. The summary stays under 2,000 tokens.
+2. One model turn. The instruction text and output form (ga/intake/prompt.py) are the same bytes for agv, claude_cli,
+   codex_cli, openai_http and anthropic_http. Backends with a system channel get it as the system prompt; the others
+   get it in front of the message. claude_cli always runs bare (`--tools ""`). agv cannot turn its tools off, so its
+   measured overhead (11,124 input tokens per turn) is written on each of its ledger rows.
+3. Code fills `schema`, `id`, `request` and `repo`, then checks the result as task/1 (ga/forms/task.py):
+   - Each acceptance item must be one of: a runnable command, a path, or an observable result with a number or a
+     quoted literal. Kind `review` needs a rubric.
+   - Vague words with no measure are flagged (good, fast, clean, properly, 적절히, 잘, 깔끔하게, 빠르게 …).
+   - A question's `needs` must be credential, budget, new_repo or irreversible. Any other gap is an assumption with a
+     default.
+4. If the check finds problems, there is one repair turn. It carries the problems and the answer they refer to, but not
+   the request or the summary. If problems remain after that, the status is `blocked`.
+
+Outputs:
+- `.ga/tasks/<id>/task.json`
+- `summary.md`, for a person (in Korean if the request is in Korean)
+- `report.json`: report/2-shaped, with status `paused` and next stage `planner` until GA40 exists
+- per turn, one L0 `run.end` in `.ga/telemetry.jsonl` and one row in `.ga/ledger/<UTC day>.jsonl` (backend, model,
+  input/output/cache tokens, seconds, problems)
+
+Progress goes to stderr while a turn runs. Exit codes: 0 ready, 1 blocked, 2 config error.
+Tests: `tests/test_ga37.py` (golden set: `tests/fixtures/ga37/golden.json`); mutations: `tests/mutations_ga37.py`.
