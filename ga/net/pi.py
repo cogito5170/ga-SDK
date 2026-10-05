@@ -1,8 +1,7 @@
 """pi_ij and activation (CMD-GA31 S2): the NET4 functions (MS ``ms.network``, 937115144c83).
 
-ga core is standard library only and the pinned rlo-sdk carries an MS without ``ms.network``, so this module uses MS's
-functions when they import and otherwise this port of the same formulas (tests check both give the same numbers when
-MS is there). pi is derived State of the node (``pi.json``), never an L0 field.
+ga core is standard library only: this module uses ms.network when the NET path is on (ga-sdk[net], ga.net.real) and
+otherwise this port of the same formulas (tests/test_ga32_net.py runs both and checks the same numbers). pi is derived State of the node (``pi.json``), never an L0 field.
 
     pi = r * (w_u*u + w_g*g + w_t*t)   u usefulness (prior 1/2) · g information gain · t trust (prior 1/2) · r relevance
 """
@@ -11,12 +10,21 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
-try:  # pragma: no cover - depends on the installed MS
-    from ms import network as _ms  # type: ignore
-    SOURCE = "ms.network"
-except Exception:  # noqa: BLE001 - MS absent or older than NET4
-    _ms = None
-    SOURCE = "ga.net.pi (port of ms.network 937115144c83)"
+from . import real
+
+SOURCE_NET, SOURCE_PORT = "ms.network", "ga.net.pi (port of ms.network)"
+
+
+def _ms():
+    """ms.network on the NET path (ga-sdk[net], CMD-GA32), else None: the port below runs."""
+    if not real.enabled():
+        return None
+    from ms import network  # type: ignore
+    return network
+
+
+def source() -> str:
+    return SOURCE_NET if _ms() is not None else SOURCE_PORT
 
 
 @dataclass(frozen=True)
@@ -74,15 +82,23 @@ def _pi_port(inter, obs, required, exported, now, cfg: NetConfig) -> float:
 
 
 def pi(inter, obs, required, exported, now, cfg: NetConfig = NetConfig()) -> float:
-    if _ms is not None:
-        mc = _ms.NetConfig(window=cfg.window, half_life=cfg.half_life, weights=cfg.weights, theta=cfg.theta)
-        return _ms.pi([_ms.Interaction(**asdict(x)) for x in inter], [_ms.Observation(o.ts, o.invalid) for o in obs],
-                      required, exported, now, mc)
+    ms = _ms()
+    if ms is not None:
+        mc = ms.NetConfig(window=cfg.window, half_life=cfg.half_life, weights=cfg.weights, theta=cfg.theta)
+        return ms.pi([ms.Interaction(**asdict(x)) for x in inter], [ms.Observation(o.ts, o.invalid) for o in obs],
+                     required, exported, now, mc)
     return _pi_port(inter, obs, required, exported, now, cfg)
 
 
 def activate(i: str, j: str, pi_ij: float, cfg: NetConfig, *, missing=(), covers=None, verify_open=False):
     """(send?, reason) -- reason pi · required · verify · none (ms.network.activate, the flag given as a bool)."""
+    ms = _ms()
+    if ms is not None:
+        flags = ms.VerifyFlags()
+        if verify_open:
+            flags.open(i, j)
+        mc = ms.NetConfig(window=cfg.window, half_life=cfg.half_life, weights=cfg.weights, theta=cfg.theta)
+        return ms.activate(i, j, pi_ij, mc, missing=missing, covers=covers, flags=flags)
     if pi_ij >= cfg.theta:
         return True, "pi"
     covers = covers or {}
@@ -117,5 +133,5 @@ class Edges:
         return v
 
     def to_dict(self) -> dict[str, Any]:
-        return {"schema": "ga-node-pi/1", "source": SOURCE, "interactions": self.inter, "observations": self.obs,
+        return {"schema": "ga-node-pi/1", "source": source(), "interactions": self.inter, "observations": self.obs,
                 "flags": self.flags, "pi": self.values}

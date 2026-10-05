@@ -17,11 +17,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from . import real
 from .pi import Edges, NetConfig, activate
 
 PURPOSE = "peer_interaction"
 ACTIONS = ("consult", "send", "skip")
 DEFAULT_ACTION = "skip"
+
+
+def purpose(missing: list[str], uncertain: list[str]) -> dict[str, Any]:
+    """The purpose this node's decision asks DC about: name, action names, default, and the refs it reads.
+
+    NET path: dc's own ``peer_interaction_purpose`` (refs filled from the node's missing and uncertain refs); fallback:
+    the same facts from this module's constants. ``ga node step`` records it, and the tests compare the two.
+    """
+    own = list(dict.fromkeys(list(missing) + list(uncertain)))
+    if real.enabled():
+        from dc.peer import peer_interaction_purpose  # type: ignore
+        p = peer_interaction_purpose(missing, uncertain)
+        return {"name": p.name, "actions": [a.name for a in p.actions], "default": p.default_decision[0],
+                "required": sorted(f"{r.role}.{r.name}" for r in p.refs if r.required),
+                "optional": sorted({f"{r.source}:{r.role}" for r in p.refs if not r.required})}
+    return {"name": PURPOSE, "actions": list(ACTIONS), "default": DEFAULT_ACTION, "required": sorted(own),
+            "optional": ["net:pi", "peer:peer"] if own else ["net:pi"]}
 
 
 @dataclass(frozen=True)

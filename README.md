@@ -8,6 +8,8 @@
 
 ```sh
 pip install -e .
+# optional: the real NET packages for peer mode (ga/net falls back to thin adapters without them)
+# pip install -e '.[net]'
 ```
 
 - **One ga (CMD-GA20, BD-206):** installing ga-sdk also installs `rlo-sdk[sensor]`, pinned by sha (`ga/_pins.py` is the source; `pyproject.toml` must say the same, and `tests/test_unified.py` checks both, plus the installed metadata in a clean venv). rlo's seven layers stay in their own repositories; ga copies none of their code.
@@ -256,7 +258,7 @@ from the lowest priority and the drops are recorded in the pack head; a directiv
 The turn's answer must hold a report/2 and one ```` ```state ```` block: ga checks both, posts the report, writes the state
 file and only then moves the cursor; an answer that fails the check is a failed turn (`answer:<why>`), never retried.
 Every turn's usage, served model and answer text land in `TurnResult`; each turn is a Telemetry L0 `run.end` record in
-`.ga/telemetry/<s>.jsonl`. `runner.context_budget: {soft, hard, mode}` writes the rlo 0.11.0 context-budget/1 hook
+`.ga/telemetry/<s>.jsonl`. `runner.context_budget: {soft, hard, mode}` writes the rlo 0.11.1 context-budget/1 hook
 (`ga/adapters/budget_hook.py`, shadow by default) into the fresh turn's own settings in the runner's per-session dir only.
 `runner.tools` / `runner.system_prompt` narrow the child's fixed cost. Measured: `results/ga29/table.md`
 (`examples/ga29_measure.py`).

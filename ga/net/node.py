@@ -219,6 +219,9 @@ class Node:
         can = lambda ref: rt.can(self.ref_needs(ref)) and bool(self.ref_needs(ref))  # noqa: E731
         decisions = dc.decide(self.me, st, self.required, self.exports(), edges, self.netcfg, now,
                               can_observe=can, ref_needs=self.ref_needs)
+        allowed = set(dc.purpose(st.missing(self.required), st.uncertain())["actions"]) | {"observe"}
+        decisions = [d if d.action in allowed else dc.Decision(dc.DEFAULT_ACTION, d.ref, d.peer, "not in purpose")
+                     for d in decisions]  # the purpose names the actions; anything else is the default (skip)
         out["decisions"] = [[d.action, d.ref, d.peer, d.reason] for d in decisions]
         for d in decisions:
             if d.action == "consult":

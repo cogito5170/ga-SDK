@@ -1,7 +1,7 @@
 """One Telemetry L0 record per session turn (CMD-GA29 S3): a ``run.end`` event in the l0-telemetry/1 envelope.
 
 ga core stays standard library only, so the envelope is written here by hand; tests check it with
-``telemetry.event.check`` (l0-telemetry, pinned through rlo-sdk 0.11.0). Only what the runner reported goes in:
+``telemetry.event.check`` (l0-telemetry, pinned through rlo-sdk 0.11.1). Only what the runner reported goes in:
 a field it did not give is null and listed in ``unobserved`` (never 0).
 """
 from __future__ import annotations
@@ -64,6 +64,12 @@ def peer_message(direction: str, run_id: str, seq: int, *, sender: str, to: str,
         raise ValueError("direction: sent or received")
     if not msg_id:
         raise ValueError("a peer message event needs msg_id")
+    from .net import real
+    if real.enabled() and schema is not None:  # l0-telemetry builds it (NET1): same envelope, bytes as ga counted them
+        from telemetry import event
+        return event.make(f"peer.message.{direction}", run_id, seq, source, from_session=sender, to_session=to,
+                          msg_id=msg_id, in_reply_to=in_reply_to, schema=schema, bytes=nbytes,
+                          tokens_est=-(-nbytes // 4))
     data = {"from_session": sender, "to_session": to, "msg_id": msg_id, "in_reply_to": in_reply_to,
             "schema": schema, "bytes": nbytes, "tokens_est": -(-nbytes // 4)}
     return {"spec": SPEC, "id": f"{run_id}:{seq}", "type": f"peer.message.{direction}", "run_id": run_id, "seq": seq,

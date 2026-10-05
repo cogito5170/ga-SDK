@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-CONTRACT = "llmsensor.state-export/2"
+CONTRACT = "llmsensor.state-export/2"  # dc.sources.SENSOR_CONTRACT (tests/test_ga32_net.py checks it)
 
 
 @dataclass

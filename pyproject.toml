@@ -4,16 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ga-sdk"
-version = "0.4.0"
+version = "0.5.0"
 description = "Hub loop SDK: directive / report / verdict forms, integration, rules, gates, records"
 requires-python = ">=3.10"
 # the source of these pins is ga/_pins.py; this list must say the same (tests/test_pins.py)
 dependencies = [
-    "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@063b861df32e783f5cacde5db079187965a82f5c",
+    "rlo-sdk[sensor] @ git+https://github.com/cogito5170/rlo-SDK@0d92a3de3fed6c67eb6643859588179107977cbd",
 ]
 
 [project.optional-dependencies]
 agent = ["claude-agent-sdk>=0.2"]
+net = [  # the real NET packages (ga/net uses them when installed); the source is ga/_pins.py NET_PINS (tests/test_ga32_net.py)
+    "l0-telemetry @ git+https://github.com/cogito5170/Telemetry@f6c7ae26d336965d3558092517e97d37d222c4ea",
+    "llmsensor @ git+https://github.com/cogito5170/Sensor@ff17bddfd24f6d8cf9c14c0c45107b53818dd26a",
+    "dc @ git+https://github.com/cogito5170/DC@7e0ac1494192e49ab03c687c79f7156cb38abcec",
+    "ms @ git+https://github.com/cogito5170/MS@1f1018e0348428c9b83af4f6679659f0057e3f4b",
+    "action-contract @ git+https://github.com/cogito5170/action@9d6729fc6809d68d2b5d55b4ad2fd37e5281d998",
+]
 http = ["httpx>=0.25"]  # openai_http · anthropic_http (CMD-GA28); the other backends need nothing more
 
 [project.entry-points."ga.backends"]  # the built-ins load through the same path as an installed plugin (agv first)
