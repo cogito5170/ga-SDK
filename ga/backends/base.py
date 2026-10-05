@@ -22,8 +22,10 @@ are ga's and do not depend on the backend. Standard library only.
 """
 from __future__ import annotations
 
+import re
+import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from ..adapters.gemini_cli import GeminiError, GeminiRateLimited, ModelMismatch, quota_body
 
@@ -34,7 +36,22 @@ BackendError = GeminiError        # a failed turn; ``reason`` is a label, never 
 RateLimited = GeminiRateLimited   # kind minute · day (agv: quota · credits); status/body as rlo's Governor reads them
 
 __all__ = ["API_VERSION", "USAGE_FORMATS", "BackendError", "RateLimited", "ModelMismatch", "ConfigError",
-           "BackendTurn", "check_served", "rate_limited", "quota_body"]
+           "BackendTurn", "check_served", "rate_limited", "quota_body", "Transient", "transient_code",
+           "TRANSIENT_BACKOFF_S", "retry_transient"]
+
+# CMD-GA41 S3: the server's own passing trouble (500 INTERNAL, 502, 503 UNAVAILABLE / MODEL_CAPACITY_EXHAUSTED, 504,
+# 529 overloaded) is ``transient``: the loop retries the turn once after a short backoff, then the step fails with the
+# reason ``transient:<code>``. A quota or rate limit is not transient (RateLimited: parked as before).
+TRANSIENT_BACKOFF_S = 20.0
+TRANSIENT_STATUS = (500, 502, 503, 504, 529)
+_TRANSIENT_TEXT = (
+    (re.compile(r"MODEL_CAPACITY_EXHAUSTED|(?-i:\bUNAVAILABLE\b)|\b503\b.{0,40}\bcapacity|\bcapacity\b.{0,40}\b503\b"
+                r"|\(code 503\)", re.I), 503),
+    (re.compile(r"(?-i:\bINTERNAL\b)|\(code 500\)|\binternal server error\b", re.I), 500),
+    (re.compile(r"\boverloaded(?:_error)?\b|\(code 529\)", re.I), 529),
+    (re.compile(r"(?-i:\bBAD_GATEWAY\b)|\(code 502\)", re.I), 502),
+    (re.compile(r"(?-i:\bDEADLINE_EXCEEDED\b|\bGATEWAY_TIMEOUT\b)|\(code 504\)", re.I), 504),
+)
 
 
 class ConfigError(ValueError):
@@ -77,3 +94,37 @@ def rate_limited(retry_after: Any = None) -> RateLimited:
     except (TypeError, ValueError):
         hint = None
     return RateLimited("minute", hint if hint is not None and hint >= 0 else None, via="status")
+
+
+class Transient(GeminiError):
+    """A turn the server failed for a passing reason (S3): ``code`` 500 · 502 · 503 · 504 · 529; reason
+    ``transient:<code>``. A label only, never provider text."""
+
+    def __init__(self, code: int):
+        super().__init__(f"transient:{int(code)}", int(code))
+        self.code = int(code)
+
+
+def transient_code(text: str = "", status: int | None = None) -> int | None:
+    """The transient class of an error: an HTTP status in TRANSIENT_STATUS, or a server text (agy's 'API error
+    (attempt 3): INTERNAL (code 500)', 503 MODEL_CAPACITY_EXHAUSTED, Anthropic's overloaded_error); None otherwise."""
+    if isinstance(status, int) and status in TRANSIENT_STATUS:
+        return status
+    for rx, code in _TRANSIENT_TEXT:
+        if text and rx.search(text):
+            return code
+    return None
+
+
+def retry_transient(call: Callable[[], Any], *, backoff_s: float = TRANSIENT_BACKOFF_S,
+                    sleep: Callable[[float], None] = time.sleep,
+                    on_retry: Callable[[Transient], None] | None = None) -> Any:
+    """``call()``; on Transient once more after ``backoff_s``; a second Transient is raised (the step fails as
+    ``transient:<code>``). Exactly one retry: never zero, never more."""
+    try:
+        return call()
+    except Transient as e:
+        if on_retry is not None:
+            on_retry(e)
+        sleep(float(backoff_s))
+    return call()

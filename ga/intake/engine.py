@@ -47,6 +47,7 @@ class Turn:
     output: int | None = None
     cache_read: int | None = None
     cache_creation: int | None = None
+    thinking: int | None = None    # thinking tokens when the provider reports them apart (GA41 S6)
     seconds: float = 0.0
     overhead_tokens: Any = None    # the backend's fixed per-turn overhead when it is not bare (S3), else None
     prompt_tokens: int = 0         # ga's estimate of what it sent (system + prompt)
@@ -195,12 +196,16 @@ def _run_with_progress(fn: Callable[[], Any], on_progress: Callable[[dict], None
 class Intake:
     def __init__(self, runner: Any, *, backend: str, model: str, ga_dir: str | Path,
                  overhead: Any = None, on_progress: Callable[[dict], None] | None = None,
-                 clock: Callable[[], float] = time.time, wait_every_s: float = 5.0):
+                 clock: Callable[[], float] = time.time, wait_every_s: float = 5.0,
+                 sleep: Callable[[float], None] = time.sleep, transient_backoff_s: float | None = None):
         self.runner, self.backend, self.model = runner, backend, model
         self.ga_dir = Path(ga_dir)
         self.bare = bool(getattr(runner, "bare", False))
         self.overhead = None if self.bare else overhead
         self.on_progress, self.clock, self.wait_every_s = on_progress, clock, wait_every_s
+        from ..backends.base import TRANSIENT_BACKOFF_S
+        self.sleep = sleep
+        self.transient_backoff_s = TRANSIENT_BACKOFF_S if transient_backoff_s is None else transient_backoff_s
 
     # ---- one turn: the same text for every backend, only the channel differs
     def send(self, text: str) -> tuple[dict[str, str | None], Callable[[], Any]]:
@@ -232,10 +237,14 @@ class Intake:
         t0 = time.monotonic()
         answer = None
         try:
-            bt = _run_with_progress(call, self.on_progress, info, self.wait_every_s)
+            from ..backends.base import retry_transient
+            bt = _run_with_progress(lambda: retry_transient(call, backoff_s=self.transient_backoff_s, sleep=self.sleep),
+                                    self.on_progress, info, self.wait_every_s)  # GA41 S3: one retry of a transient
             answer = bt.answer
             for k, v in usage_counts(bt.usage, bt.usage_format).items():
                 setattr(t, k, v)
+            from ..gemini import thinking_tokens
+            t.thinking = thinking_tokens(bt.usage)
             t.seconds = float(bt.seconds or round(time.monotonic() - t0, 3))
         except Exception as e:  # a failed turn is a row and a blocked intake, never a crash
             t.error = str(getattr(e, "reason", "") or type(e).__name__)[:80]

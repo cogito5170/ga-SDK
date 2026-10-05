@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ga.adapters import sandbox
 from ga.adapters.git import git
+from ga.paths import real
 
 from test_headless import Stub
 from world import World, directive
@@ -144,10 +145,11 @@ class CloneIsolationTest(unittest.TestCase):
         w.vcs.fetch("alpha")
         self.assertEqual(w.vcs.session_head("alpha", "A"), git(ws, "rev-parse", "HEAD"))
         paths = w.hub.sandbox_paths("A")
-        self.assertEqual(paths["writable"][0], str(w.ga / "worktrees" / "A"))
+        # real paths on both sides (GA41 S5): on macOS the temp dir is /var/..., the same directory as /private/var/...
+        self.assertEqual(paths["writable"][0], real(w.ga / "worktrees" / "A"))
         for r in ("alpha", "beta"):  # listed in their own right, wherever they live
-            self.assertIn(str((w.tmp / "remotes" / f"{r}.git").resolve()), paths["protect"])
-            self.assertIn(str(w.repos[r]), paths["protect"])
+            self.assertIn(real(w.tmp / "remotes" / f"{r}.git"), paths["protect"])
+            self.assertIn(real(w.repos[r]), paths["protect"])
 
     def test_only_its_own_branch_is_pulled(self):
         w = World()

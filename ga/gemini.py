@@ -86,6 +86,7 @@ class GeminiConfig:
     form: str = CONFIG_SCHEMA            # the config form it was read from: ga-gemini/1 or ga-supervise/1 (GA28)
     backend: str = ""                    # ga-supervise/1: the ga.backends plugin name
     options: dict[str, Any] = field(default_factory=dict)  # ga-supervise/1: that backend's options (no keys)
+    transient_backoff_s: float = 20.0    # GA41 S3: the one retry of a transient server error waits this long
 
     @property
     def active_model(self) -> str:
@@ -118,7 +119,8 @@ def config_problems(raw: Any) -> list[Problem]:
     if not isinstance(raw, dict):
         return [Problem("$", "must be an object")]
     known = {"schema", "model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps", "result_cap",
-             "turn_timeout_s", "est_tokens", "daily", "turn_status_s", "max_parallel", "host", "agy", "prompt_mode"}
+             "turn_timeout_s", "est_tokens", "daily", "turn_status_s", "max_parallel", "host", "agy", "prompt_mode",
+             "transient_backoff_s"}
     for k in sorted(set(raw) - known):
         bad(f"$.{k}", "unknown field")
     if raw.get("schema") != CONFIG_SCHEMA:
@@ -161,6 +163,10 @@ def config_problems(raw: Any) -> list[Problem]:
     for k in ("turn_timeout_s", "turn_status_s"):
         if k in raw and not (isinstance(raw[k], (int, float)) and not isinstance(raw[k], bool) and raw[k] > 0):
             bad(f"$.{k}", "must be a positive number")
+    if "transient_backoff_s" in raw and not (isinstance(raw["transient_backoff_s"], (int, float))
+                                             and not isinstance(raw["transient_backoff_s"], bool)
+                                             and raw["transient_backoff_s"] >= 0):
+        bad("$.transient_backoff_s", "must be a number >= 0")
     if "max_parallel" in raw and not (isinstance(raw["max_parallel"], int) and not isinstance(raw["max_parallel"], bool)
                                       and raw["max_parallel"] >= 1):
         bad("$.max_parallel", "must be an integer >= 1")
@@ -206,7 +212,7 @@ def config_problems(raw: Any) -> list[Problem]:
 
 SUPERVISE_FIELDS = {"schema", "backend", "model", "options", "budget", "tools", "mcp_servers", "state_dir",
                     "max_model_steps", "result_cap", "turn_timeout_s", "est_tokens", "daily", "turn_status_s",
-                    "max_parallel", "prompt_mode"}
+                    "max_parallel", "prompt_mode", "transient_backoff_s"}
 _SECRET_NAME = re.compile(r"(?i)(api_?key|^key$|token|secret|password|credential|auth)")
 _SECRET_VALUE = re.compile(r"^(sk-|sk_|AIza|xox[abp]-|ghp_|github_pat_|Bearer\s)")
 
@@ -257,7 +263,8 @@ def load_config(path: str | Path, backend: str | None = None) -> GeminiConfig:
         if probs:
             raise FormError(probs)
         kw = {k: raw[k] for k in ("tools", "mcp_servers", "max_model_steps", "result_cap", "turn_timeout_s",
-                                  "est_tokens", "turn_status_s", "max_parallel", "prompt_mode") if k in raw}
+                                  "est_tokens", "turn_status_s", "max_parallel", "prompt_mode", "transient_backoff_s")
+              if k in raw}
         return GeminiConfig(root=path.resolve().parent, model=raw["model"], budget=dict(raw.get("budget") or {}),
                             daily={**DAILY_DEFAULT, **raw.get("daily", {})}, state_dir=raw.get("state_dir", ".ga-supervise"),
                             form=SUPERVISE_SCHEMA, backend=backend or raw["backend"],
@@ -267,7 +274,7 @@ def load_config(path: str | Path, backend: str | None = None) -> GeminiConfig:
         raise FormError(probs)
     kw = {k: raw[k] for k in ("model", "cli", "budget", "tools", "mcp_servers", "state_dir", "max_model_steps",
                               "result_cap", "turn_timeout_s", "est_tokens", "turn_status_s", "max_parallel", "host",
-                              "prompt_mode")
+                              "prompt_mode", "transient_backoff_s")
           if k in raw}
     return GeminiConfig(root=path.resolve().parent, daily={**DAILY_DEFAULT, **raw.get("daily", {})},
                         agy={**AGY_DEFAULT, **raw.get("agy", {})}, **kw)
@@ -658,6 +665,42 @@ def _hhmmss(t: float) -> str:
     return time.strftime("%H:%M:%S", time.localtime(t))
 
 
+def tool_error_label(e: BaseException) -> str:
+    """A tool error as a label for the model (GA41 S2): the exception type and its first line, secret-shaped spans
+    withheld, capped — never a stack."""
+    from .act.card import redact
+    reason = getattr(e, "reason", None)
+    first = (str(reason) if isinstance(reason, str) and reason else str(e)).strip().splitlines()
+    text = f"{type(e).__name__}: {first[0][:160]}" if first and first[0] else type(e).__name__
+    return redact(text)[0][:200]
+
+
+def _add_usage(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    """Two turns' usage objects as one (a plan and its repair): numbers summed, the rest from the later turn."""
+    out = dict(a)
+    for k, v in (b or {}).items():
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and isinstance(out.get(k), (int, float)):
+            out[k] = out[k] + v
+        else:
+            out[k] = v
+    return out
+
+
+def thinking_tokens(usage: Any) -> int | None:
+    """Thinking (reasoning) tokens of a turn when the provider reports them apart (GA41 S6): OpenAI's
+    completion_tokens_details.reasoning_tokens / output_tokens_details, Gemini's thoughts_token_count. None otherwise."""
+    if not isinstance(usage, dict):
+        return None
+    for k in ("thoughts_token_count", "thoughtsTokenCount", "reasoning_tokens", "thinking_tokens"):
+        if isinstance(usage.get(k), int):
+            return usage[k]
+    for d in ("completion_tokens_details", "output_tokens_details"):
+        v = usage.get(d)
+        if isinstance(v, dict) and isinstance(v.get("reasoning_tokens"), int):
+            return v["reasoning_tokens"]
+    return None
+
+
 class Supervisor:
     def __init__(self, cfg: GeminiConfig, *, cli: Any = None, clock: Callable[[], float] = time.time,
                  sleep: Callable[[float], None] = time.sleep, out: TextIO | None = None):
@@ -698,6 +741,7 @@ class Supervisor:
         self.sched = None
         self._clients: dict[str, Any] = {}
         self._shown: tuple = ()
+        self._reasons: dict[str, str] = {}  # step id -> a failure label the Scheduler's type name would hide (GA41)
 
     # -- state · log --
     def load(self) -> bool:
@@ -788,14 +832,19 @@ class Supervisor:
             t0 = self.clock()
             try:
                 value = self._call_tool(rec)
-            except Exception as e:
-                self.log("tool", step=sid, tool=rec["tool"], ok=False, error=type(e).__name__)
-                raise
+            except Exception as e:  # GA41 S2: a failed tool step is a result the next model turn sees, not a failed task
+                label = tool_error_label(e)
+                value = f"{rec['tool']} failed: {label}"
+                with self._lock:
+                    self.st["tool_errors"] = int(self.st.get("tool_errors", 0)) + 1
+                self.log("tool", step=sid, tool=rec["tool"], ok=False, error=label[:120])
             preview = (value if isinstance(value, str) else json.dumps(value, ensure_ascii=False))[: self.cfg.result_cap]
             with self._lock:
                 _atomic_write(self.dir / "results" / f"{sid}.json", value)
                 self.st["done"].append(sid)
-            self.log("tool", step=sid, tool=rec["tool"], ok=True, chars=len(preview), seconds=round(self.clock() - t0, 3))
+            if not (isinstance(value, str) and value.startswith(f"{rec['tool']} failed: ")):
+                self.log("tool", step=sid, tool=rec["tool"], ok=True, chars=len(preview),
+                         seconds=round(self.clock() - t0, 3))
             self.save()
             return preview  # in memory: capped
         return run
@@ -814,16 +863,63 @@ class Supervisor:
             else:
                 self.say(f"[ga gemini] resumed {sid} after {waited:g} s")
                 self.log("resume", step=sid, waited_s=waited)
-        from .adapters.gemini_cli import GeminiRateLimited, quota_body
         bare = bool(getattr(self.cli, "bare", False))
         if bare:  # S5: the host's tools off, the protocol as its system prompt
             system, prompt = self._messages(rec)
             extra: dict[str, Any] = {"system": system}
         else:
             system, prompt, extra = "", self._prompt(rec), {}
+        turn, usage, fmt = self._one_turn(sid, prompt, system, extra, bare, "plan")
+        plan, probs = self._checked(sid, turn.text)
+        if probs:  # GA41 S1: one repair turn with the labels, the form's reminder and the answer itself; no task text
+            from . import repair
+            self.st["repairs"] = int(self.st.get("repairs", 0)) + 1
+            self.log("repair", step=sid, problems=probs[:5])
+            prompt = repair.plan_prompt(probs, self.cfg.plan_schema, turn.text or "")
+            turn, usage2, fmt = self._one_turn(sid, prompt, system, extra, bare, "repair")
+            usage = _add_usage(usage, usage2)
+            plan, probs = self._checked(sid, turn.text)
+            if probs:
+                self.log("plan", step=sid, ok=False, problems=",".join(probs[:5])[:200], repaired=False)
+                raise PlanError(",".join(probs[:5]))
         try:
-            turn = self.cli.run_turn(prompt, self.st.get("session_id"), on_wait=self._turn_wait(sid),
-                                     wait_every_s=self.cfg.turn_status_s, **extra)
+            self._extend(sid, plan)
+        except PlanError as e:
+            self.log("plan", step=sid, ok=False, problems=str(e)[:200])
+            raise
+        self.st["done"].append(sid)
+        self.save()
+        if fmt == "otel":
+            return {"usage": {k: usage[k] for k in ("input_tokens", "output_tokens", "total_tokens") if k in usage}}
+        return {"usage": dict(usage)}  # the provider's own shape; the Scheduler's ledger reads it as usage_format
+
+    def _checked(self, sid: str, text: str) -> tuple[Any, list[str]]:
+        """The answer's plan and its problems (labels): not_json, or check_plan's (the authority)."""
+        try:
+            plan = extract_plan(text if isinstance(text, str) else "")
+        except PlanError as e:
+            return None, [str(e)]
+        probs = check_plan(plan, self.cfg.tools)
+        spec_probs = spec_check(plan, self.cfg.tools)  # CMD-GA26: the same-spec check, beside it; labels only
+        if bool(probs) != bool(spec_probs):
+            self.log("check_disagree", step=sid, check_plan_ok=not probs, spec_ok=not spec_probs)
+        return plan, probs
+
+    def _one_turn(self, sid: str, prompt: str, system: str, extra: dict[str, Any], bare: bool,
+                  kind: str) -> tuple[Any, dict[str, Any], str | None]:
+        """One host turn (a plan or its repair), a transient server error retried once (GA41 S3), logged."""
+        from .adapters.gemini_cli import GeminiRateLimited, quota_body
+        from .backends.base import Transient, retry_transient
+
+        def retry_line(e: Transient) -> None:
+            b = self.cfg.transient_backoff_s
+            self.say(f"[ga gemini] {sid}: the server failed the turn ({e.reason}); one retry in {b:g} s")
+            self.log("transient", step=sid, reason=e.reason, backoff_s=b, kind=kind)
+        try:
+            turn = retry_transient(lambda: self.cli.run_turn(prompt, self.st.get("session_id"),
+                                                             on_wait=self._turn_wait(sid),
+                                                             wait_every_s=self.cfg.turn_status_s, **extra),
+                                   backoff_s=self.cfg.transient_backoff_s, sleep=self._sleep, on_retry=retry_line)
         except GeminiRateLimited as e:
             now = self.clock()
             if e.kind == "day":  # not a minute window: wait for the reset, then probe once
@@ -842,7 +938,9 @@ class Supervisor:
             self.log("turn", step=sid, ok=False, reason=e.reason, source=src, via=e.via, model=self.model)
             raise
         except GeminiError as e:
-            self.log("turn", step=sid, ok=False, reason=e.reason, model=self.model)
+            self.log("turn", step=sid, ok=False, reason=e.reason, model=self.model, kind=kind)
+            if isinstance(e, Transient):
+                self._reasons[sid] = e.reason  # the step fails as transient:<code>
             raise
         self.st["session_id"] = turn.session_id or self.st.get("session_id")
         from rlo.pspec import tokens as est
@@ -852,28 +950,13 @@ class Supervisor:
                  tokens=usage.get("total_tokens"), input_tokens=usage.get("input_tokens"),
                  output_tokens=usage.get("output_tokens", usage.get("completion_tokens")),  # GA36: ga ask --solve lines
                  provider_prompt_tokens=provider_prompt_tokens(usage, fmt), usage_format=fmt, bare=bare,
-                 prompt_est=est(prompt) + (est(system) if system else 0), prompt_mode=self.cfg.prompt_mode)
+                 prompt_est=est(prompt) + (est(system) if system else 0), prompt_mode=self.cfg.prompt_mode,
+                 kind=kind, thinking_tokens=thinking_tokens(usage))
         denied = list(getattr(turn, "denied", []) or [])
         if denied:  # agy refused tool calls inside the turn (V: denied_actions); reported, labels only
             self.say(f"[ga gemini] agy refused {len(denied)} action(s) in {sid}: {', '.join(denied[:8])}")
             self.log("denied", step=sid, count=len(denied), labels=sorted(set(denied))[:8])
-        try:
-            plan = extract_plan(turn.text)
-            probs = check_plan(plan, self.cfg.tools)  # the authority
-            spec_probs = spec_check(plan, self.cfg.tools)  # CMD-GA26: the same-spec check, beside it; labels only
-            if bool(probs) != bool(spec_probs):
-                self.log("check_disagree", step=sid, check_plan_ok=not probs, spec_ok=not spec_probs)
-            if probs:
-                raise PlanError(",".join(probs[:5]))
-            self._extend(sid, plan)
-        except PlanError as e:
-            self.log("plan", step=sid, ok=False, problems=str(e)[:200])
-            raise
-        self.st["done"].append(sid)
-        self.save()
-        if fmt == "otel":
-            return {"usage": {k: usage[k] for k in ("input_tokens", "output_tokens", "total_tokens") if k in usage}}
-        return {"usage": dict(usage)}  # the provider's own shape; the Scheduler's ledger reads it as usage_format
+        return turn, usage, fmt
 
     def _turn_wait(self, sid: str) -> Callable[[float], None]:
         """S7: a turn that runs long may be the CLI retrying a quota error inside the process (the preview model's
@@ -1035,17 +1118,18 @@ class Supervisor:
             for c in self._clients.values():
                 c.close()
             self._clients = {}
-        self.st["failed"] = dict(report.failed)
+        self.st["failed"] = {k: self._reasons.get(k, v) for k, v in report.failed.items()}
         self.st["status"] = "done" if report.ok else ("parked" if report.parked and not report.failed else "failed")
         self.save()
         models = sum(1 for r in self.st["steps"] if r["kind"] == "model" and r["id"] in self.st["done"])
         tools = sum(1 for r in self.st["steps"] if r["kind"] == "tool" and r["id"] in self.st["done"])
         self.log("end", task=self.st["task"], status=self.st["status"], model_turns=models, tool_steps=tools,
-                 failed=len(report.failed), skipped=len(report.skipped), slept_s=report.slept_s, sleeps=report.sleeps)
+                 failed=len(report.failed), skipped=len(report.skipped), slept_s=report.slept_s, sleeps=report.sleeps,
+                 repairs=int(self.st.get("repairs", 0)), tool_errors=int(self.st.get("tool_errors", 0)))
         head = (f"[ga gemini] {self.st['task']} {self.st['status']}: {models} model turn(s), {tools} tool step(s), "
                 f"{len(report.failed)} failed, waited {report.slept_s:g} s")
         if report.failed:
-            head += " — failed: " + ", ".join(f"{k} ({v})" for k, v in report.failed.items())
+            head += " — failed: " + ", ".join(f"{k} ({v})" for k, v in self.st["failed"].items())
         self.say(head + (("\n" + self.st["say"]) if self.st.get("say") else ""))
         return report.ok
 

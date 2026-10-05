@@ -234,7 +234,7 @@ class AgyAdapterCapacityTest(unittest.TestCase):
             r = AgvRunner([sys.executable, str(TESTS / "fake_agy.py")], "gpt-oss-120b-medium")
             with self.assertRaises(GeminiError) as cm:
                 r.run_turn("hello")
-            self.assertEqual(cm.exception.reason, "capacity")
+            self.assertEqual(cm.exception.reason, "transient:503")  # GA41 S3: the capacity class is transient
             self.assertNotIsInstance(cm.exception, GeminiRateLimited)
         finally:
             del os.environ["FAKE_AGY_DIR"]
@@ -252,7 +252,8 @@ class EndToEndTest(unittest.TestCase):
         self.addCleanup(os.environ.pop, "GA_ASK_HOME", None)
         (self.w.work / "ga-supervise.json").write_text(json.dumps({
             "schema": "ga-supervise/1", "backend": "agv", "model": "gpt-oss-120b-medium",
-            "options": {"cli": [sys.executable, str(TESTS / "fake_agy.py")]}, "tools": {}}))
+            "options": {"cli": [sys.executable, str(TESTS / "fake_agy.py")]}, "tools": {},
+            "transient_backoff_s": 0}))
         self.cfgfile = self.w.tmp / "agy-bridge.json"
         self.cfgfile.write_text(json.dumps({"mailbox_repo": str(self.w.tmp / "mac"), "workdir": str(self.w.work),
                                             "capacity_backoff_s": 0, "turn_timeout_s": 120}))
@@ -284,7 +285,8 @@ class EndToEndTest(unittest.TestCase):
         self.w.hub.send("AGY", form(DIRECTIVE), "baseline")
         bridge.main(["once", "--config", str(self.cfgfile)])
         head, _ = parse_text(list(self.w.hub.unread("baseline"))[0].text)
-        self.assertEqual(len([c for c in self.calls() if c["kind"] == "turn"]), 2)  # one retry (/usage probes are free)
+        # one retry (/usage probes are free): ga supervise retries the transient turn (GA41), the bridge not again
+        self.assertEqual(len([c for c in self.calls() if c["kind"] == "turn"]), 2)
         self.assertTrue(head["blockers"][0]["what"].startswith("capacity:"))
 
 

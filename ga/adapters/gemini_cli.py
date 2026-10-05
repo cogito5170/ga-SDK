@@ -239,6 +239,10 @@ class GeminiCLI:
         if q is not None:
             raise GeminiRateLimited(*q)
         if s.status != "success":
+            from ..backends.base import Transient, transient_code
+            code = transient_code(f"{s.error_type or ''} {s.error_message}")
+            if code is not None:  # GA41 S3: the server's passing trouble, retried once by the loop
+                raise Transient(code)
             raise GeminiError(f"result_{s.error_type or 'error'}"[:60])
         if s.cli_errors:
             raise GeminiError("cli_error")
