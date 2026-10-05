@@ -388,6 +388,39 @@ All keys are optional; a config without them behaves as in 0.6.
   the claude_cli stream-json tool uses are relayed as `turn.progress` (tool name and path only, at most 50 per turn).
 - **Item ids**: `CMD-<LETTERS><n>` or `<PREFIX>-<LETTERS>-<n>` (e.g. `W-FE-01`).
 
+## `ga act`: one work item, token-optimized (CMD-GA38, BD-394)
+
+The model answers only in a fixed text action format; code does the rest. No tool schemas in the prompt, no chat
+history: every turn is a fresh, fixed-size state card.
+
+```sh
+ga act --item item.json --backend claude_cli --model claude-haiku-4-5 [--repo .] [--max-turns 10] [--cap 6000]
+# item.json: {"id": "CMD-X1", "goal": "...", "files": ["src/**"], "done_when": "test"}   (done_when: a name or argv)
+# <repo>/.ga-act.json: {"commands": {"test": ["{python}", "-m", "unittest"], "lint": ["ruff", "check", "."]},
+#                       "done_when": "test", "timeout_s": 300}
+```
+
+- **Action format** (`ga/act/fmt.py`, about 300 tokens, the same bytes every turn): `EDIT <path>` with SEARCH/REPLACE
+  blocks (exact, unique), `NEW <path>` (CONTENT ... END), `RUN <name>`, `NEED symbol|file|grep`, `DONE`,
+  `BLOCKED <reason>`. Edits apply only inside the item's `files` globs (never `.git`/`.ga`, never outside the repo); a
+  SEARCH that does not match exactly once rejects only that block and its nearest lines go into the next card.
+- **Named commands** (`.ga-act.json`): argv fixed, no shell, project cwd, timeout, secret-named env vars stripped
+  (`KEY`, `TOKEN`, `SECRET`, `PASSW`, `AUTH`, ...). The card lists only the names; unknown names are rejected.
+- **State card** (`ga/act/card.py`): a stable prefix (spec, item, done_when, owned files, command names; cacheable)
+  then failing tests with their key stack lines, code slices (Python by `ast`, TS/JS by a regex index; NEED results;
+  small owned files whole), the last turn's applied/rejected summary only, and the budget. Hard cap (default 6000).
+- **Loop policy**: done = done_when passes when code runs it (after any edit, or on `DONE`; a red `DONE` is refused).
+  The same failing set after two consecutive edit turns, the turn cap (10) or the token cap stops as `blocked`.
+- **Ledger**: one row per turn in `<state>/ledger/<UTC day>.jsonl` and one L0 `run.end` in `<state>/telemetry.jsonl`
+  (backend, model, input/output/cache tokens, seconds, edits applied/rejected, commands; null when not reported).
+- **Backends**: any of the five built-ins. claude_cli runs bare (`--tools ""`, the prefix as `--system-prompt`);
+  anthropic_http marks the prefix with `cache_control`; openai_http works with a local `base_url` and no key; agv and
+  codex_cli (not bare) get the prefix first in one prompt.
+- **Pool**: a role with `"executor": "act"` (needs `pool.repo`, refuses `tools`; optional `"act": {"max_turns",
+  "max_tokens", "cap"}`) runs `ga act` in the node's worktree; the item's `files` and `done_when` are passed through,
+  the ledger goes to `.ga/nodes/<id>/act/`, and the hand-in is judged and integrated as before.
+- Live smoke (results/ga38): one bare claude_cli turn on Haiku 4.5 fixed a seeded bug with 1,617 tokens in total.
+
 ## 시험
 
 ```sh
