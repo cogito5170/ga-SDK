@@ -1,3 +1,20 @@
+# STATE — CMD-GA41 rev 1, branch claude/ga41 (done)
+
+ga 0.9.0: GA Engine's model loop with a small model (gpt-oss-120b-medium through agy).
+- `ga/repair.py`: one repair turn (labels, the form's reminder, the previous answer capped) in `ga supervise`/`ga gemini`
+  plans (`Supervisor._model_turn`) and `ga act` action blocks; a second bad answer fails as before; `repair` log rows,
+  `repairs` on the end row and act ledger rows.
+- `Supervisor._tool_fn`: a raising tool step is the result `<tool> failed: <label>` (`tool_error_label`); `tool_errors`.
+- `ga/backends/base.py`: `Transient`, `transient_code`, `retry_transient` (exactly one retry, `transient_backoff_s`
+  default 20); agy `status: ERROR` on exit 0 is an error (500 INTERNAL / 503 capacity -> transient), claude_cli,
+  codex, gemini_cli and HTTP 5xx classified; step reason `transient:<code>`; ga do / ga act retry too; bridge no
+  double retry.
+- `ga agy-agent install` (`ga/backends/agy_agent.py`), agv option `agent` (`--agent` before `-p`), `_Agv.overhead`
+  9,852 / 2,530-2,958; option `thinking` (claude_cli, agv, anthropic_http) and thinking tokens per turn.
+- `ga/paths.py`: real paths in `Hub.sandbox_paths`, hub ga dir, git worktree list, pool ws/repo paths.
+
+Tests: tests/test_ga41.py (42), tests/mutations_ga41.py 16/16 killed with a green control.
+
 # STATE — CMD-GA36 rev 2, branch claude/ga36 (done)
 
 ga 0.8.0: GA CLI `ga ask` / `ga bridge`, GA UI `ga ui` (GA Engine naming, research/NAMING.md).

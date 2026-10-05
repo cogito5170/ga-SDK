@@ -20,7 +20,7 @@ from typing import Any
 KINDS = (
     ("sandbox", re.compile(r"(?i)operation not permitted"),
      "Antigravity 터미널 샌드박스가 ga를 막았습니다. 일반 터미널(Terminal.app)에서 ga를 실행하세요."),
-    ("capacity", re.compile(r"MODEL_CAPACITY_EXHAUSTED|\b503\b.{0,40}capacity|\(capacity\)|reason\W+capacity", re.I),
+    ("capacity", re.compile(r"MODEL_CAPACITY_EXHAUSTED|\b503\b.{0,40}capacity|\(capacity\)|reason\W+capacity|transient:503", re.I),
      "agy 서버 용량 부족(503)입니다. 할당량 문제가 아니니 잠시 후 다시 하세요."),
     ("quota", re.compile(r"(?i)\bquota\b|AI credits|usage limit|agy_quota"),
      "agy 할당량을 다 썼습니다. 초기화 시각까지 기다리세요 (`agy -p /usage`)."),

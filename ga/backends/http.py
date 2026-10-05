@@ -16,7 +16,8 @@ import time
 from typing import Any, Callable
 
 from .catalog import CATALOG
-from .base import API_VERSION, BackendError, BackendTurn, ConfigError, check_served, rate_limited
+from .base import (API_VERSION, BackendError, BackendTurn, ConfigError, Transient, check_served, rate_limited,
+                   transient_code)
 
 Transport = Callable[[str, dict[str, str], bytes, float], tuple[int, dict[str, str], bytes]]
 EFFORTS = ("low", "medium", "high", "xhigh", "max")  # Messages API output_config.effort
@@ -74,6 +75,8 @@ class HttpRunner:
         if status == 429:
             raise rate_limited((rh or {}).get("retry-after"))
         if status != 200:
+            if transient_code("", status) is not None:  # GA41 S3: 500 502 503 504 529: retried once by the loop
+                raise Transient(status)
             raise BackendError(f"http_{status}")
         try:
             data = json.loads(raw)
@@ -157,6 +160,11 @@ class _Http:
             if options["effort"] not in EFFORTS:
                 raise ConfigError(f"{self.name}: options.effort must be one of {', '.join(EFFORTS)}")
             kw["effort"] = options["effort"]
+        if "thinking" in self.knobs:  # GA41 S6: off|low -> effort low (the one control every current model takes;
+            # Opus 5.5 cannot turn thinking off, Sonnet 5.5 refuses "disabled"); an explicit effort wins
+            from .builtin import thinking_option
+            if thinking_option(options, self.name) in ("off", "low") and "effort" not in kw:
+                kw["effort"] = "low"
         return self.runner(model, url, key_env, timeout_s=ctx.get("timeout_s", 600.0), transport=ctx.get("transport"),
                            max_tokens=mt, **kw)
 
@@ -169,7 +177,7 @@ class _OpenAIHttp(_Http):
 class _AnthropicHttp(_Http):
     catalog = CATALOG['anthropic_http']  # CMD-GA31 S3: what the router may pick
     name, runner, default_url = "anthropic_http", AnthropicRunner, "https://api.anthropic.com"
-    knobs = ("effort",)
+    knobs = ("effort", "thinking")
 
 
 OPENAI_HTTP = _OpenAIHttp()

@@ -37,6 +37,7 @@ worktree and keeps the branch.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -352,7 +353,7 @@ class Pool:
                  judge: Callable[..., Any] | None = None, **node_kw: Any):
         self.cfg, self.ga = cfg, Path(ga_dir)
         r = cfg.network["pool"].get("repo")
-        self.repo = {"path": cfg.resolve(r["path"]).resolve(), "branch": r.get("branch", "main"),
+        self.repo = {"path": Path(os.path.realpath(cfg.resolve(r["path"]))), "branch": r.get("branch", "main"),
                      "judge": str(cfg.resolve(r["judge"])) if r.get("judge") else None} if r else None
         self.judge = judge
         self.conf = {**DEFAULTS, **{k: v for k, v in cfg.network["pool"].items() if k in DEFAULTS}}
@@ -642,7 +643,7 @@ class Pool:
         rd, integ = self.repo["path"], self.repo["branch"]
         if not live.get("ws"):
             base = G.git(rd, "rev-parse", "--verify", f"refs/heads/{integ}^{{commit}}")
-            live["ws"] = {"path": str((self.ga / "worktrees" / node).resolve()), "branch": f"ga/{node}", "base": base}
+            live["ws"] = {"path": os.path.realpath(self.ga / "worktrees" / node), "branch": f"ga/{node}", "base": base}
             self.save(reg)  # decided before created: a restart makes the same worktree
         ws = live["ws"]
         G.add_worktree(rd, Path(ws["path"]), ws["branch"], ws["base"])

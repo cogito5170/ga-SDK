@@ -25,7 +25,8 @@ from typing import Any, Callable
 from ..adapters import agy_cli
 from ..adapters.gemini_cli import GeminiCLI, clean_env
 from .catalog import CATALOG
-from .base import API_VERSION, BackendError, BackendTurn, ConfigError, check_served, rate_limited
+from .base import (API_VERSION, BackendError, BackendTurn, ConfigError, Transient, check_served, rate_limited,
+                   transient_code)
 
 
 def _cli(options: dict[str, Any], default: list[str]) -> list[str]:
@@ -124,18 +125,41 @@ class AgvRunner(agy_cli.AgyCLI):
                            t.seconds, t.events, list(getattr(t, "denied", []) or []))
 
 
+AGENT_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")  # an agy plugin agent name (a file name too)
+THINKING = ("off", "low", "default")  # GA41 S6: the thinking cap for intake/plan turns
+
+
+def thinking_option(options: dict[str, Any], backend: str) -> str:
+    v = options.get("thinking", "default")
+    if v not in THINKING:
+        raise ConfigError(f"{backend}: options.thinking must be one of {', '.join(THINKING)}")
+    return v
+
+
+CLAUDE_THINKING = {"off": "0", "low": "1024", "default": None}  # claude_cli: MAX_THINKING_TOKENS per cap
+
+
 class _Agv:
     catalog = CATALOG['agv']  # CMD-GA31 S3: what the router may pick
     name, version, api = "agv", "1", API_VERSION
-    options = {"cli", "usage_floor_pct", "window", "reset_fallback_s", "usage_every_s"}
-    overhead = {"bare": False, "tokens": None, "source": "not measured; agy is not installed here and its docs name no "
-                "flag that turns tools off or replaces the system prompt",
-                "closest": "none known: -p, --output-format, --model only"}
+    options = {"cli", "usage_floor_pct", "window", "reset_fallback_s", "usage_every_s", "agent", "thinking"}
+    # GA41 S4: measured on the user's Mac (baseline, gpt-oss-120b-medium): agy's own fixed input per turn. A plugin agent
+    # with ``tools: []`` (``ga agy-agent install``; option ``agent``) cuts it; nothing turns the system prompt off.
+    overhead = {"bare": False, "tokens": 9852, "tokens_toolless_agent": [2530, 2958],
+                "source": "measured: agy default agent 9,852 input tokens per turn; a plugin agent with tools: [] "
+                "2,530-2,958 (baseline, CMD-GA41)",
+                "closest": "option agent: <name> (--agent, a tools: [] plugin agent from ga agy-agent install)"}
 
     def create(self, model: str, options: dict[str, Any], ctx: dict[str, Any]) -> AgvRunner:
         _known(options, self.options, self.name)
+        agent = options.get("agent")
+        if agent is not None and not (isinstance(agent, str) and AGENT_NAME.fullmatch(agent)):
+            raise ConfigError("agv: options.agent must be a plugin agent name ([a-z0-9-], at most 40)")
+        # agy knows no "off": both caps send --effort low (the planning-turn setting); default sends nothing
+        effort = "low" if thinking_option(options, self.name) in ("off", "low") else None
         try:
-            return AgvRunner(_cli(options, ["agy"]), model, cwd=ctx.get("cwd"), timeout_s=ctx.get("timeout_s", 600.0))
+            return AgvRunner(_cli(options, ["agy"]), model, cwd=ctx.get("cwd"), timeout_s=ctx.get("timeout_s", 600.0),
+                             agent=agent, effort=effort)
         except ValueError as e:
             raise ConfigError(str(e)) from None
 
@@ -295,6 +319,9 @@ def parse_claude(stdout: str, code: int, model: str, seconds: float = 0.0) -> Ba
     if data.get("is_error") or data.get("subtype") not in (None, "success"):
         if data.get("api_error_status") == 429 or _LIMIT.search(str(data.get("result") or "")):
             raise rate_limited(None)
+        code = transient_code(str(data.get("result") or ""), data.get("api_error_status"))
+        if code is not None:  # GA41 S3: 500 / 503 / 529 overloaded: retried once by the loop
+            raise Transient(code)
         raise BackendError(f"is_error:{str(data.get('subtype', '?'))[:40]}")
     mu = data.get("modelUsage")
     served = sorted(str(k) for k in mu) if isinstance(mu, dict) else []
@@ -313,12 +340,16 @@ class _ClaudeCli:
                 "(default host: 29,287 / 32,287)", "closest": "bare"}
 
     def create(self, model: str, options: dict[str, Any], ctx: dict[str, Any]) -> ClaudeRunner:
-        _known(options, {"cli", "bare"}, self.name)
+        _known(options, {"cli", "bare", "thinking"}, self.name)
         if not isinstance(options.get("bare", True), bool):
             raise ConfigError("claude_cli: options.bare must be true or false")
-        return ClaudeRunner(_cli(options, ["claude"]), model, bare=options.get("bare", True), cwd=ctx.get("cwd"),
-                            timeout_s=ctx.get("timeout_s", 600.0), tools=ctx.get("tools"),
-                            on_progress=ctx.get("on_progress"))
+        r = ClaudeRunner(_cli(options, ["claude"]), model, bare=options.get("bare", True), cwd=ctx.get("cwd"),
+                         timeout_s=ctx.get("timeout_s", 600.0), tools=ctx.get("tools"),
+                         on_progress=ctx.get("on_progress"))
+        cap = CLAUDE_THINKING.get(thinking_option(options, self.name))
+        if cap is not None:  # GA41 S6 (A: Claude Code reads MAX_THINKING_TOKENS); GA37: ~75% of Haiku intake output
+            r.env["MAX_THINKING_TOKENS"] = cap  # was thinking
+        return r
 
 
 CLAUDE_CLI = _ClaudeCli()
@@ -368,6 +399,7 @@ def _models(obj: Any, out: list[str]) -> None:
 
 def parse_codex(stdout: str, code: int, model: str, seconds: float = 0.0) -> BackendTurn:
     answer, usage, served, events, failed, limited = None, None, [], 0, None, False
+    transient: int | None = None
     for line in stdout.splitlines():
         line = line.strip()
         if not line.startswith("{"):
@@ -390,8 +422,11 @@ def parse_codex(stdout: str, code: int, model: str, seconds: float = 0.0) -> Bac
             msg = str((ev.get("error") or {}).get("message") if isinstance(ev.get("error"), dict) else ev.get("message"))
             limited = limited or bool(_LIMIT.search(msg))
             failed = t
+            transient = transient or transient_code(msg)
     if limited:
         raise rate_limited(None)
+    if failed and transient is not None:  # GA41 S3
+        raise Transient(transient)
     if failed or answer is None:
         raise BackendError(failed or (f"exit_{code}" if code else "no_answer"))
     check_served(served, model)

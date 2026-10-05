@@ -303,7 +303,35 @@ or daily cap unless configured (BD-289). A served model other than `model` fails
 Plan calls are bare where the host allows it (S5): `claude_cli` runs with `--tools "" --strict-mcp-config
 --system-prompt <once>`, the HTTP backends send the protocol as the system text and no tools. agv, gemini_cli and
 codex_cli have no such switch known offline; `--list-backends` gives their fixed overhead and source (gemini_cli 11,822
-input tokens measured by baseline; agv and codex not measured).
+input tokens measured by baseline; agv 9,852 with agy's default agent, codex not measured).
+
+### Small models (CMD-GA41, ga 0.9.0)
+
+GA Engine's loop holds up with a small model (gpt-oss-120b-medium through agy):
+
+- **One repair turn.** A plan (`ga supervise` / `ga gemini`) or an action block (`ga act`) that breaks the form gets
+  exactly one more turn carrying only the checker's labels (`not_json: ...`, `say: must be a string`), the form's short
+  reminder and the model's own previous answer (capped at 2,000 characters) — never the task, the tool results or the
+  card again (`ga/repair.py`). A second bad answer fails the step as before (`ga act`: the turn goes on as before). The
+  log counts them: a `repair` row per repair, `repairs` on the `end` row; `ga act` ledger rows carry `repairs`.
+- **A failed tool step is a result.** A tool that raises (a missing file, a refused path, an unknown command) gives the
+  result `<tool> failed: <Type>: <first line>` (secret-shaped spans withheld, no stack) that the next model turn sees;
+  the task fails only on caps or when the model ends it. `ga act`'s RUN and NEED do the same.
+- **Transient server errors** — agy's `status: "ERROR"` with `INTERNAL (code 500)` (agy exits 0 with it), 503
+  `MODEL_CAPACITY_EXHAUSTED`, HTTP 500/502/503/504/529, the same classes from claude/codex/gemini — are retried once after
+  `transient_backoff_s` (config field, default 20), then the step fails as `transient:<code>`. agy's exit 0 with status
+  ERROR is never a success. Quota errors park as before. `ga bridge` does not retry a run the loop already retried.
+- **agv under a tool-less plugin agent.** `ga agy-agent install [--name ga-plan] [--dir ~/.ga/agy-agents] [--print]`
+  writes a Claude-plugin-form directory (`.claude-plugin/plugin.json`, `agents/<name>.md` with `tools: []` and a "one
+  JSON block in the given form, no tools" instruction) and runs `agy plugin install <dir>` (argv, no shell; `--print`
+  only writes and prints the command). Then `"options": {"agent": "ga-plan"}` puts `--agent ga-plan` before `-p`:
+  agy's fixed input fell from 9,852 to 2,530-2,958 tokens per turn (baseline, measured on the Mac).
+- **Thinking cap.** Option `thinking: off|low|default` — claude_cli sets `MAX_THINKING_TOKENS` (0 / 1024), agv sends
+  `--effort low` (agy has no "off"), anthropic_http sends `output_config.effort` low unless `effort` is set. Thinking
+  tokens are recorded per turn where the provider reports them apart (`thinking_tokens` in the log, `thinking` in
+  `ga do` / `ga act` rows).
+- **Real paths.** Worktree, ga-dir and repository paths are stored and compared as real paths (`ga/paths.py`), so
+  macOS's `/var` and `/private/var` are the same directory.
 
 The plan form is `ga-plan/1`; `ga-gemini-plan/1` is accepted as its alias, and `ga gemini` (and its `ga-gemini/1` config,
 which `ga supervise --config` also runs) still names it, so its verbatim prompts are unchanged. The spec is

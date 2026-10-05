@@ -312,14 +312,15 @@ class SupervisorTest(unittest.TestCase):
         self.assertLess(lens["compact"][1], lens["verbatim"][1])
 
     def test_check_plan_decides_and_a_disagreement_is_logged(self):
-        script = [{"plan": {"schema": S, "steps": [{"id": "a", "tool": "add", "args": {"a": 1, "b": 1}, "after": ["a"]}],
-                            "next": None}}]
-        box, ok = self.run_task(script)
+        bad = {"plan": {"schema": S, "steps": [{"id": "a", "tool": "add", "args": {"a": 1, "b": 1}, "after": ["a"]}],
+                        "next": None}}
+        box, ok = self.run_task([bad, bad])  # GA41: the one repair turn answers the same
         self.assertFalse(ok)  # check_plan rejects the self-reference, whatever the spec's check says
         self.assertEqual([r["ok"] for r in box.log() if r["event"] == "plan"], [False])
         rows = [r for r in box.log() if r["event"] == "check_disagree"]
-        if expected_disagreements():
-            self.assertEqual(rows, [{**rows[0], "check_plan_ok": False, "spec_ok": True, "step": "T1.m1"}])
+        if expected_disagreements():  # one per check: the plan and its repair
+            self.assertEqual(rows, [{**r, "check_plan_ok": False, "spec_ok": True, "step": "T1.m1"} for r in rows])
+            self.assertEqual(len(rows), 2)
         else:
             self.assertEqual(rows, [])
 
@@ -333,8 +334,8 @@ class AuthorityTest(unittest.TestCase):
 
     def test_a_trailing_newline_id_is_refused_by_both(self):
         from test_gemini import plan
-        script = [{"plan": plan([{"id": "a\n", "tool": "add", "args": {"a": 1, "b": 1}}], None, "two")}]
-        box, ok = self.run_task(script)
+        bad = {"plan": plan([{"id": "a\n", "tool": "add", "args": {"a": 1, "b": 1}}], None, "two")}
+        box, ok = self.run_task([bad, bad])  # GA41: the one repair turn answers the same
         self.assertFalse(ok)  # check_plan decides: refused
         self.assertEqual([r["ok"] for r in box.log() if r["event"] == "plan"], [False])
         rows = [r for r in box.log() if r["event"] == "check_disagree"]

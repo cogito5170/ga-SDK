@@ -657,8 +657,8 @@ class D5Solve(SolveBase):
                        plan(say="unused")])
         r = self.solve(cli, cap=3)
         self.assertEqual(r["refused"], ["write_file"])
-        self.assertTrue(any(x.get("event") == "plan" and not x.get("ok") and "tool_not_in_table" in x.get("problems", "")
-                            for x in self.log_rows(r)))  # refused by ga's own plan check, by label
+        self.assertTrue(any(x.get("event") == "repair" and any("tool_not_in_table" in p for p in x.get("problems", []))
+                            for x in self.log_rows(r)))  # refused by ga's own plan check, by label (GA41: then repaired)
         self.assertTrue(any("거부된 도구" in x and "write_file" in x for x in self.lines))
         self.assertFalse(any(x.get("event") == "tool" and x.get("tool") == "write_file" for x in self.log_rows(r)))
         self.assertFalse((self.w.work / "x").exists())

@@ -17,6 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Callable
 
+from .paths import real, real_path
 from . import rules
 from .adapters.base import Channel, JudgeContext, Post, Runner, TurnRequest
 from .adapters.git import GitVcs
@@ -166,7 +167,7 @@ class Hub:
         today: Callable[[], str] = lambda: date.today().isoformat(),
     ):
         self.cfg = cfg
-        self.ga = Path(ga_dir).resolve()  # a relative ga_dir broke the session clone (GA10 F4)
+        self.ga = real_path(ga_dir)  # a relative ga_dir broke the session clone (GA10 F4); real: GA41 S5
         self.channel = channel
         self.vcs = vcs
         self.judge = judge
@@ -609,7 +610,9 @@ class Hub:
             (Path(root) / session).mkdir(parents=True, exist_ok=True)
             writable.append(Path(root) / session)
         (self.ga / "worktrees" / session).mkdir(parents=True, exist_ok=True)
-        return {"protect": [str(p) for p in protect], "writable": [str(p) for p in writable], "allow": post_allow(self.cfg, session)}
+        # real paths (GA41 S5): on macOS a temp or home dir under /var is /private/var to the sandbox and to git
+        return {"protect": list(dict.fromkeys(real(p) for p in protect)), "writable": [real(p) for p in writable],
+                "allow": post_allow(self.cfg, session)}
 
     def _fill_drafts(self, st: dict[str, Any], verdict: dict[str, Any], reports: list[dict[str, Any]], reviews: list[dict[str, Any]],
                      not_ff: list[tuple[str, str, str]]) -> list[tuple[dict[str, Any], str]]:
