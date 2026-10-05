@@ -31,13 +31,13 @@ class ConfigError(ValueError):
 def default(home: str = "~") -> dict[str, Any]:
     """The Mac layout: ~/baseline, ~/token (Token README path B), ~/ga-sdk-check, the bridge with ~/agy-bridge.json."""
     h = home.rstrip("/")
-    venv = f"{h}/token/backend/.venv/bin"
+    venv = f"{h}/token/.venv/bin"  # README path B: python3.12 -m venv .venv at the checkout root
     tok_env = f"{h}/token/.env"
     return {
         "schema": SCHEMA,
         "baseline": f"{h}/baseline",
-        "repos": [{"name": "baseline", "path": f"{h}/baseline", "integration_branch": "main"},
-                  {"name": "token", "path": f"{h}/token", "integration_branch": "main"},
+        "repos": [{"name": "baseline", "path": f"{h}/baseline", "integration_branch": "claude/gracious-meitner-vp49xe"},
+                  {"name": "token", "path": f"{h}/token", "integration_branch": "claude/gracious-meitner-vp49xe"},
                   {"name": "ga-sdk", "path": f"{h}/ga-sdk-check", "integration_branch": "claude/gracious-meitner-vp49xe"}],
         "mailbox": {"repo": f"{h}/baseline", "remote": "origin", "fetch_every_s": 60, "name": "baseline"},
         "ask_home": None,

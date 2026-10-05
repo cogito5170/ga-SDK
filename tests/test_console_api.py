@@ -489,6 +489,9 @@ class D1Config(unittest.TestCase):
         api = raw["services"]["token-api"]
         self.assertEqual(api["argv"][1:], ["app.main:create_app", "--factory", "--port", "8000"])
         self.assertTrue(api["argv"][0].endswith("/bin/uvicorn"))
+        self.assertEqual(api["argv"][0], "~/token/.venv/bin/uvicorn")  # README path B: the venv is at the checkout root
+        self.assertEqual(raw["services"]["token-worker"]["argv"][0], "~/token/.venv/bin/python")
+        self.assertEqual({r["integration_branch"] for r in raw["repos"]}, {"claude/gracious-meitner-vp49xe"})
         self.assertEqual((api["cwd"], api["env_file"]), ("~/token/backend", "~/token/.env"))
         self.assertEqual(api["health_url"], "http://127.0.0.1:8000/healthz")
         self.assertEqual(raw["services"]["token-worker"]["argv"][1:], ["-m", "app.worker"])
