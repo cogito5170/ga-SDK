@@ -10,6 +10,12 @@ Operators (Python files only; each applies to a node that starts on a line the d
   flag       shell=False, check=True, allow_*/verify/strict/force keywords flipped; "--force-with-lease" -> "--force"
   raise      a ``raise`` line -> ``pass``
   check      compare_digest(..) / .is_relative_to(..) -> True; ``x.resolve()`` -> ``x``
+JavaScript inside a Python string literal (CMD-GA43 S3: one that holds ``return``, a function -- ``=>`` or ``function``
+-- and a ``const``/``let``/``var``, like the judge's _JS_* page scripts), outside the script's own quoted strings:
+  js-compare ``<``/``>`` -> ``<=``/``>=`` and back (the boundary moved)
+  js-not     a ``!`` dropped
+  js-term    one operand of ``&&``/``||`` dropped (up to the next ``,`` ``;`` ``?`` ``:`` or bracket at its depth)
+  js-limit   ``>= n``/``> n`` -> 1; ``<= n``/``< n`` -> n * 1000 (n a number literal)
 
 Each mutation is ``{id, file, find, replace, tests, op, score}``: ``find`` is whole lines of the head's file, widened
 with context until it occurs once; ``tests`` are the test modules that import or name the mutated module (static
@@ -29,7 +35,8 @@ GUARD_WORDS = re.compile(r"check|verif|guard|allow|approv|(?:^|_)ok(?:$|_)|secre
                          r"safe|valid|forbid|refus|deny", re.I)
 LINE_WORDS = re.compile(r"token|secret|digest|origin|host|network|needs|allow|approv|shell|parents|resolve|"
                         r"relative|withheld|forbid|refus|deny|accept|limit|max|min|cap", re.I)
-OP_WEIGHT = {"guard": 3, "term": 3, "flag": 4, "check": 4, "permissive": 3, "raise": 2, "limit": 2, "negate": 0}
+OP_WEIGHT = {"guard": 3, "term": 3, "flag": 4, "check": 4, "permissive": 3, "raise": 2, "limit": 2, "negate": 0,
+             "js-compare": 1, "js-not": 2, "js-term": 2, "js-limit": 2}
 FLAG_TRUE_IS_SAFE = {"check", "verify", "strict", "secure", "follow_symlinks_safe"}  # True -> False weakens
 FLAG_FALSE_IS_SAFE = {"shell", "force", "follow_symlinks", "insecure", "allow_query", "allow_network"}
 REFUSALS = {"False", "None", "WITHHELD", "MASK", "REDACTED", "DENIED"}
@@ -184,6 +191,79 @@ def operators(src: _Src, tree: ast.AST):
                 yield "check", node.lineno, (*src.span(node), src.seg(f.value)), src.seg(node), 0
 
 
+def is_js(text: str) -> bool:
+    """the heuristic for a Python string that holds a JavaScript function"""
+    return "return" in text and ("=>" in text or "function" in text) and \
+        any(k in text for k in ("const ", "let ", "var "))
+
+
+_JS_QUOTED = re.compile(r"""'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`""")
+_JS_CMP = re.compile(r"(?<![=<>!])(<=|>=|<|>)(?![=>])")
+_JS_NUM = re.compile(r"(?<![=<>!])(<=|>=|<|>)(\s*)(\d+(?:\.\d+)?)\b(?!\s*[.\w])")
+
+
+def _js_operand(m: str, i: int, step: int) -> int:
+    """from index i walk the masked script in direction step to the end of one operand at depth 0; the index past it"""
+    depth, n = 0, len(m)
+    opens, closes = "([{", ")]}"
+    if step < 0:
+        opens, closes = closes, opens
+    while 0 <= i < n:
+        c = m[i]
+        if c in opens:
+            depth += 1
+        elif c in closes:
+            if depth == 0:
+                break
+            depth -= 1
+        elif depth == 0 and (c in ",;?:\n" or m[i:i + 2] in ("&&", "||") or (step < 0 and m[i - 1:i + 1] in ("&&", "||"))
+                              or (step < 0 and c == "=" and m[i - 1:i] not in "=!<>" and m[i + 1:i + 2] not in "=>")):
+            break
+        i += step
+    return i
+
+
+def js_edits(code: str):
+    """(op, index, end, new, focus) edits of a JavaScript text, outside its quoted strings"""
+    m = _JS_QUOTED.sub(lambda q: q.group(0)[0] + "_" * (len(q.group(0)) - 2) + q.group(0)[-1], code)
+    for x in _JS_NUM.finditer(m):
+        n = float(x.group(3))
+        if x.group(1).startswith(">") and n > 1:
+            yield "js-limit", x.start(3), x.end(3), "1", code[max(0, x.start() - 20):x.end()]
+        elif x.group(1).startswith("<") and n > 0:
+            yield "js-limit", x.start(3), x.end(3), f"({x.group(3)} * 1000)", code[max(0, x.start() - 20):x.end()]
+    for x in _JS_CMP.finditer(m):
+        op = x.group(1)
+        new = {"<": "<=", ">": ">=", "<=": "<", ">=": ">"}[op]
+        yield "js-compare", x.start(), x.end(), new, code[max(0, x.start() - 20):x.end() + 20]
+    for x in re.finditer(r"!(?!=)", m):
+        yield "js-not", x.start(), x.end(), "", code[x.start():x.start() + 30]
+    for x in re.finditer(r"&&|\|\|", m):
+        right = _js_operand(m, x.end(), 1)
+        left = _js_operand(m, x.start() - 1, -1) + 1
+        kw = re.match(r"\s*(?:return|else|do|yield|await|in|of)\b", m[left:x.start()])
+        if kw:                                                                          # a keyword is not the operand
+            left += kw.end()
+        if code[x.end():right].strip() and code[left:x.start()].strip():
+            yield "js-term", x.start(), right, "", code[x.start():right]             # the right operand dropped
+            lstart = left + len(code[left:x.start()]) - len(code[left:x.start()].lstrip())
+            yield "js-term", lstart, x.end() + len(code[x.end():right]) - len(code[x.end():right].lstrip()), "", \
+                code[lstart:x.end()]                                                  # the left operand dropped
+
+
+def js_operators(src: _Src, tree: ast.AST):
+    """the JS operators on each Python string literal that holds JavaScript, as byte edits of the Python file"""
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str) and is_js(node.value)):
+            continue
+        s, _ = src.span(node)
+        seg = src.seg(node)
+        for op, i, j, new, focus in js_edits(seg):
+            bs = s + len(seg[:i].encode("utf-8"))
+            be = s + len(seg[:j].encode("utf-8"))
+            yield op, src.b.count(b"\n", 0, bs) + 1, (bs, be, new), focus, 0
+
+
 def _const_num(v: ast.AST) -> bool:
     if _num(v) is not None:
         return True
@@ -228,7 +308,7 @@ def file_mutations(path: str, text: str, changed: set[int]) -> list[dict[str, An
     funcs = _functions(tree)
     out: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
-    for op, lineno, (s, e, new), focus, bonus in operators(src, tree):
+    for op, lineno, (s, e, new), focus, bonus in [*operators(src, tree), *js_operators(src, tree)]:
         if lineno not in changed:
             continue
         if src.b[s:e].decode("utf-8") == new:
