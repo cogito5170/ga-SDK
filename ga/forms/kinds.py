@@ -421,6 +421,11 @@ SCHEMAS: dict[str, tuple[list[Field], Callable[[dict[str, Any]], list[Problem]] 
     "notify/1": (NOTIFY, None),
 }
 
+# CMD-GA37 S1: the intake form (ga/forms/task.py)
+from .task import TASK, task_cross  # noqa: E402
+
+SCHEMAS["task/1"] = (TASK, task_cross)
+
 
 def validate(doc: Any, expect: str | None = None) -> list[Problem]:
     """All problems of a form document. Never raises."""

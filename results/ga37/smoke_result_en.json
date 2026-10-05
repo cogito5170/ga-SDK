@@ -1,0 +1,213 @@
+{
+ "model": "claude-haiku-4-5-20251001",
+ "backend": "claude_cli (bare)",
+ "claude_p_runs": 1,
+ "refused": 0,
+ "request": "add a due date field to each todo item",
+ "exit": 0,
+ "kind": "change",
+ "outcome": "paused",
+ "status": "paused",
+ "turns": 1,
+ "tokens": {
+  "input": 1188,
+  "output": 7397,
+  "cache_read": 0,
+  "cache_creation": 0
+ },
+ "summary_tokens": 60,
+ "valid_task1": true,
+ "turn_problems": [
+  {
+   "n": 1,
+   "kind": "intake",
+   "problems": [],
+   "input": 1188,
+   "output": 7397,
+   "seconds": 72.909,
+   "error": null
+  }
+ ],
+ "request_row": [
+  {
+   "asked_human": 0,
+   "at": "2026-10-05T10:49:26Z",
+   "backend": "claude_cli",
+   "kind": "change",
+   "model": "claude-haiku-4-5-20251001",
+   "outcome": "paused",
+   "request": "add a due date field to each todo item",
+   "resolution": null,
+   "seconds": 72.914,
+   "task": "T-ca6b5834",
+   "tokens": {
+    "cache_creation": 0,
+    "cache_read": 0,
+    "input": 1188,
+    "output": 7397
+   },
+   "turns": 1,
+   "withheld": 0
+  }
+ ],
+ "raw_usage": [
+  {
+   "usage": {
+    "input_tokens": 1188,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 7397,
+    "output_tokens_details": {
+     "thinking_tokens": 6558
+    },
+    "server_tool_use": {
+     "web_search_requests": 0,
+     "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+     "ephemeral_1h_input_tokens": 0,
+     "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "not_available",
+    "iterations": [
+     {
+      "input_tokens": 1188,
+      "output_tokens": 7397,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_creation": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      },
+      "type": "message"
+     }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+   },
+   "total_cost_usd": 0.038173,
+   "duration_ms": 71216
+  }
+ ],
+ "notes": [],
+ "spec": {
+  "acceptance": [
+   {
+    "check": "npm test",
+    "id": "A1",
+    "kind": "command"
+   },
+   {
+    "check": "npm run build",
+    "id": "A2",
+    "kind": "command"
+   },
+   {
+    "check": "grep -q \"dueDate\" src/App.tsx",
+    "id": "A3",
+    "kind": "command"
+   },
+   {
+    "check": "grep -q \"dueDate\" src/TodoList.tsx",
+    "id": "A4",
+    "kind": "command"
+   },
+   {
+    "check": "grep -q \"dueDate\" tests/app.test.tsx",
+    "id": "A5",
+    "kind": "command"
+   }
+  ],
+  "assumptions": [
+   {
+    "default": "dueDate stored as ISO format string (YYYY-MM-DD)",
+    "text": "Todo items are objects with id, text, and completed status; dueDate will be added as an optional string field"
+   },
+   {
+    "default": "<input type=\"date\"> element",
+    "text": "Due date input uses HTML5 native date picker"
+   },
+   {
+    "default": "Optional field",
+    "text": "Due dates are optional, not required for new todos"
+   },
+   {
+    "default": "Client-side state management (useState)",
+    "text": "Todos are managed in React component state with no backend API"
+   }
+  ],
+  "constraints": [
+   "All existing todo functionality must remain unbroken",
+   "Due date field must be type-safe in TypeScript",
+   "Due dates must be stored as part of each todo item object"
+  ],
+  "deliverables": [
+   {
+    "id": "V1",
+    "what": "Update App.tsx to accept due date input when creating todos and store dueDate in todo objects",
+    "where": "src/App.tsx"
+   },
+   {
+    "id": "V2",
+    "what": "Update TodoList.tsx to display the due date for each todo item in the rendered list",
+    "where": "src/TodoList.tsx"
+   },
+   {
+    "id": "V3",
+    "what": "Add test cases verifying todos can be created with a due date and the date is displayed",
+    "where": "tests/app.test.tsx"
+   }
+  ],
+  "goal": "Add an optional due date field to each todo item, allowing users to set and view due dates for tasks",
+  "id": "T-ca6b5834",
+  "kind": "change",
+  "non_goals": [
+   "Sorting or reordering todos by due date",
+   "Visual styling for overdue items",
+   "Editing due dates after todo creation",
+   "Reminders or notifications for due dates",
+   "Recurring or repeating todos",
+   "Timezone or DST handling"
+  ],
+  "questions": [],
+  "repo": {
+   "build_cmds": [
+    "npm run build"
+   ],
+   "languages": {
+    "typescript": 3
+   },
+   "test_cmds": [
+    "npm test"
+   ]
+  },
+  "request": "add a due date field to each todo item",
+  "risks": [
+   "Existing tests may fail if test data lacks the dueDate field; update test fixtures to include it (or make it optional with default undefined)",
+   "If todos are persisted (localStorage), old stored todos will not have dueDate; must handle gracefully with optional chaining or default values",
+   "HTML5 <input type=\"date\"> has limited browser support; fallback text input may be needed for older browsers"
+  ],
+  "schema": "task/1"
+ },
+ "stderr": [
+  "ga do: GA Engine intake on claude_cli claude-haiku-4-5-20251001 (by flag); repo summary first",
+  "ga do: turn 1 (intake) on claude_cli claude-haiku-4-5-20251001 ...",
+  "ga do: ... still waiting on claude_cli (5.0s)",
+  "ga do: ... still waiting on claude_cli (10.0s)",
+  "ga do: ... still waiting on claude_cli (15.0s)",
+  "ga do: ... still waiting on claude_cli (20.0s)",
+  "ga do: ... still waiting on claude_cli (25.0s)",
+  "ga do: ... still waiting on claude_cli (30.0s)",
+  "ga do: ... still waiting on claude_cli (35.0s)",
+  "ga do: ... still waiting on claude_cli (40.0s)",
+  "ga do: ... still waiting on claude_cli (45.0s)",
+  "ga do: ... still waiting on claude_cli (50.0s)",
+  "ga do: ... still waiting on claude_cli (55.0s)",
+  "ga do: ... still waiting on claude_cli (60.0s)",
+  "ga do: ... still waiting on claude_cli (65.0s)",
+  "ga do: ... still waiting on claude_cli (70.0s)",
+  "ga do: turn 1 in 1188 / out 7397 tokens",
+  "ga do: paused; /tmp/ga37-smoke-en-bzus9neh/.ga/tasks/T-ca6b5834/summary.md; tokens in 1188 out 7397 cache_read 0 over 1 turn(s)"
+ ]
+}

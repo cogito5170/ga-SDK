@@ -355,6 +355,8 @@ class Node:
             choice = rt.pick(cls, needs)
         except NoRoute as e:
             return {"outcome": f"no_route:{e}"[:200]}
+        if job["kind"] == "task" and self.n.get("executor") == "act":  # CMD-GA38 S5: ga act in the worktree
+            return self._act(job, st, edges, run, rt, choice, needs, cls)
         try:
             pack, how = self._pack(job, st, run)
         except ctxpack.CtxPackError as e:
@@ -450,6 +452,37 @@ class Node:
         rt.result(cls, needs, choice, verified, tokens)
         result["outcome"] = "done" if verified else "check_failed"
         return result
+
+    def _act(self, job: dict, st: State, edges: Edges, run: dict, rt: Router, choice: Any, needs: dict,
+             cls: str) -> dict[str, Any]:
+        """CMD-GA38 S5: the item runs through ga act (action format, state card, named commands) in the node's
+        worktree; its ledger and L0 rows go to the node dir (never into the worktree). Done = done_when passed."""
+        from ..act import loop as A
+        from ..act.card import CardError
+        from ..act.commands import ActConfigError
+        conf = dict(self.n.get("act") or {})
+        wd = self.workdir or self.dir
+        item = {"id": job["id"], "goal": self.task.get("goal", ""), "files": self.task.get("files") or ["**"],
+                **({"done_when": self.task["done_when"]} if self.task.get("done_when") is not None else {})}
+        run["runs"][job["id"]] = run["runs"].get(job["id"], 0) + 1
+        try:
+            runner = self.get_backend(choice.backend).create(choice.model, dict(choice.options), {
+                "cwd": str(wd), "timeout_s": self.n.get("timeout_s", 600), "state_dir": str(self.dir)})  # no tools
+            res = A.run_item(Path(wd), item, backend=choice.backend, model=choice.model, runner=runner,
+                             state_dir=self.dir / "act",
+                             max_turns=int(conf.get("max_turns", A.MAX_TURNS)),
+                             max_tokens=int(conf.get("max_tokens", A.MAX_TOKENS)), cap=int(conf.get("cap", 6000)))
+        except (ActConfigError, CardError, BackendError, ConfigError, OSError) as e:
+            rt.result(cls, needs, choice, False, None)
+            return {"outcome": f"failed:act:{e}"[:200]}
+        verified = res.status == "done"
+        st.done[job["id"]] = {"status": "done" if verified else "failed", "verified": verified, "turns": res.turns,
+                              "answer": f"act {res.status}: {res.reason}"[:300]}
+        self._learn_pi(edges, run, verified)
+        rt.result(cls, needs, choice, verified, res.tokens.get("total") or None)
+        return {"turn": {"job": job["id"], "backend": choice.backend, "model": choice.model, "tier": choice.tier,
+                         "executor": "act", "turns": res.turns, "tokens": res.tokens, "reason": res.reason},
+                "outcome": "done" if verified else f"act_{res.status}"}
 
     def _observed(self, job: dict, items: list, st: State, edges: Edges, result: dict) -> bool:
         got = False

@@ -53,7 +53,7 @@ DEFAULTS = {"max_live": 3, "max_queue": 20, "max_spawn_per_round": 1, "max_depth
 ROLE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.]{0,29}$")
 ITEM_ID = re.compile(r"^(?:CMD-[A-Z]+\d+|[A-Z][A-Z0-9]*-[A-Z]+-\d+)$")  # CMD-X1, or <PREFIX>-<LETTERS>-<n> (W-FE-01)
 ITEM_KEYS = {"schema", "id", "role", "goal", "uses", "needs", "answer", "check", "parent", "depth", "origin",
-             "after", "files"}
+             "after", "files", "done_when"}  # done_when: CMD-GA38 (executor: act), a command name or argv
 PROPOSAL_KEYS = {"role", "goal", "uses", "needs", "answer"}  # no check: a node never names a command to run
 ATTEMPTS = 3
 WORK_BLOCK = re.compile(r"^```work[ \t]*\n(.*?)\n```[ \t]*$", re.MULTILINE | re.DOTALL)
@@ -115,6 +115,18 @@ def problems_of(network: dict) -> list[Problem]:
                 bad(p + ".tools", f"backend(s) {', '.join(map(str, no))} cannot run a turn with tools (claude_cli can)")
         if "progress" in n and not isinstance(n["progress"], bool):
             bad(p + ".progress", "must be true or false")
+        if "executor" in n:  # CMD-GA38 S5: executor act = the node runs ga act in its worktree, tools off
+            if n["executor"] not in ("turn", "act"):
+                bad(p + ".executor", "must be turn or act")
+            elif n["executor"] == "act":
+                if "tools" in n:
+                    bad(p + ".executor", "act runs the model with its tools off; drop tools")
+                if "repo" not in pool:
+                    bad(p + ".executor", "act needs network.pool.repo (it works in the node's worktree)")
+        a = n.get("act", {})
+        if not isinstance(a, dict) or set(a) - {"max_turns", "max_tokens", "cap"} or any(
+                isinstance(x, bool) or not isinstance(x, int) or x <= 0 for x in a.values()):
+            bad(p + ".act", "must be {max_turns?, max_tokens?, cap?} (positive integers)")
     if "repo" in pool:
         r = pool["repo"]
         if not isinstance(r, dict) or set(r) - {"path", "branch", "judge"} or not isinstance(r.get("path"), str) \
@@ -207,6 +219,9 @@ def item_problems(item: Any, roles: dict) -> list[str]:
     if not isinstance(f, list) or not f or not all(
             isinstance(x, str) and x and not x.startswith("/") and ".." not in x.split("/") for x in f):
         out.append("files lists relative path globs")
+    dw = item.get("done_when", "x")  # CMD-GA38
+    if not (isinstance(dw, str) and dw) and not (isinstance(dw, list) and dw and all(isinstance(x, str) and x for x in dw)):
+        out.append("done_when is a command name or an argv list")
     return out
 
 
@@ -264,7 +279,8 @@ def node_spec(cfg: Any, ga_dir: Path, me: str) -> dict | None:
     it = live["item"]
     task = {"id": it["id"], "goal": it["goal"], "class": live["role"], "uses": list(it.get("uses", []))}
     needs = it.get("needs", role.get("needs"))
-    for k, v in (("needs", needs), ("answer", it.get("answer")), ("check", it.get("check"))):
+    for k, v in (("needs", needs), ("answer", it.get("answer")), ("check", it.get("check")),
+                 ("files", it.get("files")), ("done_when", it.get("done_when"))):  # files, done_when: CMD-GA38
         if v is not None:
             task[k] = v
     spec = {**{k: v for k, v in role.items() if k != "needs"}, "task": task}

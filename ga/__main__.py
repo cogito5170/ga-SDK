@@ -622,12 +622,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--read-max", type=int, default=20000000); p.add_argument("--ctx-grow", type=int, default=50000)
     p.add_argument("--json", action="store_true"); p.add_argument("--fail", action="store_true", help="exit 1 on an alarm")
     p.set_defaults(fn=cmd_usage)
+    from .act.cli import add_parser as act_parser  # CMD-GA38: ga act
+    act_parser(sub)
     sub.add_parser("rlo", add_help=False, help="rlo Autonomy commands (ga.rlo, owned by GR)")  # listed here, run above
     sub.add_parser("ask", add_help=False, help="GA CLI: ask in Korean or English; local rules pick the action, cost "
                    "shown and y/N before tokens or mail (CMD-GA36)")  # listed here, run above
     sub.add_parser("bridge", add_help=False, help="GA CLI: the agy bridge — the hub's directives through ga supervise, "
                    "report/2 back (CMD-GA36)")
     sub.add_parser("ui", add_help=False, help="GA UI: a local browser page over the same engine as ga ask (CMD-GA36)")
+    from .intake.cli import add_parser as _add_do  # CMD-GA37: ga do
+    _add_do(sub)
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
         ap.error("prompt needs SESSION or --hub")

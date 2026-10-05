@@ -41,6 +41,7 @@ class HttpRunner:
     resumes, bare = False, True
     usage_format = ""
     max_tokens = 4096
+    cache_prefix = False  # CMD-GA38 S5: ga act sets it; anthropic_http then marks the system text for prompt caching
 
     def __init__(self, model: str, base_url: str, key_env: str | None, *, timeout_s: float = 600.0,
                  transport: Transport | None = None, max_tokens: int | None = None, effort: str | None = None):
@@ -117,6 +118,8 @@ class AnthropicRunner(HttpRunner):
                 "messages": [{"role": "user", "content": prompt}]}
         if self.effort:
             body["output_config"] = {"effort": self.effort}  # the Messages API effort knob
+        if self.cache_prefix:  # CMD-GA38: the act card's stable prefix is the system text; cache it
+            body["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
         return f"{self.base_url}/v1/messages", headers, body
 
     def parse(self, data: dict[str, Any]) -> tuple[str, list[str], dict[str, Any] | None]:

@@ -410,6 +410,39 @@ All keys are optional; a config without them behaves as in 0.6.
   the claude_cli stream-json tool uses are relayed as `turn.progress` (tool name and path only, at most 50 per turn).
 - **Item ids**: `CMD-<LETTERS><n>` or `<PREFIX>-<LETTERS>-<n>` (e.g. `W-FE-01`).
 
+## `ga act`: one work item, token-optimized (CMD-GA38, BD-394)
+
+The model answers only in a fixed text action format; code does the rest. No tool schemas in the prompt, no chat
+history: every turn is a fresh, fixed-size state card.
+
+```sh
+ga act --item item.json --backend claude_cli --model claude-haiku-4-5 [--repo .] [--max-turns 10] [--cap 6000]
+# item.json: {"id": "CMD-X1", "goal": "...", "files": ["src/**"], "done_when": "test"}   (done_when: a name or argv)
+# <repo>/.ga-act.json: {"commands": {"test": ["{python}", "-m", "unittest"], "lint": ["ruff", "check", "."]},
+#                       "done_when": "test", "timeout_s": 300}
+```
+
+- **Action format** (`ga/act/fmt.py`, about 300 tokens, the same bytes every turn): `EDIT <path>` with SEARCH/REPLACE
+  blocks (exact, unique), `NEW <path>` (CONTENT ... END), `RUN <name>`, `NEED symbol|file|grep`, `DONE`,
+  `BLOCKED <reason>`. Edits apply only inside the item's `files` globs (never `.git`/`.ga`, never outside the repo); a
+  SEARCH that does not match exactly once rejects only that block and its nearest lines go into the next card.
+- **Named commands** (`.ga-act.json`): argv fixed, no shell, project cwd, timeout, secret-named env vars stripped
+  (`KEY`, `TOKEN`, `SECRET`, `PASSW`, `AUTH`, ...). The card lists only the names; unknown names are rejected.
+- **State card** (`ga/act/card.py`): a stable prefix (spec, item, done_when, owned files, command names; cacheable)
+  then failing tests with their key stack lines, code slices (Python by `ast`, TS/JS by a regex index; NEED results;
+  small owned files whole), the last turn's applied/rejected summary only, and the budget. Hard cap (default 6000).
+- **Loop policy**: done = done_when passes when code runs it (after any edit, or on `DONE`; a red `DONE` is refused).
+  The same failing set after two consecutive edit turns, the turn cap (10) or the token cap stops as `blocked`.
+- **Ledger**: one row per turn in `<state>/ledger/<UTC day>.jsonl` and one L0 `run.end` in `<state>/telemetry.jsonl`
+  (backend, model, input/output/cache tokens, seconds, edits applied/rejected, commands; null when not reported).
+- **Backends**: any of the five built-ins. claude_cli runs bare (`--tools ""`, the prefix as `--system-prompt`);
+  anthropic_http marks the prefix with `cache_control`; openai_http works with a local `base_url` and no key; agv and
+  codex_cli (not bare) get the prefix first in one prompt.
+- **Pool**: a role with `"executor": "act"` (needs `pool.repo`, refuses `tools`; optional `"act": {"max_turns",
+  "max_tokens", "cap"}`) runs `ga act` in the node's worktree; the item's `files` and `done_when` are passed through,
+  the ledger goes to `.ga/nodes/<id>/act/`, and the hand-in is judged and integrated as before.
+- Live smoke (results/ga38): one bare claude_cli turn on Haiku 4.5 fixed a seeded bug with 1,617 tokens in total.
+
 ## 시험
 
 ```sh
@@ -442,3 +475,56 @@ failure/dependency; surviving mutation or no test counts or a bad report head �
 Per-repo config: `<repo>/.ga-judge.json` (`dist`, `extras`, `test`, `test_named`, `pinned`, `pip_args`, `pythonpath`, `repo`,
 `timeout`; `{python}` is the venv interpreter). Mutation spec: a JSON list of `{id, file, find, replace, tests}`; this repo's
 is `.ga-judge.mutations.json`.
+
+## `ga do`: the GA Engine's entry, from a request to a checked task/1 on any backend (CMD-GA37, BD-394/395)
+
+The GA Engine is the whole machine that carries a request through intake, planner, executor and verifier. GA Core
+(this SDK, `import ga`) is the library it is built on. `ga do` is the Engine's GA CLI entry, and intake is its
+first stage.
+
+```
+ga do "가격 페이지에 연간 요금 토글을 추가해줘"          # backend/model: --backend/--model, else <repo>/ga-do.json, else the router
+ga do --dry-run "fix the flaky login test"             # the repo summary and its token count; no model
+ga do --replay requests.txt                            # one request per blank-line block, in order, same state
+```
+
+1. Code summarizes the repo (ga/intake/summary.py): languages by file count, test/build commands from package.json,
+   pyproject.toml, Makefile, Cargo.toml, go.mod, the top-level tree, the README head, and the backend/model keys of a ga
+   config. The summary stays under 2,000 tokens.
+2. One model turn. The instruction text and output form (ga/intake/prompt.py) are the same bytes for agv, claude_cli,
+   codex_cli, openai_http and anthropic_http. Backends with a system channel get it as the system prompt; the others
+   get it in front of the message. claude_cli always runs bare (`--tools ""`). agv cannot turn its tools off, so its
+   measured overhead (11,124 input tokens per turn) is written on each of its ledger rows.
+3. Code fills `schema`, `id`, `request` and `repo`, then checks the result as task/1 (ga/forms/task.py):
+   - Each acceptance item must be one of: a runnable command, a path, or an observable result with a number or a
+     quoted literal. Kind `review` needs a rubric.
+   - Vague words with no measure are flagged (good, fast, clean, properly, 적절히, 잘, 깔끔하게, 빠르게 …).
+   - A question's `needs` must be credential, budget, new_repo or irreversible. Any other gap is an assumption with a
+     default.
+4. If the check finds problems, there is one repair turn. It carries the problems and the answer they refer to, but not
+   the request or the summary. If problems remain after that, the status is `blocked`.
+
+Outputs:
+- `.ga/tasks/<id>/task.json`
+- `summary.md`, for a person (in Korean if the request is in Korean)
+- `report.json`: report/2-shaped, with status `paused` and next stage `planner` until GA40 exists
+- per turn, one L0 `run.end` in `.ga/telemetry.jsonl` and one row in `.ga/ledger/<UTC day>.jsonl` (backend, model,
+  input/output/cache tokens, seconds, problems)
+
+Kinds and project state (rev 2):
+- task/1 has a `kind`, and each kind goes somewhere different (ga/intake/route.py):
+  - `answer` ends at intake. The answer's `cites` must appear in the material code gathered, or be paths in the repo.
+  - `decide` appends a row to `.ga/state/decisions.jsonl`. Its `affects` must be ids of open work.
+  - `investigate` and `change` become open work and go to the planner stub (paused until GA40).
+- Offered `options` are stored as the last offer.
+- The state store `.ga/state/` holds decisions, the last offered options, open work and open requests. It is
+  summarized into the same 2,000-token material, together with the last request rows of the ledger.
+- Short fragments are resolved by code before the model turn (ga/intake/fragment.py). Examples: `1번`, `option 2`,
+  `추천대로 해`, `시작해`, `어디까지 되었어?`. If the state cannot settle a fragment, the most recent offer is assumed and
+  the assumption is recorded. A fragment never becomes a question to the person.
+- A line that looks like a secret is replaced before any model sees it: ga.rules patterns plus `name = value`.
+- Each request also writes one row to `.ga/ledger/requests-<day>.jsonl`: kind, tokens, seconds, asked-human count,
+  outcome, how many lines were withheld.
+
+Progress goes to stderr while a turn runs. Exit codes: 0 ready, 1 blocked, 2 config error.
+Tests: `tests/test_ga37.py` (golden set: `tests/fixtures/ga37/golden.json`); mutations: `tests/mutations_ga37.py`.
