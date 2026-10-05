@@ -306,7 +306,7 @@ class Install(Base):
             def run(self, argv, **kw):
                 if argv[:1] == ["git"] and "status" in argv:
                     self.calls.append(list(argv))
-                    return 128, "fatal"
+                    return 128, ""
                 return super().run(argv, **kw)
         before = self.snap()
         rc, r = self.inst(Bad())
