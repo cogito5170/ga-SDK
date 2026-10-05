@@ -114,7 +114,8 @@ class Run:
             raise RunFailed(str(e)[:200]) from e
         q = quota.quota_usd(self.model, res.usage)
         self.budget.record({"n": self.budget.calls + 1, "run_id": self.run_id, "role": role, "model": self.model,
-                            "usage": res.usage, "total_cost_usd": res.total_cost_usd, "quota_usd": q})
+                            "usage": res.usage, "total_cost_usd": res.total_cost_usd, "quota_usd": q,
+                            "model_usage": res.model_usage})
         self.calls.append({"usage": res.usage, "total_cost_usd": res.total_cost_usd})
         self.call_rows.append({"role": role, "input": quota.call_input(res.usage), "output": quota.usage_parts(res.usage)["output"],
                                "quota_usd": q, "total_cost_usd": res.total_cost_usd})

@@ -18,6 +18,7 @@ class CallResult:
     total_cost_usd: float | None
     served: list[str]
     seconds: float = 0.0
+    model_usage: dict | None = None   # claude -p's per-model token totals (what its total_cost_usd is priced from)
 
 
 class ClaudeBackend:
@@ -58,7 +59,9 @@ def parse(stdout: str, code: int, model: str, seconds: float = 0.0) -> CallResul
     usage = data.get("usage")
     if not isinstance(usage, dict):
         raise BackendError("no_usage")
-    return CallResult(str(data.get("result") or ""), usage, data.get("total_cost_usd"), served, seconds)
+    keep = ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
+    mus = {m: {k: v.get(k) for k in keep} for m, v in mu.items() if isinstance(v, dict)} if isinstance(mu, dict) else None
+    return CallResult(str(data.get("result") or ""), usage, data.get("total_cost_usd"), served, seconds, mus)
 
 
 @dataclass
