@@ -1,9 +1,11 @@
-# STATE — CMD-FT1 rev 2, branch claude/ft1r2 (done, full matrix)
+# STATE — CMD-GA34 rev 1, branch claude/ga34-realwork (done)
 
-Harness: bench/final_task/ (ft/ package, run.py, fixtures/). Offline tests: tests/test_ft1.py (30), tests/mutations_ft1.py kills 5/5 (incl. void T2 fixture).
-Rev 2: T2 fixture fixed (`from textutil import *`), 12 rev-1 T2 rows marked `void` (kept in runs.jsonl, excluded from tables) and rerun; 42 missing runs done.
-Result: 100 of 100 valid runs, 0 errors. rev-2 `claude -p` calls 106 of 130; cumulative claude -p cost $18.32 of $35 (rev 1 $14.49 + rev 2 $3.83); usage-based quota_usd $9.60.
-Caps now: 130 calls counted per rev (ledger rows carry `rev`, none = rev 1), $35 cumulative by claude -p total_cost_usd.
-Both quota columns (quota_usd, quota_cli_usd) in results/SUMMARY.md; section 6 names which measure bound each conclusion.
+ga 0.7.0: pool nodes do real repository work.
+- `network.pool.repo` → per-node worktree `.ga/worktrees/<node>/` on `ga/<node>` (R3 pre-push hook reused from ga/adapters/git.py), turn cwd = worktree; hand-in = runtime commit, ownership check, merge of a moved integration head, `judge.judge_commit`, fast-forward only (`git.fast_forward_local`). L0 work.integrated / work.rejected.
+- role `tools` {allow, permission_mode} → claude_cli non-bare `--tools/--allowedTools/--permission-mode`; bypassPermissions/auto, network tools, unscoped Bash and git/curl/... Bash prefixes refused; other backends refuse tools.
+- work/1 `after` (deps, cycles, work.blocked once) and `files` (overlap never live together); ids `<PREFIX>-<LETTERS>-<n>`.
+- judge `setup` argv lists instead of `dist`, `junit` path, vitest/jest/playwright summary parsers.
+- L0 `turn.started` for every pool-node turn (static nodes only with `progress`), `turn.progress` (tool + path, cap 50).
 
-Known: claude -p cost vs usage disagree on nearly every call (internal Haiku call). Full-suite state: see reports/CMD-FT1.md.
+Tests: tests/test_ga34.py (36), tests/mutations_ga34.py kills 10/10. Live smoke: results/ga34/ (1 claude -p run, $0.0303).
+Baseline probe: original fails R3 R6 R8 R9; R1 R2 R4 R5 R7 assert no-new-key defaults (kept); with the new keys all 9 fail.
