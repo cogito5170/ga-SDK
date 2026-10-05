@@ -847,7 +847,8 @@ const DECISIONS = {
       const v = e.target.querySelector("input").value.trim();
       location.hash = "#/decisions" + (v ? "?q=" + encodeURIComponent(v) : "");
     } } }, h("label", { class: "vh", for: "find" }, "결정 찾기"),
-    h("input", { type: "search", id: "find", name: "q", class: "grow", "data-key": "find", prop: { value: S.decQ } }),
+    h("input", { type: "search", id: "find", name: "q", class: "grow", "data-key": "find", prop: { value: S.decDraft ?? S.decQ },
+      on: { input: (e) => { S.decDraft = e.target.value; } } }),
     h("button", { type: "submit", "data-key": "find-go" }, "결정 찾기")));
   },
   hits() {
@@ -903,7 +904,7 @@ function route() {
 function go() {
   const r = route();
   if (!location.hash || !/^#\/[a-z]+/.test(location.hash)) history.replaceState(null, "", "#/now");
-  if (r.name === "decisions") S.decQ = r.params.get("q") || "";
+  if (r.name === "decisions") { S.decQ = r.params.get("q") || ""; S.decDraft = null; }
   S.confirm = null;
   render();
   for (const k of r.need) load(k);
