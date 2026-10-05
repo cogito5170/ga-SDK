@@ -1,4 +1,4 @@
-"""CMD-GA37 D2: apply each mutation to a copy of the tree and run tests/test_ga37.py; every one must be killed.
+"""CMD-GA37 D2 and D4 (rev 2): apply each mutation to a copy of the tree and run tests/test_ga37.py; every one must be killed.
 
     python tests/mutations_ga37.py      (not part of the unittest discovery)
 """
@@ -16,6 +16,14 @@ M = [
   "whole = prompt.whole(text)", "whole = prompt.whole(text) + f\"\\n(backend: {self.backend})\""),
  ("summary over the cap", "ga/intake/summary.py",
   "while tokens(text) > cap and lines:", "while False and lines:"),
+ # rev 2 (D4)
+ ("state summary missing from the prompt", "ga/intake/engine.py",
+  "summarize(root, state=state.lines() if state is not None else None)", "summarize(root, state=None)"),
+ ("fragment turned into a human question", "ga/intake/engine.py",
+  'spec["assumptions"].append(dict(resolution.assumption))',
+  'spec["questions"].append({"text": resolution.assumption["text"], "needs": "irreversible"})'),
+ ("answer routed to the planner", "ga/intake/route.py",
+  "    if kind in WORK_KINDS:", '    if kind in WORK_KINDS + ("answer",):'),
 ]
 ok = True
 for name, f, old, new in M:

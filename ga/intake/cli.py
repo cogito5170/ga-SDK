@@ -1,9 +1,10 @@
-"""``ga do "<request>"`` (CMD-GA37 S5): the entry of the autonomy machine. Until the planner (GA40) exists it stops
+"""``ga do "<request>"`` (CMD-GA37 S5, rev 2 S6-S8): the GA CLI entry of the GA Engine. Until the planner (GA40) exists it stops
 after the checked task/1 spec.
 
     ga do "가격 페이지에 연간 요금 토글을 추가해줘"            the backend from ga-do.json, else the router
     ga do --backend codex_cli --model gpt-5.1-codex "..."   override
     ga do --dry-run "..."                                   the repo summary and its token count; no model
+    ga do --replay requests.txt                             one request per blank-line block, same state store
 
 Writes ``<ga_dir>/tasks/<id>/task.json`` (the spec), ``summary.md`` (for a person; Korean if the request is) and
 ``report.json`` (a report/2-shaped summary: status paused, next stage planner; blocked with the problems otherwise),
@@ -24,7 +25,9 @@ from typing import Any
 from .. import backends
 from ..backends.base import ConfigError
 from ..forms import canonical_json
-from .engine import Intake, Result, overhead_of
+from .engine import Intake, Result, handle, overhead_of
+from .fragment import withhold
+from .state import State
 from .summary import summarize
 
 DEFAULT_ROUTED = ["claude_cli"]
@@ -66,15 +69,19 @@ def human_summary(res: Result, request: str) -> str:
         L.append(f"# 과제 {res.task_id} — {'준비됨' if res.status == 'ready' else '막힘'}")
         L.append(f"\n요청: {request}\n")
         if res.status == "ready":
-            L.append(f"목표: {s.get('goal', '')}\n\n## 산출물")
-            L += [f"- {d['id']} {d['what']} ({d['where']})" for d in s.get("deliverables", [])]
-            L.append("\n## 수용 기준")
-            L += [f"- {a['id']} [{a['kind']}] {a['check']}" for a in s.get("acceptance", [])]
+            L += _kind_lines(res, True)
+            L.append(f"목표: {s.get('goal', '')}")
+            if s.get("deliverables") or s.get("acceptance"):
+                L.append("\n## 산출물")
+                L += [f"- {d['id']} {d['what']} ({d['where']})" for d in s.get("deliverables", [])]
+                L.append("\n## 수용 기준")
+                L += [f"- {a['id']} [{a['kind']}] {a['check']}" for a in s.get("acceptance", [])]
             L.append("\n## 가정(기본값)")
             L += [f"- {a['text']} → {a['default']}" for a in s.get("assumptions", [])] or ["- 없음"]
             L.append("\n## 사람에게 묻는 것")
             L += [f"- [{q['needs']}] {q['text']}" for q in res.human_questions()] or ["- 없음"]
-            L.append("\n다음 단계: 계획기(GA40) — 아직 없어 여기서 멈춤.")
+            if (res.outcome or {}).get("next") == "planner" or not res.outcome:
+                L.append("\n다음 단계: 계획기(GA40) — 아직 없어 여기서 멈춤.")
         else:
             L.append("## 문제")
             L += [f"- {p}" for p in res.problems]
@@ -83,15 +90,19 @@ def human_summary(res: Result, request: str) -> str:
         L.append(f"# Task {res.task_id} — {res.status}")
         L.append(f"\nRequest: {request}\n")
         if res.status == "ready":
-            L.append(f"Goal: {s.get('goal', '')}\n\n## Deliverables")
-            L += [f"- {d['id']} {d['what']} ({d['where']})" for d in s.get("deliverables", [])]
-            L.append("\n## Acceptance")
-            L += [f"- {a['id']} [{a['kind']}] {a['check']}" for a in s.get("acceptance", [])]
+            L += _kind_lines(res, False)
+            L.append(f"Goal: {s.get('goal', '')}")
+            if s.get("deliverables") or s.get("acceptance"):
+                L.append("\n## Deliverables")
+                L += [f"- {d['id']} {d['what']} ({d['where']})" for d in s.get("deliverables", [])]
+                L.append("\n## Acceptance")
+                L += [f"- {a['id']} [{a['kind']}] {a['check']}" for a in s.get("acceptance", [])]
             L.append("\n## Assumptions (defaults)")
             L += [f"- {a['text']} -> {a['default']}" for a in s.get("assumptions", [])] or ["- none"]
             L.append("\n## Asked of a person")
             L += [f"- [{q['needs']}] {q['text']}" for q in res.human_questions()] or ["- none"]
-            L.append("\nNext stage: planner (GA40) — not built yet, so ga stops here.")
+            if (res.outcome or {}).get("next") == "planner" or not res.outcome:
+                L.append("\nNext stage: planner (GA40) — not built yet, so ga stops here.")
         else:
             L.append("## Problems")
             L += [f"- {p}" for p in res.problems]
@@ -100,11 +111,37 @@ def human_summary(res: Result, request: str) -> str:
     return "\n".join(L) + "\n"
 
 
+def _kind_lines(res: Result, ko: bool) -> list[str]:
+    s, out = res.spec or {}, res.outcome or {}
+    L = [("종류: " if ko else "Kind: ") + str(s.get("kind"))]
+    r = s.get("resolution")
+    if r:
+        L.append(("해석: " if ko else "Read as: ") + f"'{r['fragment']}' → {r['to']}"
+                 + ((" (가정)" if ko else " (assumed)") if r["how"] == "assumption" else ""))
+    if s.get("kind") == "answer" and s.get("answer"):
+        L.append(("\n## 답\n" if ko else "\n## Answer\n") + s["answer"]["text"])
+        L += [f"- {c}" for c in s["answer"].get("cites", [])]
+    if s.get("kind") == "decide" and s.get("decision"):
+        L.append(("\n## 결정 " if ko else "\n## Decision ") + str(out.get("decision", "")) + "\n"
+                 + s["decision"]["text"])
+        L += [("- 영향: " if ko else "- affects: ") + w for w in s["decision"].get("affects", [])]
+    if s.get("options"):
+        L.append("\n## 선택지" if ko else "\n## Options")
+        L += [f"{o['n']}. {o['text']}" + ((" (추천)" if ko else " (recommended)") if o.get("recommended") else "")
+              for o in s["options"]]
+    return L + [""]
+
+
 def report(res: Result) -> dict[str, Any]:
-    """A report/2-shaped summary of the intake stage (S5)."""
+    """A report/2-shaped summary of the intake stage (S5; rev 2: the outcome by kind)."""
     ready = res.status == "ready"
+    out = res.outcome or {"status": "paused" if ready else "blocked", "next": "planner" if ready else None,
+                          "outcome": "paused" if ready else "blocked"}
+    extra = {k: out[k] for k in ("answer", "decision", "affects") if k in out}
     return {"shape": "report/2", "from": "ga do", "task": res.task_id, "stage": "intake",
-            "status": "paused" if ready else "blocked", "next": "planner" if ready else None,
+            "kind": (res.spec or {}).get("kind"), "outcome": out["outcome"],
+            "status": out["status"], "next": out["next"], **extra,
+            "resolution": (res.spec or {}).get("resolution"),
             "items": [{"id": "intake", "state": "done" if ready else "blocked",
                        "evidence": [f"tasks/{res.task_id}/task.json"]}],
             "blockers": [] if ready else [{"kind": "problem", "what": p} for p in res.problems],
@@ -134,17 +171,29 @@ def _progress(ev: dict) -> None:
               file=sys.stderr)
 
 
+def _blocks(text: str) -> list[str]:
+    """A replay file: one request per block, blocks separated by blank lines."""
+    return [b.strip() for b in re.split(r"\n\s*\n", text.replace("\r\n", "\n")) if b.strip()]
+
+
 def do_main(args: Any) -> int:
     request = " ".join(args.request).strip()
-    if not request:
-        print("ga do: an empty request", file=sys.stderr)
+    if not request and not args.replay:
+        print("ga do: an empty request (or give --replay FILE)", file=sys.stderr)
         return 2
     root = Path(args.repo).resolve()
+    ga_dir = Path(args.ga_dir).resolve() if getattr(args, "ga_dir", None) else root / ".ga"
+    state = State(ga_dir)
     if args.dry_run:
-        s = summarize(root)
+        s = summarize(root, state=state.lines())
         sys.stdout.write(s.text)
         print(json.dumps({"summary_tokens": s.tokens, "cap": 2000, "dropped": s.dropped}, ensure_ascii=False))
         return 0
+    try:
+        requests = _blocks(Path(args.replay).read_text(encoding="utf-8")) if args.replay else [request]
+    except OSError as e:
+        print(f"ga do: {e}", file=sys.stderr)
+        return 2
     cfg_path = Path(args.do_config) if args.do_config else root / "ga-do.json"
     try:
         cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
@@ -156,21 +205,30 @@ def do_main(args: Any) -> int:
     except (ConfigError, KeyError, ValueError, RuntimeError) as e:
         print(f"ga do: {e}", file=sys.stderr)
         return 2
-    ga_dir = Path(args.ga_dir).resolve() if getattr(args, "ga_dir", None) else root / ".ga"
-    print(f"ga do: {backend} {model} (by {how}); repo summary first", file=sys.stderr)
-    res = Intake(runner, backend=backend, model=model, ga_dir=ga_dir, overhead=overhead_of(backend, plugin),
-                 on_progress=_progress).run(request, root)
-    d = write(res, request, ga_dir)
-    tk = res.tokens()
-    print(json.dumps(report(res), ensure_ascii=False, separators=(",", ":")))
-    print(f"ga do: {res.status}; {d / 'summary.md'}; tokens in {tk['input']} out {tk['output']} "
-          f"cache_read {tk['cache_read']} over {len(res.turns)} turn(s)", file=sys.stderr)
-    return 0 if res.status == "ready" else 1
+    print(f"ga do: GA Engine intake on {backend} {model} (by {how}); repo summary first", file=sys.stderr)
+    intake = Intake(runner, backend=backend, model=model, ga_dir=ga_dir, overhead=overhead_of(backend, plugin),
+                    on_progress=_progress)
+    blocked = 0
+    for i, req in enumerate(requests, 1):
+        if args.replay:
+            print(f"ga do: replay {i}/{len(requests)}", file=sys.stderr)
+        res = handle(intake, req, root, state)
+        shown = res.spec["request"] if res.spec else withhold(req)[0]
+        d = write(res, shown, ga_dir)
+        tk = res.tokens()
+        print(json.dumps(report(res), ensure_ascii=False, separators=(",", ":")))
+        print(f"ga do: {res.outcome['outcome']}; {d / 'summary.md'}; tokens in {tk['input']} out {tk['output']} "
+              f"cache_read {tk['cache_read']} over {len(res.turns)} turn(s)", file=sys.stderr)
+        blocked += res.status != "ready"
+    return 1 if blocked else 0
 
 
 def add_parser(sub: Any) -> None:
-    p = sub.add_parser("do", help="a natural-language request -> a checked task/1 spec, on any backend (CMD-GA37)")
-    p.add_argument("request", nargs="+")
+    p = sub.add_parser("do", help="GA Engine entry: a natural-language request -> a checked task/1 spec, on any "
+                                  "backend (CMD-GA37)")
+    p.add_argument("request", nargs="*")
+    p.add_argument("--replay", metavar="FILE", help="one request per blank-line-separated block, in order, with the "
+                                                    "same project state (.ga/state/)")
     p.add_argument("--backend", help="agv, claude_cli, codex_cli, openai_http, anthropic_http, or a plugin")
     p.add_argument("--model")
     p.add_argument("--repo", default=".", help="the repository the request is about (default: here)")

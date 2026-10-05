@@ -1,0 +1,151 @@
+{
+ "state": {
+  "options": {
+   "task": "T-0000aaaa",
+   "items": [
+    {
+     "n": 1,
+     "text": "Electron 데스크톱 셸",
+     "recommended": true
+    },
+    {
+     "n": 2,
+     "text": "Tauri 데스크톱 셸",
+     "recommended": false
+    }
+   ]
+  },
+  "work": [
+   {
+    "id": "T-1111bbbb",
+    "title": "가격 페이지 연간 요금 토글",
+    "kind": "change"
+   }
+  ],
+  "decisions": [
+   "테스트 러너는 vitest 를 쓴다"
+  ],
+  "ledger": [
+   {
+    "task": "T-1111bbbb",
+    "kind": "change",
+    "outcome": "paused",
+    "request": "가격 페이지에 연간 요금 토글을 추가해줘"
+   }
+  ]
+ },
+ "cases": [
+  {
+   "request": "어디까지 되었어?",
+   "kind": "answer",
+   "outcome": "answered",
+   "resolution": "state",
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"answer\", \"goal\": \"진행 상황을 알린다\", \"answer\": {\"text\": \"열린 작업은 T-1111bbbb(가격 페이지 연간 요금 토글) 1건이고 아직 계획 단계입니다.\", \"cites\": [\"T-1111bbbb\", \"open work:\"]}}"
+  },
+  {
+   "request": "what test command does this repo use?",
+   "kind": "answer",
+   "outcome": "answered",
+   "resolution": null,
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"answer\", \"goal\": \"Name the test command\", \"answer\": {\"text\": \"npm test (the package.json test script).\", \"cites\": [\"package.json\", \"test: npm test\"]}}"
+  },
+  {
+   "request": "가격 페이지 파일은 어디 있어?",
+   "kind": "answer",
+   "outcome": "answered",
+   "resolution": null,
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"answer\", \"goal\": \"가격 페이지 파일 위치를 알린다\", \"answer\": {\"text\": \"src/pages/Pricing.tsx 입니다.\", \"cites\": [\"src/pages/Pricing.tsx\"]}}"
+  },
+  {
+   "request": "is there a login test?",
+   "kind": "answer",
+   "outcome": "answered",
+   "resolution": null,
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"answer\", \"goal\": \"Say whether a login test exists\", \"answer\": {\"text\": \"Yes: tests/login.test.ts.\", \"cites\": [\"tests/login.test.ts\"]}}"
+  },
+  {
+   "request": "로그인 테스트가 왜 가끔 실패하는지 조사해줘",
+   "kind": "investigate",
+   "outcome": "paused",
+   "resolution": null,
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"원인과 재현 절차를 적은 조사 메모\", \"where\": \"docs/flaky-login.md\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"docs/flaky-login.md\", \"kind\": \"file\"}, {\"id\": \"A2\", \"check\": \"npx vitest run tests/login.test.ts --repeat 50\", \"kind\": \"command\"}], \"non_goals\": [], \"assumptions\": [{\"text\": \"반복 횟수\", \"default\": \"50 회\"}], \"questions\": [], \"risks\": [], \"kind\": \"investigate\", \"goal\": \"로그인 테스트 간헐 실패의 원인을 찾는다\"}"
+  },
+  {
+   "request": "compare Electron and Tauri for the desktop shell",
+   "kind": "investigate",
+   "outcome": "paused",
+   "resolution": null,
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"comparison table: bundle size, startup time, API surface\", \"where\": \"docs/shell-comparison.md\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"docs/shell-comparison.md\", \"kind\": \"file\"}, {\"id\": \"A2\", \"check\": \"the table has 3 rows with a number in each cell\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"investigate\", \"goal\": \"Compare Electron and Tauri as the desktop shell\", \"options\": [{\"n\": 1, \"text\": \"Electron desktop shell\", \"recommended\": true}, {\"n\": 2, \"text\": \"Tauri desktop shell\", \"recommended\": false}]}"
+  },
+  {
+   "request": "검색 API 가 느린 원인을 찾아줘",
+   "kind": "investigate",
+   "outcome": "paused",
+   "resolution": null,
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"측정 결과와 원인\", \"where\": \"docs/search-latency.md\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"docs/search-latency.md 에 100 회 요청의 p95 지연이 적혀 있다\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"investigate\", \"goal\": \"검색 API 지연의 원인을 찾는다\"}"
+  },
+  {
+   "request": "find out why the build takes over 60 seconds",
+   "kind": "investigate",
+   "outcome": "paused",
+   "resolution": null,
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"build timing breakdown\", \"where\": \"docs/build-time.md\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm run build\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"docs/build-time.md\", \"kind\": \"file\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"investigate\", \"goal\": \"Find what makes the build take over 60 s\"}"
+  },
+  {
+   "request": "1번",
+   "kind": "change",
+   "outcome": "paused",
+   "resolution": "state",
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"Electron 메인 프로세스\", \"where\": \"desktop/main.ts\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm run build\", \"kind\": \"command\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"change\", \"goal\": \"Electron 데스크톱 셸을 만든다\"}"
+  },
+  {
+   "request": "시작해",
+   "kind": "change",
+   "outcome": "paused",
+   "resolution": "state",
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"연간 토글\", \"where\": \"src/pages/Pricing.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- Pricing\", \"kind\": \"command\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"change\", \"goal\": \"가격 페이지에 연간 요금 토글을 추가한다\"}"
+  },
+  {
+   "request": "add a logout button to the settings page",
+   "kind": "change",
+   "outcome": "paused",
+   "resolution": null,
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"logout button calling logout()\", \"where\": \"src/pages/Settings.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- Settings\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"clicking it shows \\\"Signed out\\\"\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"change\", \"goal\": \"Add a logout button to settings\"}"
+  },
+  {
+   "request": "go with option 2",
+   "kind": "change",
+   "outcome": "paused",
+   "resolution": "state",
+   "answer": "{\"deliverables\": [{\"id\": \"V1\", \"what\": \"Tauri app config\", \"where\": \"src-tauri/tauri.conf.json\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"src-tauri/tauri.conf.json\", \"kind\": \"file\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"change\", \"goal\": \"Build the Tauri desktop shell\"}"
+  },
+  {
+   "request": "추천대로 해",
+   "kind": "decide",
+   "outcome": "decided",
+   "resolution": "state",
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"decide\", \"goal\": \"데스크톱 셸을 정한다\", \"decision\": {\"text\": \"데스크톱 셸은 Electron 으로 간다(추천안 1번)\", \"affects\": []}}"
+  },
+  {
+   "request": "Tauri 로 가자, Electron 은 접어",
+   "kind": "decide",
+   "outcome": "decided",
+   "resolution": null,
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"decide\", \"goal\": \"데스크톱 셸을 Tauri 로 정한다\", \"decision\": {\"text\": \"데스크톱 셸은 Tauri, Electron 안은 접는다\", \"affects\": []}}"
+  },
+  {
+   "request": "we'll use vitest, not jest",
+   "kind": "decide",
+   "outcome": "decided",
+   "resolution": null,
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"decide\", \"goal\": \"Fix the test runner\", \"decision\": {\"text\": \"The test runner is vitest; jest is not used\", \"affects\": []}}"
+  },
+  {
+   "request": "let's drop the annual discount from the pricing toggle",
+   "kind": "decide",
+   "outcome": "decided",
+   "resolution": null,
+   "answer": "{\"deliverables\": [], \"constraints\": [], \"acceptance\": [], \"non_goals\": [], \"assumptions\": [], \"questions\": [], \"risks\": [], \"kind\": \"decide\", \"goal\": \"Drop the annual discount\", \"decision\": {\"text\": \"The annual toggle shows prices without a discount\", \"affects\": [\"T-1111bbbb\"]}}"
+  }
+ ]
+}

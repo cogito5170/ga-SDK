@@ -1,7 +1,7 @@
 """The repository summary the intake turn sees (CMD-GA37 S2): gathered by code, no model, under ``CAP`` tokens.
 
 Units, highest priority first: languages (files per language), commands (test/build/lint detected from package.json,
-pyproject.toml, Makefile, Cargo.toml, go.mod), ga config (backend/model keys only, never a value of any other key),
+pyproject.toml, Makefile, Cargo.toml, go.mod), project state (rev 2 S7, when given), ga config (backend/model keys only, never a value of any other key),
 tree (top level, then one level of the biggest directories), README head. Over the cap the lowest unit is cut line by
 line from its end, then the next; each cut is listed in ``dropped``. Same tree, same bytes: walk order is sorted, no
 clock, no environment. Tokens are ctxpack's estimate (ceil(utf-8 bytes / 4)).
@@ -205,17 +205,21 @@ def render(units: list[tuple[str, list[str]]]) -> str:
     return "\n".join(f"[{name}]\n" + "\n".join(lines) for name, lines in units if lines) + "\n"
 
 
-def summarize(root: str | Path, cap: int = CAP) -> Summary:
+def summarize(root: str | Path, cap: int = CAP, state: list[str] | None = None) -> Summary:
+    """``state``: the state store's summary lines (rev 2 S7), packed in the same cap, after the commands."""
     root = Path(root).resolve()
     langs, tops, n, capped = _walk(root)
     langs = dict(sorted(langs.items(), key=lambda kv: (-kv[1], kv[0])))
     test, build, other = commands(root)
-    s = Summary(langs, test, build, other, _tree(root, tops), _readme(root), ga_config(root), n, capped)
+    from .fragment import withhold
+    readme = withhold("\n".join(_readme(root)))[0].split("\n") if _readme(root) else []
+    s = Summary(langs, test, build, other, _tree(root, tops), readme, ga_config(root), n, capped)
     lang_line = ", ".join(f"{k} {v}" for k, v in langs.items()) or "none detected"
     units: list[tuple[str, list[str]]] = [
         ("languages", [f"{lang_line}; files {n}{'+' if capped else ''}"]),
         ("commands", [f"test: {' | '.join(test) or 'none detected'}", f"build: {' | '.join(build) or 'none detected'}"]
          + ([f"other: {' | '.join(other)}"] if other else [])),
+        ("state", list(state or [])),
         ("ga config", [json.dumps(s.config, ensure_ascii=False, sort_keys=True)] if s.config else []),
         ("tree", list(s.tree)),
         ("readme head", list(s.readme)),

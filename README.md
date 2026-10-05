@@ -421,11 +421,16 @@ Per-repo config: `<repo>/.ga-judge.json` (`dist`, `extras`, `test`, `test_named`
 `timeout`; `{python}` is the venv interpreter). Mutation spec: a JSON list of `{id, file, find, replace, tests}`; this repo's
 is `.ga-judge.mutations.json`.
 
-## `ga do`: a request becomes a checked task/1 spec, on any backend (CMD-GA37, BD-394)
+## `ga do`: the GA Engine's entry, from a request to a checked task/1 on any backend (CMD-GA37, BD-394/395)
+
+The GA Engine is the whole machine that carries a request through intake, planner, executor and verifier. GA Core
+(this SDK, `import ga`) is the library it is built on. `ga do` is the Engine's GA CLI entry, and intake is its
+first stage.
 
 ```
 ga do "가격 페이지에 연간 요금 토글을 추가해줘"          # backend/model: --backend/--model, else <repo>/ga-do.json, else the router
 ga do --dry-run "fix the flaky login test"             # the repo summary and its token count; no model
+ga do --replay requests.txt                            # one request per blank-line block, in order, same state
 ```
 
 1. Code summarizes the repo (ga/intake/summary.py): languages by file count, test/build commands from package.json,
@@ -450,6 +455,21 @@ Outputs:
 - `report.json`: report/2-shaped, with status `paused` and next stage `planner` until GA40 exists
 - per turn, one L0 `run.end` in `.ga/telemetry.jsonl` and one row in `.ga/ledger/<UTC day>.jsonl` (backend, model,
   input/output/cache tokens, seconds, problems)
+
+Kinds and project state (rev 2):
+- task/1 has a `kind`, and each kind goes somewhere different (ga/intake/route.py):
+  - `answer` ends at intake. The answer's `cites` must appear in the material code gathered, or be paths in the repo.
+  - `decide` appends a row to `.ga/state/decisions.jsonl`. Its `affects` must be ids of open work.
+  - `investigate` and `change` become open work and go to the planner stub (paused until GA40).
+- Offered `options` are stored as the last offer.
+- The state store `.ga/state/` holds decisions, the last offered options, open work and open requests. It is
+  summarized into the same 2,000-token material, together with the last request rows of the ledger.
+- Short fragments are resolved by code before the model turn (ga/intake/fragment.py). Examples: `1번`, `option 2`,
+  `추천대로 해`, `시작해`, `어디까지 되었어?`. If the state cannot settle a fragment, the most recent offer is assumed and
+  the assumption is recorded. A fragment never becomes a question to the person.
+- A line that looks like a secret is replaced before any model sees it: ga.rules patterns plus `name = value`.
+- Each request also writes one row to `.ga/ledger/requests-<day>.jsonl`: kind, tokens, seconds, asked-human count,
+  outcome, how many lines were withheld.
 
 Progress goes to stderr while a turn runs. Exit codes: 0 ready, 1 blocked, 2 config error.
 Tests: `tests/test_ga37.py` (golden set: `tests/fixtures/ga37/golden.json`); mutations: `tests/mutations_ga37.py`.

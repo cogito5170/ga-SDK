@@ -4,7 +4,7 @@
    "name": "electron_shell_ko",
    "request": "Electron 데스크톱 셸을 설계하고 구현해줘",
    "answers": [
-    "{\"goal\": \"기존 웹 앱을 감싸는 Electron 데스크톱 셸을 설계하고 구현한다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"Electron 메인 프로세스와 창 생성 코드\", \"where\": \"desktop/main.ts\"}, {\"id\": \"V2\", \"what\": \"preload 스크립트(contextIsolation 켬)\", \"where\": \"desktop/preload.ts\"}, {\"id\": \"V3\", \"what\": \"설계 문서: 프로세스 구조와 IPC 채널 목록\", \"where\": \"docs/desktop-shell.md\"}], \"constraints\": [\"기존 웹 코드(src/)는 바꾸지 않는다\", \"nodeIntegration 은 끈다\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm run build\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"npm run desktop:test\", \"kind\": \"command\"}, {\"id\": \"A3\", \"check\": \"docs/desktop-shell.md\", \"kind\": \"file\"}, {\"id\": \"A4\", \"check\": \"앱 실행 시 창 제목이 \\\"Pricing App\\\" 으로 보인다\", \"kind\": \"observable\"}], \"non_goals\": [\"자동 업데이트\", \"코드 서명과 배포 패키지\"], \"assumptions\": [{\"text\": \"대상 OS\", \"default\": \"macOS 와 Windows\"}, {\"text\": \"Electron 버전\", \"default\": \"현재 최신 안정판\"}], \"questions\": [], \"risks\": [\"preload 에 노출한 API 가 렌더러 보안 경계를 넓힐 수 있다\"]}"
+    "{\"kind\": \"change\", \"goal\": \"기존 웹 앱을 감싸는 Electron 데스크톱 셸을 설계하고 구현한다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"Electron 메인 프로세스와 창 생성 코드\", \"where\": \"desktop/main.ts\"}, {\"id\": \"V2\", \"what\": \"preload 스크립트(contextIsolation 켬)\", \"where\": \"desktop/preload.ts\"}, {\"id\": \"V3\", \"what\": \"설계 문서: 프로세스 구조와 IPC 채널 목록\", \"where\": \"docs/desktop-shell.md\"}], \"constraints\": [\"기존 웹 코드(src/)는 바꾸지 않는다\", \"nodeIntegration 은 끈다\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm run build\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"npm run desktop:test\", \"kind\": \"command\"}, {\"id\": \"A3\", \"check\": \"docs/desktop-shell.md\", \"kind\": \"file\"}, {\"id\": \"A4\", \"check\": \"앱 실행 시 창 제목이 \\\"Pricing App\\\" 으로 보인다\", \"kind\": \"observable\"}], \"non_goals\": [\"자동 업데이트\", \"코드 서명과 배포 패키지\"], \"assumptions\": [{\"text\": \"대상 OS\", \"default\": \"macOS 와 Windows\"}, {\"text\": \"Electron 버전\", \"default\": \"현재 최신 안정판\"}], \"questions\": [], \"risks\": [\"preload 에 노출한 API 가 렌더러 보안 경계를 넓힐 수 있다\"]}"
    ],
    "expect_status": "ready",
    "expect_turns": 1,
@@ -12,6 +12,7 @@
     "schema": "task/1",
     "id": "T-8c81a9fa",
     "request": "Electron 데스크톱 셸을 설계하고 구현해줘",
+    "kind": "change",
     "goal": "기존 웹 앱을 감싸는 Electron 데스크톱 셸을 설계하고 구현한다",
     "deliverables": [
      {
@@ -92,8 +93,8 @@
    "name": "pricing_toggle_ko",
    "request": "가격 페이지에 연간 요금 토글을 추가해줘",
    "answers": [
-    "```json\n{\"goal\": \"가격 페이지에 월간/연간 요금 토글을 추가한다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"토글 컴포넌트와 연간 가격 표시\", \"where\": \"src/pages/Pricing.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"토글이 깔끔하게 동작한다\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [{\"text\": \"연간 할인율\", \"default\": \"20%\"}], \"questions\": [], \"risks\": []}\n```",
-    "```json\n{\"goal\": \"가격 페이지에 월간/연간 요금 토글을 추가한다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"토글 컴포넌트와 연간 가격 표시\", \"where\": \"src/pages/Pricing.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- Pricing\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"연간을 고르면 월 $10 플랜이 \\\"$96/년\\\" 으로 보인다\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [{\"text\": \"연간 할인율\", \"default\": \"20%\"}], \"questions\": [], \"risks\": []}\n```"
+    "```json\n{\"kind\": \"change\", \"goal\": \"가격 페이지에 월간/연간 요금 토글을 추가한다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"토글 컴포넌트와 연간 가격 표시\", \"where\": \"src/pages/Pricing.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"토글이 깔끔하게 동작한다\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [{\"text\": \"연간 할인율\", \"default\": \"20%\"}], \"questions\": [], \"risks\": []}\n```",
+    "```json\n{\"kind\": \"change\", \"goal\": \"가격 페이지에 월간/연간 요금 토글을 추가한다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"토글 컴포넌트와 연간 가격 표시\", \"where\": \"src/pages/Pricing.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- Pricing\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"연간을 고르면 월 $10 플랜이 \\\"$96/년\\\" 으로 보인다\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [{\"text\": \"연간 할인율\", \"default\": \"20%\"}], \"questions\": [], \"risks\": []}\n```"
    ],
    "expect_status": "ready",
    "expect_turns": 2,
@@ -101,6 +102,7 @@
     "schema": "task/1",
     "id": "T-07e80529",
     "request": "가격 페이지에 연간 요금 토글을 추가해줘",
+    "kind": "change",
     "goal": "가격 페이지에 월간/연간 요금 토글을 추가한다",
     "deliverables": [
      {
@@ -149,7 +151,7 @@
    "name": "flaky_login_en",
    "request": "fix the flaky login test",
    "answers": [
-    "Here is the spec:\n```json\n{\"goal\": \"Make the login test pass deterministically\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"the race in the login test fixed (await the session cookie)\", \"where\": \"tests/login.test.ts\"}], \"constraints\": [\"do not change the login API\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npx vitest run tests/login.test.ts --repeat 50\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"50 of 50 repeated runs pass\", \"kind\": \"observable\"}], \"non_goals\": [\"rewriting the auth flow\"], \"assumptions\": [{\"text\": \"cause of the flake\", \"default\": \"a timing race in the test, not in the product\"}], \"questions\": [], \"risks\": [\"the flake may be in the product code; then the fix moves to src/api/auth.ts\"]}\n```\nDone."
+    "Here is the spec:\n```json\n{\"kind\": \"change\", \"goal\": \"Make the login test pass deterministically\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"the race in the login test fixed (await the session cookie)\", \"where\": \"tests/login.test.ts\"}], \"constraints\": [\"do not change the login API\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npx vitest run tests/login.test.ts --repeat 50\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"50 of 50 repeated runs pass\", \"kind\": \"observable\"}], \"non_goals\": [\"rewriting the auth flow\"], \"assumptions\": [{\"text\": \"cause of the flake\", \"default\": \"a timing race in the test, not in the product\"}], \"questions\": [], \"risks\": [\"the flake may be in the product code; then the fix moves to src/api/auth.ts\"]}\n```\nDone."
    ],
    "expect_status": "ready",
    "expect_turns": 1,
@@ -157,6 +159,7 @@
     "schema": "task/1",
     "id": "T-74ae2c61",
     "request": "fix the flaky login test",
+    "kind": "change",
     "goal": "Make the login test pass deterministically",
     "deliverables": [
      {
@@ -211,7 +214,7 @@
    "name": "stripe_ko",
    "request": "결제 모듈을 Stripe로 붙여줘",
    "answers": [
-    "{\"goal\": \"결제 페이지에 Stripe 결제를 붙인다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"Stripe Checkout 세션 생성 API\", \"where\": \"src/api/checkout.ts\"}, {\"id\": \"V2\", \"what\": \"결제 버튼\", \"where\": \"src/pages/Pricing.tsx\"}], \"constraints\": [\"키는 환경 변수 STRIPE_SECRET_KEY 로만 읽는다\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- checkout\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"테스트 모드에서 결제 후 /success 로 돌아오고 \\\"결제 완료\\\" 가 보인다\", \"kind\": \"observable\"}], \"non_goals\": [\"구독 갱신 처리\"], \"assumptions\": [{\"text\": \"결제 방식\", \"default\": \"Stripe Checkout(호스팅 페이지)\"}], \"questions\": [{\"text\": \"Stripe 테스트 모드 비밀 키를 STRIPE_SECRET_KEY 로 넣어 주세요\", \"needs\": \"credential\"}], \"risks\": [\"웹훅 서명 검증을 빼먹으면 위조 결제 알림을 받을 수 있다\"]}"
+    "{\"kind\": \"change\", \"goal\": \"결제 페이지에 Stripe 결제를 붙인다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"Stripe Checkout 세션 생성 API\", \"where\": \"src/api/checkout.ts\"}, {\"id\": \"V2\", \"what\": \"결제 버튼\", \"where\": \"src/pages/Pricing.tsx\"}], \"constraints\": [\"키는 환경 변수 STRIPE_SECRET_KEY 로만 읽는다\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- checkout\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"테스트 모드에서 결제 후 /success 로 돌아오고 \\\"결제 완료\\\" 가 보인다\", \"kind\": \"observable\"}], \"non_goals\": [\"구독 갱신 처리\"], \"assumptions\": [{\"text\": \"결제 방식\", \"default\": \"Stripe Checkout(호스팅 페이지)\"}], \"questions\": [{\"text\": \"Stripe 테스트 모드 비밀 키를 STRIPE_SECRET_KEY 로 넣어 주세요\", \"needs\": \"credential\"}], \"risks\": [\"웹훅 서명 검증을 빼먹으면 위조 결제 알림을 받을 수 있다\"]}"
    ],
    "expect_status": "ready",
    "expect_turns": 1,
@@ -219,6 +222,7 @@
     "schema": "task/1",
     "id": "T-6a61551f",
     "request": "결제 모듈을 Stripe로 붙여줘",
+    "kind": "change",
     "goal": "결제 페이지에 Stripe 결제를 붙인다",
     "deliverables": [
      {
@@ -283,7 +287,7 @@
    "name": "purge_ko",
    "request": "오래된 사용자 데이터를 DB에서 지워줘",
    "answers": [
-    "{\"goal\": \"2년 넘게 로그인하지 않은 사용자 데이터를 DB 에서 지운다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"삭제 스크립트(먼저 --dry-run 으로 대상 수만 출력)\", \"where\": \"scripts/purge_inactive.ts\"}], \"constraints\": [\"삭제 전에 백업 테이블에 복사한다\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- purge\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"--dry-run 실행이 삭제 대상 수를 출력하고 0 행을 지운다\", \"kind\": \"observable\"}], \"non_goals\": [\"활성 사용자 데이터 정리\"], \"assumptions\": [{\"text\": \"오래된 사용자의 기준\", \"default\": \"마지막 로그인 730 일 전\"}], \"questions\": [{\"text\": \"운영 DB 에서 실제로 지워도 됩니까? 되돌릴 수 없습니다\", \"needs\": \"irreversible\"}], \"risks\": [\"백업 없이 지우면 복구가 불가능하다\"]}"
+    "{\"kind\": \"change\", \"goal\": \"2년 넘게 로그인하지 않은 사용자 데이터를 DB 에서 지운다\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"삭제 스크립트(먼저 --dry-run 으로 대상 수만 출력)\", \"where\": \"scripts/purge_inactive.ts\"}], \"constraints\": [\"삭제 전에 백업 테이블에 복사한다\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- purge\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"--dry-run 실행이 삭제 대상 수를 출력하고 0 행을 지운다\", \"kind\": \"observable\"}], \"non_goals\": [\"활성 사용자 데이터 정리\"], \"assumptions\": [{\"text\": \"오래된 사용자의 기준\", \"default\": \"마지막 로그인 730 일 전\"}], \"questions\": [{\"text\": \"운영 DB 에서 실제로 지워도 됩니까? 되돌릴 수 없습니다\", \"needs\": \"irreversible\"}], \"risks\": [\"백업 없이 지우면 복구가 불가능하다\"]}"
    ],
    "expect_status": "ready",
    "expect_turns": 1,
@@ -291,6 +295,7 @@
     "schema": "task/1",
     "id": "T-56dcc66c",
     "request": "오래된 사용자 데이터를 DB에서 지워줘",
+    "kind": "change",
     "goal": "2년 넘게 로그인하지 않은 사용자 데이터를 DB 에서 지운다",
     "deliverables": [
      {
@@ -350,7 +355,7 @@
    "name": "dark_mode_en",
    "request": "add dark mode to the settings page",
    "answers": [
-    "Sure. {\"goal\": \"Add a dark mode switch to the settings page\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"theme switch persisted in localStorage key \\\"theme\\\"\", \"where\": \"src/pages/Settings.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- Settings\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"after the switch, body has class \\\"dark\\\" and it survives 1 reload\", \"kind\": \"observable\"}], \"non_goals\": [\"redesigning other pages\"], \"assumptions\": [{\"text\": \"default theme\", \"default\": \"follow the OS setting\"}], \"questions\": [], \"risks\": []}"
+    "Sure. {\"kind\": \"change\", \"goal\": \"Add a dark mode switch to the settings page\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"theme switch persisted in localStorage key \\\"theme\\\"\", \"where\": \"src/pages/Settings.tsx\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm test -- Settings\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"after the switch, body has class \\\"dark\\\" and it survives 1 reload\", \"kind\": \"observable\"}], \"non_goals\": [\"redesigning other pages\"], \"assumptions\": [{\"text\": \"default theme\", \"default\": \"follow the OS setting\"}], \"questions\": [], \"risks\": []}"
    ],
    "expect_status": "ready",
    "expect_turns": 1,
@@ -358,6 +363,7 @@
     "schema": "task/1",
     "id": "T-b4cf2a4d",
     "request": "add dark mode to the settings page",
+    "kind": "change",
     "goal": "Add a dark mode switch to the settings page",
     "deliverables": [
      {
@@ -408,8 +414,8 @@
    "name": "search_speed_en",
    "request": "speed up the search endpoint",
    "answers": [
-    "{\"goal\": \"Make the search endpoint fast\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"an index on the search query\", \"where\": \"src/api/search.ts\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"search is fast\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [{\"text\": \"Which database do you prefer?\", \"needs\": \"preference\"}], \"risks\": []}",
-    "{\"goal\": \"Make the search endpoint fast\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"an index on the search query\", \"where\": \"src/api/search.ts\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"search is fast\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [{\"text\": \"Which database do you prefer?\", \"needs\": \"preference\"}], \"risks\": []}"
+    "{\"kind\": \"change\", \"goal\": \"Make the search endpoint fast\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"an index on the search query\", \"where\": \"src/api/search.ts\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"search is fast\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [{\"text\": \"Which database do you prefer?\", \"needs\": \"preference\"}], \"risks\": []}",
+    "{\"kind\": \"change\", \"goal\": \"Make the search endpoint fast\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"an index on the search query\", \"where\": \"src/api/search.ts\"}], \"constraints\": [], \"acceptance\": [{\"id\": \"A1\", \"check\": \"search is fast\", \"kind\": \"observable\"}], \"non_goals\": [], \"assumptions\": [], \"questions\": [{\"text\": \"Which database do you prefer?\", \"needs\": \"preference\"}], \"risks\": []}"
    ],
    "expect_status": "blocked",
    "expect_turns": 2,
@@ -422,7 +428,7 @@
    "name": "docs_repo_en",
    "request": "create a new repo for the docs site and deploy it",
    "answers": [
-    "{\"goal\": \"Create a separate repository for the docs site and deploy it\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"docs site scaffold\", \"where\": \"new repository docs-site/\"}, {\"id\": \"V2\", \"what\": \"deploy workflow\", \"where\": \"docs-site/.github/workflows/deploy.yml\"}], \"constraints\": [\"reuse README.md content as the first page\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm run build\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"docs-site/.github/workflows/deploy.yml\", \"kind\": \"file\"}, {\"id\": \"A3\", \"check\": \"the deployed URL answers HTTP 200\", \"kind\": \"observable\"}, {\"id\": \"A4\", \"check\": \"the docs read as a coherent guide for a new user\", \"kind\": \"review\", \"rubric\": [\"every page links back to the index\", \"install steps come before usage\"]}], \"non_goals\": [\"a custom domain\"], \"assumptions\": [{\"text\": \"static site generator\", \"default\": \"the one the README already names, else VitePress\"}], \"questions\": [{\"text\": \"May ga create the repository docs-site under your account?\", \"needs\": \"new_repo\"}, {\"text\": \"Hosting may cost money beyond the free tier; what monthly limit?\", \"needs\": \"budget\"}], \"risks\": []}"
+    "{\"kind\": \"change\", \"goal\": \"Create a separate repository for the docs site and deploy it\", \"deliverables\": [{\"id\": \"V1\", \"what\": \"docs site scaffold\", \"where\": \"new repository docs-site/\"}, {\"id\": \"V2\", \"what\": \"deploy workflow\", \"where\": \"docs-site/.github/workflows/deploy.yml\"}], \"constraints\": [\"reuse README.md content as the first page\"], \"acceptance\": [{\"id\": \"A1\", \"check\": \"npm run build\", \"kind\": \"command\"}, {\"id\": \"A2\", \"check\": \"docs-site/.github/workflows/deploy.yml\", \"kind\": \"file\"}, {\"id\": \"A3\", \"check\": \"the deployed URL answers HTTP 200\", \"kind\": \"observable\"}, {\"id\": \"A4\", \"check\": \"the docs read as a coherent guide for a new user\", \"kind\": \"review\", \"rubric\": [\"every page links back to the index\", \"install steps come before usage\"]}], \"non_goals\": [\"a custom domain\"], \"assumptions\": [{\"text\": \"static site generator\", \"default\": \"the one the README already names, else VitePress\"}], \"questions\": [{\"text\": \"May ga create the repository docs-site under your account?\", \"needs\": \"new_repo\"}, {\"text\": \"Hosting may cost money beyond the free tier; what monthly limit?\", \"needs\": \"budget\"}], \"risks\": []}"
    ],
    "expect_status": "ready",
    "expect_turns": 1,
@@ -430,6 +436,7 @@
     "schema": "task/1",
     "id": "T-e6124efa",
     "request": "create a new repo for the docs site and deploy it",
+    "kind": "change",
     "goal": "Create a separate repository for the docs site and deploy it",
     "deliverables": [
      {

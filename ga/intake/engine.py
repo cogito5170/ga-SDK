@@ -1,4 +1,4 @@
-"""The intake engine (CMD-GA37 S2-S4): request -> repo summary (code) -> one model turn -> task/1 checked by code.
+"""The intake engine of the GA Engine (CMD-GA37 S2-S4, rev 2 S6-S8): request -> repo summary (code) -> one model turn -> task/1 checked by code.
 
     summary  ga.intake.summary.summarize: no model, under 2000 tokens
     turn 1   INSTRUCTION + message(request, summary) on whichever backend the caller picked (same bytes for all)
@@ -64,6 +64,8 @@ class Result:
     turns: list[Turn]
     summary: Summary
     sent: list[dict[str, str | None]] = field(default_factory=list)  # [{system, prompt}] per turn, as sent
+    resolution: Any = None         # ga.intake.fragment.Resolution for a fragment request (rev 2 S7)
+    outcome: dict[str, Any] = field(default_factory=dict)  # what route() did (rev 2 S6); {} before routing
 
     def tokens(self) -> dict[str, int]:
         out = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}
@@ -86,6 +88,41 @@ def overhead_of(backend: str, plugin: Any) -> Any:
     """The fixed input tokens a non-bare backend adds to every turn: the plugin's figure, else the measured one."""
     tok = (getattr(plugin, "overhead", None) or {}).get("tokens")
     return tok if tok is not None else MEASURED_OVERHEAD.get(backend)
+
+
+def _cite_found(cite: str, material: str, root: Path) -> bool:
+    c = cite.strip().strip("`'\"")
+    if not c:
+        return False
+    if c in material:
+        return True
+    p = c.split(":", 1)[0].split("#", 1)[0]
+    if p and not p.startswith("/") and ".." not in Path(p).parts:
+        try:
+            return (root / p).exists()
+        except OSError:
+            return False
+    return False
+
+
+def context_problems(spec: dict[str, Any], material: str, root: Path,
+                     open_work: list[str]) -> list[tuple[str, str]]:
+    """Rev 2 S6 checks that need what code gathered: an answer's cites are found there (or are paths in the repo); a
+    decision affects only open work ids. [(rule@path, message)]."""
+    out = []
+    if spec.get("kind") == "answer" and isinstance(spec.get("answer"), dict):
+        for i, c in enumerate(spec["answer"].get("cites", [])):
+            if not _cite_found(str(c), material, root):
+                path = f"$.answer.cites[{i}]"
+                out.append((f"task:cite@{path}", f"[hard] task:cite {path}: {str(c)[:80]!r} is not in the material "
+                                                  "code gathered nor a path in the repo"))
+    if spec.get("kind") == "decide" and isinstance(spec.get("decision"), dict):
+        for i, w in enumerate(spec["decision"].get("affects", [])):
+            if w not in open_work:
+                path = f"$.decision.affects[{i}]"
+                out.append((f"task:affects@{path}", f"[hard] task:affects {path}: {str(w)[:40]!r} is not an open "
+                                                    "work id"))
+    return out
 
 
 def task_id(request: str) -> str:
@@ -207,12 +244,17 @@ class Intake:
             self.on_progress(dict(info, event="done", error=t.error, input=t.input, output=t.output))
         return t, answer
 
-    def run(self, request: str, root: str | Path, summary: Summary | None = None) -> Result:
-        summary = summary or summarize(root)
+    def run(self, request: str, root: str | Path, summary: Summary | None = None, state: Any = None,
+            resolution: Any = None) -> Result:
+        """``state``: a ga.intake.state.State whose summary goes into the material (rev 2 S7); ``resolution``: what code
+        resolved a fragment to (ga.intake.fragment.resolve)."""
+        root = Path(root)
+        summary = summary or summarize(root, state=state.lines() if state is not None else None)
+        open_work = [w["id"] for w in state.work() if w.get("status") != "done"] if state is not None else []
         tid = task_id(request)
         turns: list[Turn] = []
         sent: list[dict] = []
-        text = prompt.message(request[:REQUEST_CAP], summary.text)
+        text = prompt.message(request[:REQUEST_CAP], summary.text, resolution.line() if resolution else None)
         spec, problems, notes = None, [], []
         for attempt in range(1 + MAX_REPAIRS):
             t, answer = self.turn(tid, attempt + 1, "intake" if attempt == 0 else "repair", text, sent)
@@ -227,16 +269,49 @@ class Intake:
                 t.problems = ["json@$"]
             else:
                 spec = build_spec(request, obj, summary)
+                if resolution is not None:
+                    spec["resolution"] = resolution.spec()
+                    if resolution.assumption:  # an unresolved fragment is an assumption, never a question (S7)
+                        spec["assumptions"].append(dict(resolution.assumption))
                 found = validate(spec, "task/1")
                 problems = [str(p) for p in hard(found)]
                 notes = [str(p) for p in soft(found)]
                 t.problems = [f"{p.rule or 'shape'}@{p.path}" for p in hard(found)]
+                if not problems:
+                    extra = context_problems(spec, summary.text, root, open_work)
+                    problems += [msg for _, msg in extra]
+                    t.problems += [label for label, _ in extra]
             self._record(tid, t)
             if not problems:
                 break
             text = prompt.repair(problems, answer or "")
         status = "ready" if not problems and spec is not None else "blocked"
-        return Result(status, tid, spec, problems, notes, turns, summary, sent)
+        return Result(status, tid, spec, problems, notes, turns, summary, sent, resolution)
 
 
-__all__ = ["Intake", "Result", "Turn", "MAX_REPAIRS", "MEASURED_OVERHEAD", "overhead_of", "task_id", "build_spec", "usage_counts"]
+def handle(intake: Intake, raw_request: str, root: str | Path, state: Any, planner: Any = None) -> Result:
+    """One request end to end (rev 2 S6-S8): withhold secret-looking lines, resolve a fragment from the state, intake,
+    route by kind, and one request row in ``<ga_dir>/ledger/requests-<UTC day>.jsonl`` (kind, tokens, seconds,
+    asked-human count, outcome)."""
+    from .fragment import resolve, withhold
+    from .route import planner_stub, route
+    t0 = time.monotonic()
+    request, withheld = withhold(raw_request.strip())
+    resolution = resolve(request, state)
+    res = intake.run(request, root, state=state, resolution=resolution)
+    if res.status == "ready":
+        res.outcome = route(res.spec, state, planner or planner_stub)
+    else:
+        res.outcome = {"status": "blocked", "next": None, "outcome": "blocked"}
+    now = intake.clock()
+    row = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)), "task": res.task_id,
+           "request": request[:120], "kind": (res.spec or {}).get("kind"), "outcome": res.outcome["outcome"],
+           "tokens": res.tokens(), "seconds": round(time.monotonic() - t0, 3),
+           "asked_human": len(res.human_questions()) if res.status == "ready" else 0, "turns": len(res.turns),
+           "withheld": withheld, "resolution": resolution.how if resolution else None,
+           "backend": intake.backend, "model": intake.model}
+    l0.append(intake.ga_dir / "ledger" / f"requests-{time.strftime('%Y-%m-%d', time.gmtime(now))}.jsonl", row)
+    return res
+
+
+__all__ = ["Intake", "Result", "handle", "context_problems", "Turn", "MAX_REPAIRS", "MEASURED_OVERHEAD", "overhead_of", "task_id", "build_spec", "usage_counts"]
