@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +44,8 @@ def default(home: str = "~") -> dict[str, Any]:
         "ask_home": None,
         "token_sources": {"act": [f"{h}/ga-sdk-check/.ga/act/ledger", f"{h}/token/.ga/act/ledger"],
                           "supervise": [f"{h}/ga-sdk-check/.ga/ledger.jsonl"]},
-        "bridge": {"argv": ["python3", f"{h}/baseline/ops/agy_bridge/bridge.py", "--config", f"{h}/agy-bridge.json"],
+        # the Python running `ga console init` (on the Mac ~/ga-venv/bin/python3): the bridge imports this same ga
+        "bridge": {"argv": [sys.executable, f"{h}/baseline/ops/agy_bridge/bridge.py", "--config", f"{h}/agy-bridge.json"],
                    "cwd": f"{h}/baseline", "config_path": f"{h}/agy-bridge.json"},
         "services": {
             "token-api": {"argv": [f"{venv}/uvicorn", "app.main:create_app", "--factory", "--port", "8000"],

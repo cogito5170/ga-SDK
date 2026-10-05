@@ -469,9 +469,9 @@ class D1Ask(Base):
 class D2Version(unittest.TestCase):
     def test_version_0_10_0_and_the_static_page_is_packaged(self):
         import ga
-        self.assertEqual(ga.__version__, "0.10.0")
+        self.assertGreaterEqual(tuple(map(int, ga.__version__.split("."))), (0, 10, 0))  # GA43 moved it on to 0.11.0
         text = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
-        self.assertIn('version = "0.10.0"', text)
+        self.assertIn(f'version = "{ga.__version__}"', text)
         self.assertIn('"console/static/*"', text)
 
 
@@ -497,7 +497,8 @@ class D1Config(unittest.TestCase):
         self.assertEqual(raw["services"]["token-worker"]["argv"][1:], ["-m", "app.worker"])
         self.assertEqual(raw["services"]["token-web"]["argv"], ["npm", "run", "dev"])
         self.assertEqual(raw["services"]["token-web"]["cwd"], "~/token/frontend")
-        self.assertEqual(raw["bridge"]["argv"], ["python3", "~/baseline/ops/agy_bridge/bridge.py", "--config",
+        self.assertEqual(raw["bridge"]["argv"][0], sys.executable)  # the bridge imports the ga that ran init
+        self.assertEqual(raw["bridge"]["argv"], [sys.executable, "~/baseline/ops/agy_bridge/bridge.py", "--config",
                                                  "~/agy-bridge.json"])
         self.assertIn("~/ga-sdk-check", [r["path"] for r in raw["repos"]])
         with contextlib.redirect_stderr(io.StringIO()):

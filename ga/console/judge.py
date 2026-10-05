@@ -22,7 +22,11 @@ V -- invariants (after gentleMonster's engine judge). Every one must hold; unkno
                                    box 1-3 px thick, >= 6 px long, with a background) is on a control (button, input,
                                    select, textarea, a), on [aria-current] or :focus-visible, or inside [role=progressbar]
                                    or [data-line=functional]; everything else must be separated by space and weight
-    weight                         everything the page loads (document, css, js, images) <= 512 KB
+    undefined-var                  every var(--x) without a fallback, in a same-origin stylesheet rule that matches a
+                                   rendered element, resolves on that element (defined on :root or an ancestor rule);
+                                   an undefined var() draws nothing, so a line or a colour silently vanishes
+    weight                         everything the page loads (document, css, js, images) <= 512 KB; an open
+                                   text/event-stream response is left out and never read to the end
 
 The page is opened three times: 375 and 1440 px with reduced motion (all V), 1440 px with motion (reported only).
 """
@@ -43,7 +47,8 @@ CHROMA_SHARE = 0.0002                 # ... and the page fails when more than th
 LINE_OK = {"self": "button,input,select,textarea,a,[aria-current],:focus-visible",
            "inside": "[role=progressbar],[data-line=functional]"}
 CHECKS = ("overflow-375", "overflow-1440", "contrast", "min-font-375", "offline", "js-errors", "names", "headings",
-          "reduced-motion", "monochrome", "display-line", "weight")
+          "reduced-motion", "monochrome", "display-line", "undefined-var", "weight")
+STREAM = "text/event-stream"
 
 _JS_TEXT = r"""([NEED, NEED_LARGE]) => {
  const P = s => { const m = /rgba?\(([^)]+)\)/.exec(s || ''); if (!m) return null;
@@ -149,6 +154,31 @@ _JS_LINES = r"""([SELF, INSIDE]) => {
  return bad;
 }"""
 
+_JS_VARS = r"""() => {
+ const out = [], seen = new Set();
+ const DYN = /:(?:hover|focus|focus-visible|focus-within|active|visited|target)\b/g;
+ const PSEUDO = /::?(?:before|after|marker|placeholder|selection|backdrop|first-line|first-letter)\b/g;
+ const rendered = el => { const r = el.getBoundingClientRect(); return (r.width > 0 || r.height > 0) && getComputedStyle(el).display !== 'none'; };
+ const walk = rules => {
+   for (const rule of rules) {
+     if (rule.cssRules && !rule.selectorText) { walk(rule.cssRules); continue; }
+     if (!rule.selectorText || !rule.style) continue;
+     const names = [];
+     for (const m of rule.style.cssText.matchAll(/var\(\s*(--[\w-]+)\s*([,)])/g)) if (m[2] === ')') names.push(m[1]);
+     if (!names.length) continue;
+     let els = [];
+     try { els = [...document.querySelectorAll(rule.selectorText.replace(PSEUDO, '').replace(DYN, ''))].filter(rendered); } catch (e) { continue; }
+     for (const name of names) {
+       const el = els.find(e => getComputedStyle(e).getPropertyValue(name).trim() === '');
+       const key = name + ' ' + rule.selectorText;
+       if (el && !seen.has(key)) { seen.add(key); out.push({name, rule: rule.selectorText.slice(0, 60), el: el.tagName.toLowerCase()}); }
+     }
+   }
+ };
+ for (const sheet of document.styleSheets) { let rules; try { rules = sheet.cssRules; } catch (e) { continue; } if (rules) walk(rules); }
+ return out;
+}"""
+
 
 _AVAILABLE: list = []
 
@@ -209,6 +239,7 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
     stem = Path(urlsplit(url).path).stem or "page"
     ext, errs, raw = [], [], {}
     sizes: dict = {}
+    streams: list = []
     t0 = time.time()
     with sync_playwright() as p:
         b = _launch(p)
@@ -230,6 +261,10 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
             pg.goto(url, wait_until="load")
             pg.wait_for_timeout(settle_ms)
             for resp in resps:
+                if STREAM in (resp.headers.get("content-type") or ""):
+                    if resp.request.url not in streams:
+                        streams.append(resp.request.url)   # an open stream has no end: never read, never weighed
+                    continue
                 if resp.request.url not in sizes:
                     try:
                         sizes[resp.request.url] = len(resp.body())
@@ -239,6 +274,7 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
             raw[key] = {"doc": pg.evaluate(_JS_DOC)}
             if motion == "reduce":
                 raw[key]["text"] = pg.evaluate(_JS_TEXT, list(CONTRAST))
+                raw[key]["vars"] = pg.evaluate(_JS_VARS)
                 raw[key]["lines"] = pg.evaluate(_JS_LINES, [LINE_OK["self"], LINE_OK["inside"]])
                 png = pg.screenshot(full_page=True)
                 if shots:
@@ -263,6 +299,7 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
     weight = sum(sizes.values())
     chroma = {"375": m["chroma"], "1440": d["chroma"]}
     lines = m["lines"] + [x for x in d["lines"] if x not in m["lines"]]
+    undef = m["vars"] + [x for x in d["vars"] if x not in m["vars"]]
     v = {"overflow-375": m["doc"]["overflow"] <= 1 and not m["text"]["cut"],
          "overflow-1440": d["doc"]["overflow"] <= 1 and not d["text"]["cut"],
          "contrast": bool(items) and not low and not unm,
@@ -274,6 +311,7 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
          "reduced-motion": not m["doc"]["running"] and not d["doc"]["running"],
          "monochrome": all(c["share"] <= CHROMA_SHARE for c in chroma.values()),
          "display-line": not lines,
+         "undefined-var": not undef,
          "weight": 0 < weight <= MAX_BYTES}
     failed = [k for k in CHECKS if not v[k]]
     return {"pass": not failed, "target": target, "V": v, "failed": failed,
@@ -287,7 +325,9 @@ def measure(target: str, shots: "str | Path | None" = None, settle_ms: int = 200
                       "running-reduced": m["doc"]["running"] + d["doc"]["running"],
                       "running-with-motion": len(raw["1440-no-preference"]["doc"]["running"]),
                       "chroma-share": {k: round(c["share"], 6) for k, c in chroma.items()},
-                      "max-chroma": max(c["max"] for c in chroma.values()), "display-lines": lines[:6], "bytes": weight, "requests": len(sizes),
+                      "max-chroma": max(c["max"] for c in chroma.values()), "display-lines": lines[:6],
+                      "undefined-vars": sorted({x["name"] for x in undef}), "undefined-var-rules": undef[:6],
+                      "streams": streams[:6], "bytes": weight, "requests": len(sizes),
                       "seconds": round(time.time() - t0, 1)}}
 
 
