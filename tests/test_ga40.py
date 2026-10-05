@@ -109,6 +109,19 @@ class Card(unittest.TestCase):
             self.assertIn(cardmod.TEMPLATE, c.text)
             self.assertTrue(c.dropped)
 
+    def test_huge_request_on_a_small_repo_is_cut_and_the_map_still_fits(self):
+        with tempfile.TemporaryDirectory() as t:
+            r = small_repo(Path(t))
+            c = cardmod.build("요청 " * 40000, r, to="GA")
+            self.assertLessEqual(c.size, cardmod.CARD_MAX)
+            self.assertLessEqual(c.sections["request"], cardmod.REQUEST_MAX + len("## Request\n\n\n"))
+            self.assertIn("...(cut)", c.text)
+            for want in ("unittest discover", "app-sdk (pyproject.toml)", "readme run head - Running", "dir - web/"):
+                self.assertIn(want, c.text)  # the request does not starve the map
+            short = cardmod.build("연간 요금 토글", r, to="GA")
+            self.assertNotIn("(cut)", short.text)  # nothing is cut when it fits
+            self.assertIn("## Request\n연간 요금 토글\n", short.text)
+
 
 # ---- D1: one turn, one repair, ga check -------------------------------------------------------------------------
 class Turn(unittest.TestCase):
@@ -152,6 +165,16 @@ class Turn(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("failed after 2 turn(s), no draft written", out[-1])
         self.assertFalse((home / "plan" / "drafts").exists() and any((home / "plan" / "drafts").iterdir()))
+
+    def test_non_object_answers_and_configs_are_refused(self):
+        for bad in ("[1, 2]", '{"head": {"schema": "directive/1"}}', '{"head": {}, "item": [1]}'):
+            self.assertTrue(draft.extract(bad)[1], bad)
+        (self.repo / "ga-plan.json").write_text("[1, 2]")
+        out = []
+        run = FakeRunner([answer()])
+        self.assertEqual(cli.main(["x", "--repo", str(self.repo), "--yes"], runner=run, out=out.append), 2)
+        self.assertIn("not a ga-plan/1 config", out[-1])
+        self.assertEqual(run.calls, [])
 
     def test_a_draft_carries_ga_check_errors(self):
         h = head()
@@ -243,6 +266,9 @@ class Lessons(unittest.TestCase):
                                      "README.md run section (the Token venv per README path B) and .ga-judge.json."))
             self.assertQuiet("L5", dr(fixed), {"repo": repo})
             self.assertEqual(lessons.check(dr(fixed), {"repo": repo}), [])
+            # no default-like word: literals alone are not defaults (quiet)
+            self.assertQuiet("L5", dr(head(scope=scope("the dev server listens on port 8787 under ~/token/venv, branch "
+                                                       "main."))), {"repo": repo})
             (repo / "README.md").unlink()
             self.assertIn("read pyproject.toml", self.assertFires("L5", dr(h), {"repo": repo})[0]["message"])
 
