@@ -1,3 +1,14 @@
+# STATE — CMD-GA36 rev 2, branch claude/ga36 (done)
+
+ga 0.8.0: GA CLI `ga ask` / `ga bridge`, GA UI `ga ui` (GA Engine naming, research/NAMING.md).
+- `ga/ask/intents.py`: 8 intents (help status next run report usage doctor stop), ko+en regex, verbs weigh 3; unmatched -> 3 closest, never a guess. No model in routing.
+- `ga/ask/__init__.py` Engine: cost classes free|mail|model; `execute` refuses model/mail without confirmation (`--yes` = mail only); daily agy cap (`DayTurns`, default 10); `--model` one agy turn (`--mode plan --disable-slash-commands`, prompt <= 1500 tokens); doctor's five kinds; ledger `~/.ga-ask/ledger.jsonl`.
+- `ga/ask/solve.py`: `--solve` / ui Solve box: one Supervisor in-process with ga's tool table only, turn cap (8) and the daily cap, y/N with the estimate (cap x measured overhead), per-turn lines from log.jsonl, totals = sums, overhead share, one ledger row; non-table tools and TOOL_NEEDED listed.
+- `ga/bridge`: baseline's ops/agy_bridge absorbed (tools `ga.bridge.tools`), capacity 503 -> one retry -> dependency blocker `capacity:`; agy adapter reason `capacity`.
+- `ga/ui`: 127.0.0.1, token, Host/Origin/Sec-Fetch-Site, POST+X-GA-Token, CSP, SSE with Last-Event-ID; `ga/runlog.py` (Tail, TurnMeter, follow, RunLog, redact).
+
+Tests: tests/test_ga36.py (41), tests/test_ga36_bridge.py (24, 9 ported as-is), tests/mutations_ga36.py 12/12 killed with a green control.
+
 # STATE — CMD-GA34 rev 1, branch claude/ga34-realwork (done)
 
 ga 0.7.0: pool nodes do real repository work.
