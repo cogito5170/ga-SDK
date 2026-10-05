@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>브랜치 · GA Console</title>
+<link rel="stylesheet" href="../static/tokens.css">
+<link rel="stylesheet" href="golden.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span>127.0.0.1:8765 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="now.html">지금</a></li>
+      <li><a href="work.html">작업<span class="n">4</span></a></li>
+      <li><a href="branches.html" aria-current="page">브랜치</a></li>
+      <li><a href="services.html">서비스<span class="n">3/4</span></a></li>
+      <li><a href="tokens.html">토큰</a></li>
+      <li><a href="ask.html">묻기</a></li>
+      <li><a href="decisions.html">결정</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="mast">
+  <p class="cap">브랜치 · <b>저장소 3</b> · 안 합친 것 4</p>
+  <h1>공용 머리 <span class="mono">5558f39</span></h1>
+  <span class="hot" aria-hidden="true"></span>
+  <p class="lede">ga-sdk 의 공용 브랜치가 지금 가리키는 커밋입니다. 1시간 전, GA36 보고를 합친 것.
+    <span class="sub">머리 = 브랜치의 가장 최근 커밋.</span></p>
+</div>
+
+<main id="main">
+  <section aria-labelledby="h-repos">
+    <h2 id="h-repos">저장소마다 공용 머리</h2>
+    <ul class="items">
+      <li>
+        <div class="row"><h3>ga-sdk</h3><span class="state"><span class="mark ok" aria-hidden="true"></span>깨끗함</span></div>
+        <p class="say"><span class="mono">5558f39</span> CMD-GA36: report on the merge with ecc80b0</p>
+        <p class="meta"><span>공용 <b class="mono">claude/gracious-meitner-vp49xe</b></span><span>지금 <b class="mono">claude/con1</b></span><span>앞섬 3 · 뒤짐 0</span><span class="mono">~/src/ga-sdk</span></p>
+      </li>
+      <li>
+        <div class="row"><h3>Token</h3><span class="state"><span class="mark wait" aria-hidden="true"></span>고친 파일 2개 있음</span></div>
+        <p class="say"><span class="mono">a91c04e</span> usage: group by local day</p>
+        <p class="meta"><span>공용 <b class="mono">main</b></span><span>지금 <b class="mono">claude/tk12</b></span><span>앞섬 1 · 뒤짐 2</span><span class="mono">~/src/Token</span></p>
+      </li>
+      <li>
+        <div class="row"><h3>gentleMonster</h3><span class="state"><span class="mark ok" aria-hidden="true"></span>깨끗함</span></div>
+        <p class="say"><span class="mono">0c7d2b1</span> worldtrip: judge passes at 375</p>
+        <p class="meta"><span>공용 <b class="mono">main</b></span><span>지금 <b class="mono">main</b></span><span>앞섬 0 · 뒤짐 0</span><span class="mono">~/src/gentleMonster</span></p>
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="h-br">
+    <h2 id="h-br">작업 브랜치 <span class="sub">claude/* · agv/*</span></h2>
+    <table class="tbl">
+      <thead><tr><th>브랜치</th><th>무엇</th><th>합침</th><th class="num">앞섬</th><th class="num">뒤짐</th><th>머리</th><th>언제</th></tr></thead>
+      <tbody>
+        <tr><td data-label="브랜치"><span class="mono">claude/con1</span></td><td data-label="무엇">콘솔 모양과 견본 화면</td><td data-label="합침"><span class="state"><span class="mark wait" aria-hidden="true"></span>안 합침</span></td><td class="num" data-label="앞섬">3</td><td class="num" data-label="뒤짐">0</td><td data-label="머리"><span class="mono">e41a9d0</span></td><td data-label="언제">14:20</td></tr>
+        <tr><td data-label="브랜치"><span class="mono">claude/con2</span></td><td data-label="무엇">콘솔 서버</td><td data-label="합침"><span class="state"><span class="mark wait" aria-hidden="true"></span>안 합침</span></td><td class="num" data-label="앞섬">5</td><td class="num" data-label="뒤짐">0</td><td data-label="머리"><span class="mono">7b02c11</span></td><td data-label="언제">14:31</td></tr>
+        <tr><td data-label="브랜치"><span class="mono">agv/tk12-r2</span></td><td data-label="무엇">Token 날짜 묶음 다시</td><td data-label="합침"><span class="state"><span class="mark wait" aria-hidden="true"></span>안 합침</span></td><td class="num" data-label="앞섬">1</td><td class="num" data-label="뒤짐">2</td><td data-label="머리"><span class="mono">a91c04e</span></td><td data-label="언제">11:58</td></tr>
+        <tr><td data-label="브랜치"><span class="mono">claude/ga38</span></td><td data-label="무엇">ga act 실행기</td><td data-label="합침"><span class="state"><span class="mark ok" aria-hidden="true"></span>합침</span></td><td class="num" data-label="앞섬">0</td><td class="num" data-label="뒤짐">4</td><td data-label="머리"><span class="mono">b811614</span></td><td data-label="언제">어제</td></tr>
+        <tr><td data-label="브랜치"><span class="mono">claude/ga37</span></td><td data-label="무엇">ga do 묻고 하기</td><td data-label="합침"><span class="state"><span class="mark ok" aria-hidden="true"></span>합침</span></td><td class="num" data-label="앞섬">0</td><td class="num" data-label="뒤짐">6</td><td data-label="머리"><span class="mono">ecc80b0</span></td><td data-label="언제">어제</td></tr>
+      </tbody>
+    </table>
+    <p class="note">합침 = 이 브랜치의 머리가 공용 브랜치 안에 들어 있음. 앞섬 = 공용에 없는 커밋 수, 뒤짐 = 이 브랜치에 없는 공용 커밋 수.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>이 화면은 읽기만 합니다. 합치기와 지우기는 허브가 합니다.</p>
+</footer>
+</body>
+</html>

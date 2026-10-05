@@ -1,0 +1,45 @@
+{
+ "pass": true,
+ "target": "ga/console/golden/services.html",
+ "V": {
+  "overflow-375": true,
+  "overflow-1440": true,
+  "contrast": true,
+  "min-font-375": true,
+  "offline": true,
+  "js-errors": true,
+  "names": true,
+  "headings": true,
+  "reduced-motion": true,
+  "accent": true,
+  "weight": true
+ },
+ "failed": [],
+ "facts": {
+  "min-contrast": 4.88,
+  "low-contrast": [],
+  "unmeasured": [],
+  "min-font-375": 14.2505,
+  "small-text": [],
+  "overflow": {
+   "375": 0,
+   "1440": 0
+  },
+  "cut-text": [],
+  "external": [],
+  "errors": [],
+  "unnamed": [],
+  "headings": {
+   "lang": "ko",
+   "h1": 1,
+   "first": 1,
+   "skips": []
+  },
+  "running-reduced": [],
+  "running-with-motion": 3,
+  "accent-share": 0.0063,
+  "bytes": 17081,
+  "requests": 3,
+  "seconds": 2.3
+ }
+}

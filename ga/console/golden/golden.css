@@ -1,0 +1,153 @@
+/* GA Console golden screens. Colour, type and space come only from ../static/tokens.css; this file is layout.
+   Grammar (DESIGN.md): paper / ink / hairline, one hot accent, one protagonist per screen, captions wide-tracked. */
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:var(--font-body);font-size:var(--step-0);line-height:1.5;-webkit-font-smoothing:antialiased}
+code,pre,kbd,.mono{font-family:var(--font-mono);font-size:.88em}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:.2em}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.skip{position:absolute;left:-999px;top:0;background:var(--bg);color:var(--ink);padding:var(--space-1)}
+.skip:focus{left:var(--space-3)}
+p{margin:0}
+
+/* frame */
+.top,.mast,main,.foot{max-width:1280px;margin:0 auto;padding-left:var(--space-3);padding-right:var(--space-3)}
+.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--space-2) var(--space-5);
+  padding-top:var(--space-3);padding-bottom:var(--space-2);border-bottom:1px solid var(--ink)}
+.brand{font-size:var(--step-m1);font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.brand span{display:inline-block;font-weight:400;letter-spacing:.04em;color:var(--sub);text-transform:none;margin-left:var(--space-1)}
+.nav ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
+.nav a{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;font-size:var(--step-0);
+  border-bottom:3px solid transparent}
+.nav a:hover{border-bottom-color:var(--line)}
+.nav a[aria-current=page]{font-weight:700;border-bottom-color:var(--accent)}
+.nav .n{font-family:var(--font-mono);font-size:var(--step-m1);color:var(--sub);margin-left:var(--space-0)}
+
+/* the masthead: caption, one protagonist in empty space, one plain line */
+.mast{padding-top:var(--space-6);padding-bottom:var(--space-5)}
+.cap{font-size:var(--step-m1);font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--sub);margin:0 0 var(--space-2)}
+.cap b{color:var(--ink);font-weight:700}
+h1{font-family:var(--font-display);font-size:var(--mast);font-weight:700;line-height:1;letter-spacing:-.03em;margin:0;
+  overflow-wrap:anywhere}
+h1 .unit{font-size:var(--step-3);letter-spacing:0;font-weight:600;margin-left:var(--space-1)}
+.hot{display:block;width:100%;height:12px;background:var(--accent);margin:var(--space-4) 0 var(--space-3)}
+.lede{font-size:var(--step-1);max-width:46ch}
+.lede .sub,.sub{color:var(--sub)}
+
+main{display:grid;gap:var(--space-6);padding-top:var(--space-3);padding-bottom:var(--space-7)}
+section{min-width:0}
+h2{font-size:var(--step-m1);font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin:0 0 var(--space-3);
+  padding-top:var(--space-2);border-top:1px solid var(--ink);display:flex;justify-content:space-between;gap:var(--space-2);flex-wrap:wrap}
+h2 .sub{font-weight:400;letter-spacing:.04em;text-transform:none}
+h3{font-size:var(--step-1);font-weight:700;margin:0;overflow-wrap:anywhere}
+.note{font-size:var(--step-m1);color:var(--sub);max-width:70ch;margin-top:var(--space-2)}
+.term{border-bottom:1px dotted var(--sub)}
+
+/* state marks: shape first, text always beside it, colour last */
+.mark{display:inline-block;width:.62em;height:.62em;margin-right:.4em;vertical-align:.06em;flex:none}
+.mark.ok{background:var(--state-ok)}
+.mark.live{border-radius:50%;border:2px solid var(--state-live);background:radial-gradient(circle,var(--state-live) 0 34%,transparent 36%)}
+.mark.wait{border-radius:50%;border:2px solid var(--state-wait)}
+.mark.off{height:2px;vertical-align:.25em;background:var(--state-off)}
+.mark.fail{background:linear-gradient(45deg,transparent 40%,var(--state-fail) 40% 60%,transparent 60%),
+  linear-gradient(-45deg,transparent 40%,var(--state-fail) 40% 60%,transparent 60%)}
+h1 .mark{width:.42em;height:.42em;vertical-align:.12em;border-width:.07em}
+.state{white-space:nowrap}
+
+/* living things breathe; nothing else moves. Never under reduced motion (declared only for no-preference). */
+@media (prefers-reduced-motion:no-preference){
+  .mark.live{animation:breath var(--breath) var(--ease) infinite}
+  @keyframes breath{0%,100%{transform:scale(1)}50%{transform:scale(.72)}}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* figures: big numbers with a caption under each */
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-4) var(--space-5);margin:0}
+.figs div{min-width:0;display:flex;flex-direction:column-reverse;justify-content:flex-end}
+.figs dt{font-size:var(--step-m1);letter-spacing:.12em;text-transform:uppercase;color:var(--sub)}
+.figs dd{margin:0 0 var(--space-0);font-size:var(--step-4);font-weight:700;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.figs dd small{font-size:var(--step-0);font-weight:400;color:var(--sub);letter-spacing:0}
+
+/* tables: hairlines; on a phone each row becomes a labelled card */
+.tbl{width:100%;border-collapse:collapse;font-size:var(--step-m1);font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{text-align:left;padding:var(--space-1) var(--space-2) var(--space-1) 0;border-bottom:1px solid var(--line);vertical-align:baseline}
+.tbl th{font-weight:600;color:var(--sub);letter-spacing:.08em;text-transform:uppercase;border-bottom-color:var(--ink)}
+.tbl td.num,.tbl th.num{text-align:right}
+.tbl tr.fail td{background:var(--state-fail-tint)}
+.tbl caption{text-align:left;color:var(--sub);font-size:var(--step-m1);padding-bottom:var(--space-1)}
+@media (max-width:719px){
+  .tbl,.tbl tbody,.tbl tr,.tbl td{display:block;width:100%}
+  .tbl thead{display:none}
+  .tbl tr{border-bottom:1px solid var(--line);padding:var(--space-1) 0}
+  .tbl td{border:none;padding:2px 0;overflow-wrap:anywhere}
+  .tbl td.num{text-align:left}
+  .tbl td[data-label]::before{content:attr(data-label) "  ";color:var(--sub);letter-spacing:.08em;text-transform:uppercase;font-size:var(--step-m1)}
+}
+
+/* lists of things: one item per hairline */
+.items{list-style:none;margin:0;padding:0}
+.items>li{padding:var(--space-3) 0;border-bottom:1px solid var(--line);display:grid;gap:var(--space-1);min-width:0}
+.items>li.fail{background:var(--state-fail-tint);padding-left:var(--space-2);padding-right:var(--space-2)}
+.row{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-0) var(--space-3);min-width:0}
+.meta{font-size:var(--step-m1);color:var(--sub);display:flex;flex-wrap:wrap;gap:var(--space-0) var(--space-3)}
+.meta b{color:var(--ink);font-weight:600}
+.id{font-family:var(--font-mono);font-size:var(--step-m1);font-weight:600}
+.say{max-width:62ch}
+
+/* the work track: sent -> running -> reported -> integrated, four stops */
+.track{list-style:none;margin:var(--space-1) 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));max-width:640px;
+  font-size:var(--step-m1);color:var(--sub)}
+.track li{border-top:3px solid var(--line);padding-top:var(--space-0);min-width:0;overflow-wrap:anywhere}
+.track li.done{border-top-color:var(--ink);color:var(--ink)}
+.track li.now{border-top-color:var(--ink);color:var(--ink);font-weight:700}
+.track li.back{border-top-color:var(--state-fail);color:var(--ink);font-weight:700}
+
+/* horizontal bars (tokens per work item); the number is always written beside it */
+.bars{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-2)}
+.bars li{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr) max-content;gap:var(--space-2);align-items:center;font-size:var(--step-m1)}
+.bars .bar{height:10px;background:var(--surface)}
+.bars .bar i{display:block;height:100%;background:var(--ink)}
+.bars .v{font-variant-numeric:tabular-nums;text-align:right}
+
+/* controls */
+button,.btn{font:inherit;font-size:var(--step-m1);font-weight:600;min-height:44px;padding:0 var(--space-3);cursor:pointer;
+  color:var(--ink);background:var(--bg);border:1px solid var(--ink);border-radius:0}
+button:hover{background:var(--surface)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+button[disabled]{color:var(--sub);border-color:var(--line);cursor:not-allowed;background:var(--bg)}
+.actions{display:flex;flex-wrap:wrap;gap:var(--space-1);align-items:center}
+label{font-size:var(--step-m1);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--sub)}
+input[type=search],input[type=text],textarea{font:inherit;font-size:var(--step-0);color:var(--ink);background:var(--bg);
+  border:1px solid var(--ink);border-radius:0;padding:var(--space-2);min-height:44px;width:100%;max-width:100%}
+textarea{min-height:8.5em;line-height:1.5;resize:vertical}
+.field{display:grid;gap:var(--space-1)}
+.choice{display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-4);border:0;margin:0;padding:0}
+.choice legend{font-size:var(--step-m1);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);padding:0;margin-bottom:var(--space-1)}
+.choice label{display:inline-flex;align-items:center;gap:var(--space-1);min-height:44px;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:400;font-size:var(--step-0)}
+.choice input{width:20px;height:20px;accent-color:var(--ink)}
+
+/* the cost card in 묻기: cost first, run after confirm */
+.cost{border:1px solid var(--ink);padding:var(--space-4);display:grid;gap:var(--space-3);max-width:720px}
+.cost .figs dd{font-size:var(--step-3)}
+
+/* logs: a raised plane, mono, line numbers */
+.log{background:var(--surface);margin:0;padding:var(--space-2) var(--space-3);list-style:none;font-family:var(--font-mono);
+  font-size:var(--step-m1);line-height:1.6;overflow-wrap:anywhere}
+.log li{display:grid;grid-template-columns:3.5ch 9ch minmax(0,1fr);gap:var(--space-2);min-width:0}
+.log .ln,.log .at{color:var(--sub)}
+.log .tx{overflow-wrap:anywhere}
+.log li.err .tx{font-weight:700}
+.log li.err .tx::before{content:"! ";}
+@media (max-width:719px){.log li{grid-template-columns:3.5ch minmax(0,1fr)}.log .at{display:none}}
+
+/* decisions: search, then hits */
+mark{background:var(--surface);color:var(--ink);padding:0 .1em;box-shadow:inset 0 -2px 0 var(--ink)}
+.hits .id{display:inline-block;min-width:5ch}
+
+.two{display:grid;gap:var(--space-6)}
+@media (min-width:960px){.two{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}}
+
+.foot{border-top:1px solid var(--line);padding-top:var(--space-3);padding-bottom:var(--space-5);color:var(--sub);font-size:var(--step-m1)}
+.foot p{max-width:70ch}

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>작업 · GA Console</title>
+<link rel="stylesheet" href="../static/tokens.css">
+<link rel="stylesheet" href="golden.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span>127.0.0.1:8765 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="now.html">지금</a></li>
+      <li><a href="work.html" aria-current="page">작업<span class="n">4</span></a></li>
+      <li><a href="branches.html">브랜치</a></li>
+      <li><a href="services.html">서비스<span class="n">3/4</span></a></li>
+      <li><a href="tokens.html">토큰</a></li>
+      <li><a href="ask.html">묻기</a></li>
+      <li><a href="decisions.html">결정</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="mast">
+  <p class="cap">작업 · <b>열린 것 4</b> · 이번 주 11</p>
+  <h1>CMD-TK12 돌려보냄</h1>
+  <span class="hot" aria-hidden="true"></span>
+  <p class="lede">보고서 형식이 틀려 다시 보냈습니다. 고친 보고가 오면 여기서 <span class="term">통합</span>할 수 있어요.
+    <span class="sub">통합 = 공용 브랜치에 합침.</span></p>
+</div>
+
+<main id="main">
+  <section aria-labelledby="h-open">
+    <h2 id="h-open">열린 작업 <span class="sub">보낸 시각 순 · 최근 먼저</span></h2>
+    <ol class="items">
+      <li class="fail">
+        <div class="row"><span class="id">CMD-TK12</span><h3>Token 사용량 화면의 날짜 묶음</h3></div>
+        <p class="say">보고서의 tests 칸이 비어 있어 받지 않았어요. 같은 지시로 다시 보냈습니다.</p>
+        <ol class="track" aria-label="진행">
+          <li class="done">보냄 09:12</li><li class="done">도는 중</li><li class="done">보고됨 11:07</li><li class="back"><span class="mark fail" aria-hidden="true"></span>돌려보냄 11:20</li>
+        </ol>
+        <p class="meta"><span>받는 쪽 <b>token</b></span><span>build</span><span>182,440 토큰</span><span>결정 <a href="decisions.html">BD-207</a></span><span class="mono">claude/tk12</span></p>
+      </li>
+      <li>
+        <div class="row"><span class="id">CMD-CON2</span><h3>GA Console 서버와 수집기</h3></div>
+        <p class="say">서버를 만드는 중. 턴 7, 지금까지 41,280 토큰.</p>
+        <ol class="track" aria-label="진행">
+          <li class="done">보냄 13:58</li><li class="now"><span class="mark live" aria-hidden="true"></span>도는 중</li><li>보고됨</li><li>통합됨</li>
+        </ol>
+        <p class="meta"><span>받는 쪽 <b>server</b></span><span>build</span><span>41,280 토큰</span><span>결정 <a href="decisions.html">BD-214</a> <a href="decisions.html">BD-215</a></span><span class="mono">claude/con2</span></p>
+      </li>
+      <li>
+        <div class="row"><span class="id">CMD-CON1</span><h3>GA Console 의 모양과 화면 문법</h3></div>
+        <p class="say">토큰, 설계 문서, 일곱 화면 견본, 판정기를 보고했어요. 통합을 기다립니다.</p>
+        <ol class="track" aria-label="진행">
+          <li class="done">보냄 13:58</li><li class="done">도는 중</li><li class="now"><span class="mark ok" aria-hidden="true"></span>보고됨 14:20</li><li>통합됨</li>
+        </ol>
+        <p class="meta"><span>받는 쪽 <b>design</b></span><span>design</span><span>0 토큰 · 모델 안 씀</span><span>결정 <a href="decisions.html">BD-214</a></span><span class="mono">claude/con1</span></p>
+      </li>
+      <li>
+        <div class="row"><span class="id">CMD-GA39</span><h3>ga do 의 비용 미리보기</h3></div>
+        <p class="say">아직 보내지 않은 초안입니다.</p>
+        <ol class="track" aria-label="진행">
+          <li><span class="mark wait" aria-hidden="true"></span>초안</li><li>도는 중</li><li>보고됨</li><li>통합됨</li>
+        </ol>
+        <p class="meta"><span>받는 쪽 <b>GA</b></span><span>build</span><span>—</span></p>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-done">
+    <h2 id="h-done">끝난 작업 <span class="sub">최근 3</span></h2>
+    <table class="tbl">
+      <thead><tr><th>작업</th><th>상태</th><th>보낸 때</th><th>보고</th><th class="num">토큰</th><th>결정</th></tr></thead>
+      <tbody>
+        <tr><td data-label="작업"><span class="id">CMD-GA38</span> ga act 실행기</td><td data-label="상태"><span class="state"><span class="mark ok" aria-hidden="true"></span>통합됨</span></td><td data-label="보낸 때">10-04 21:10</td><td data-label="보고">10-05 08:55</td><td class="num" data-label="토큰">1,617</td><td data-label="결정"><a href="decisions.html">BD-201</a></td></tr>
+        <tr><td data-label="작업"><span class="id">CMD-GA37</span> ga do 묻고 하기</td><td data-label="상태"><span class="state"><span class="mark ok" aria-hidden="true"></span>통합됨</span></td><td data-label="보낸 때">10-04 15:02</td><td data-label="보고">10-04 20:41</td><td class="num" data-label="토큰">0</td><td data-label="결정"><a href="decisions.html">BD-198</a></td></tr>
+        <tr><td data-label="작업"><span class="id">CMD-GA36</span> GA UI 첫 판</td><td data-label="상태"><span class="state"><span class="mark ok" aria-hidden="true"></span>통합됨</span></td><td data-label="보낸 때">10-03 18:30</td><td data-label="보고">10-04 09:12</td><td class="num" data-label="토큰">0</td><td data-label="결정"><a href="decisions.html">BD-190</a></td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>상태는 다섯 칸으로만 읽습니다: 초안 → 보냄 → 도는 중 → 보고됨 → 통합됨. 옆으로 빠지는 길은 돌려보냄과 실패 둘뿐입니다.</p>
+</footer>
+</body>
+</html>

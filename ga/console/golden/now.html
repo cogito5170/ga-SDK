@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>지금 · GA Console</title>
+<link rel="stylesheet" href="../static/tokens.css">
+<link rel="stylesheet" href="golden.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span>127.0.0.1:8765 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="now.html" aria-current="page">지금</a></li>
+      <li><a href="work.html">작업<span class="n">4</span></a></li>
+      <li><a href="branches.html">브랜치</a></li>
+      <li><a href="services.html">서비스<span class="n">3/4</span></a></li>
+      <li><a href="tokens.html">토큰</a></li>
+      <li><a href="ask.html">묻기</a></li>
+      <li><a href="decisions.html">결정</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="mast">
+  <p class="cap">지금 · <b>2026-10-05 14:32</b></p>
+  <h1><span class="mark live" aria-hidden="true"></span>브리지 살아 있음</h1>
+  <span class="hot" aria-hidden="true"></span>
+  <p class="lede">마지막 확인 12초 전. <span class="sub">브리지 = 이 Mac 의 agy 와 허브를 잇는 다리. 설정 <code>~/agy-bridge.json</code></span></p>
+</div>
+
+<main id="main">
+  <section aria-labelledby="h-count">
+    <h2 id="h-count">한눈에</h2>
+    <dl class="figs">
+      <div><dt>열린 작업</dt><dd>4</dd></div>
+      <div><dt>안 읽은 편지</dt><dd>2</dd></div>
+      <div><dt>도는 서비스</dt><dd>3<small> / 4</small></dd></div>
+    </dl>
+  </section>
+
+  <div class="two">
+    <section aria-labelledby="h-run">
+      <h2 id="h-run">돌고 있는 일 <span class="sub">agv · CMD-CON2 · 턴 7</span></h2>
+      <p class="say">GA Console 서버를 만드는 중. 지금까지 <b>41,280 토큰</b>, 한 턴 평균 5,897.</p>
+      <table class="tbl">
+        <caption>턴마다 쓴 토큰 (최근 5턴)</caption>
+        <thead><tr><th>턴</th><th>시각</th><th class="num">입력</th><th class="num">출력</th><th class="num">캐시</th><th class="num">합계</th></tr></thead>
+        <tbody>
+          <tr><td data-label="턴">7 <span class="state"><span class="mark live" aria-hidden="true"></span>도는 중</span></td><td data-label="시각">14:31:50</td><td class="num" data-label="입력">—</td><td class="num" data-label="출력">—</td><td class="num" data-label="캐시">—</td><td class="num" data-label="합계">—</td></tr>
+          <tr><td data-label="턴">6</td><td data-label="시각">14:30:12</td><td class="num" data-label="입력">5,104</td><td class="num" data-label="출력">822</td><td class="num" data-label="캐시">3,900</td><td class="num" data-label="합계">5,926</td></tr>
+          <tr><td data-label="턴">5</td><td data-label="시각">14:28:41</td><td class="num" data-label="입력">4,987</td><td class="num" data-label="출력">1,210</td><td class="num" data-label="캐시">3,900</td><td class="num" data-label="합계">6,197</td></tr>
+          <tr><td data-label="턴">4</td><td data-label="시각">14:26:03</td><td class="num" data-label="입력">5,020</td><td class="num" data-label="출력">640</td><td class="num" data-label="캐시">3,900</td><td class="num" data-label="합계">5,660</td></tr>
+          <tr><td data-label="턴">3</td><td data-label="시각">14:24:55</td><td class="num" data-label="입력">4,811</td><td class="num" data-label="출력">1,034</td><td class="num" data-label="캐시">3,412</td><td class="num" data-label="합계">5,845</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="h-mail">
+      <h2 id="h-mail">우편함 <span class="sub">최근 5통</span></h2>
+      <ul class="items">
+        <li><div class="row"><span class="id">report/2</span><span class="state"><span class="mark ok" aria-hidden="true"></span>형식 맞음</span></div>
+          <p class="meta"><span><b>design</b> → baseline</span><span>14:20</span><span class="mono">mail/0412-con1.ga</span></p></li>
+        <li><div class="row"><span class="id">directive/2</span><span class="state"><span class="mark ok" aria-hidden="true"></span>형식 맞음</span></div>
+          <p class="meta"><span><b>baseline</b> → server</span><span>13:58</span><span class="mono">mail/0411-con2.ga</span></p></li>
+        <li><div class="row"><span class="id">notify/1</span><span class="state"><span class="mark wait" aria-hidden="true"></span>안 읽음</span></div>
+          <p class="meta"><span><b>GA</b> → baseline</span><span>13:41</span><span class="mono">mail/0410-ga38.ga</span></p></li>
+        <li><div class="row"><span class="id">report/2</span><span class="state"><span class="mark fail" aria-hidden="true"></span>형식 틀림</span></div>
+          <p class="meta"><span><b>token</b> → baseline</span><span>11:07</span><span class="mono">mail/0409-tk12.ga</span></p></li>
+        <li><div class="row"><span class="id">verdict/1</span><span class="state"><span class="mark ok" aria-hidden="true"></span>형식 맞음</span></div>
+          <p class="meta"><span><b>baseline</b> → GA</span><span>10:30</span><span class="mono">mail/0408-ga37.ga</span></p></li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>로그인 없음: <code>ga console</code> 이 연 이 주소와 한 번 쓰는 열쇠로만 열립니다. 이 Mac 밖으로는 아무것도 보내지 않습니다.</p>
+</footer>
+</body>
+</html>
