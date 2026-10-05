@@ -3,7 +3,8 @@
 D1  tokens.css is exactly the generator's output of tokens.json; the token pairs meet WCAG AA by math; every golden
     page passes the judge at 375 and 1440 px (when Chromium is here); the judge fails pages planted with overflow,
     low contrast, an external request, a JS error, an unnamed button, a skipped heading level, an animation running
-    under reduced motion and ~10 % accent pixels -- each page fails exactly the one check it plants.
+    under reduced motion, ~10 % accent pixels, 11 px text at 375 and a > 512 KB stylesheet -- each page fails exactly
+    the one check it plants.
 """
 import functools
 import http.server
@@ -145,6 +146,8 @@ PLANTS = {
                        "<script>document.getElementById('spin').animate([{transform:'rotate(0)'},"
                        "{transform:'rotate(360deg)'}],{duration:1000,iterations:Infinity})</script>"),
     "accent": '<div style="height:200px;background:#D9480F"></div>',
+    "min-font-375": '<p style="font-size:11px">아주 작은 글씨는 폰에서 읽기 어렵습니다</p>',
+    "weight": '<link rel="stylesheet" href="heavy.css">',    # heavy.css: > 512 KB, written in setUpClass
 }
 
 
@@ -156,6 +159,8 @@ class Judge(unittest.TestCase):
         cls.root = Path(cls.tmp.name) / "console"
         shutil.copytree(CONSOLE / "static", cls.root / "static")
         shutil.copytree(GOLDEN, cls.root / "golden")
+        # a fixed 600 KB, not derived from J.MAX_BYTES: a raised cap must let this page through
+        (cls.root / "golden" / "heavy.css").write_text("/*" + "x" * 600 * 1024 + "*/\n", encoding="utf-8")
         cls.shots = Path(cls.tmp.name) / "shots"
 
     @classmethod
@@ -184,6 +189,10 @@ class Judge(unittest.TestCase):
                 self.assertEqual(r["failed"], [check], json.dumps(r["facts"], ensure_ascii=False)[:600])
                 if check == "accent":
                     self.assertGreater(r["facts"]["accent-share"], 0.04)
+                if check == "min-font-375":
+                    self.assertEqual(r["facts"]["min-font-375"], 11)
+                if check == "weight":
+                    self.assertGreater(r["facts"]["bytes"], 600 * 1024)
 
     def test_url_target_and_same_origin(self):
         handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(self.root))
