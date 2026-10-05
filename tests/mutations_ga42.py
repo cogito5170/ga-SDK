@@ -52,6 +52,14 @@ M = [  # (name, file, [(old, new), ...])
   [("            if self.shadow:  # nothing but shadow.jsonl", "            if False:  #")]),
  ("shadow mode keeps the report under the ga dir", "ga/hub.py",
   [("        if self.shadow:  # the report goes to a throwaway file", "        if False:  #")]),
+ # rev 2 send-back (baseline's GA39 generator survivors)
+ ("shell through a wrapper later in argv allowed", "ga/actions/check.py",
+  [("if a in EVAL_FLAGS or Path(a).name in SHELLS and i > 0:", "if a in EVAL_FLAGS:")]),
+ ("project root not resolved (confined)", "ga/actions/check.py",
+  [("    root = Path(root).resolve()\n    try:", "    root = Path(root)\n    try:")]),
+ ("project root not resolved (confined and check)", "ga/actions/check.py",
+  [("    root = Path(root).resolve()\n    try:", "    root = Path(root)\n    try:"),
+   ("    root = Path(root).resolve()\n    if not isinstance(p, dict):", "    root = Path(root)\n    if not isinstance(p, dict):")]),
 ]
 
 

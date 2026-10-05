@@ -162,5 +162,51 @@ class ShadowCompare(unittest.TestCase):
             self.assertIn(c, out)
 
 
+class WrapperShell(Base):
+    """rev 2 send-back: a shell reached through a wrapper later in argv is refused with the reason."""
+    CASES = [(["env", "bash", "x.sh"], 1, "bash"), (["nice", "sh", "run.sh"], 1, "sh"),
+             (["timeout", "5", "dash", "x"], 2, "dash"), (["xargs", "sh"], 1, "sh"),
+             (["python3", "tool.py", "/bin/bash"], 2, "/bin/bash")]
+
+    def test_a_shell_later_in_argv_is_refused_with_the_reason(self):
+        from ga.actions import check as C
+        for argv, i, sh in self.CASES:
+            with self.subTest(argv=argv):
+                reasons, _ = C.check({"name": "w", "argv": argv, "cwd": ".", "timeout_s": 5, "writes": []}, self.root,
+                                     ["env", "nice", "timeout", "xargs", "python3"])
+                self.assertIn(f"argv[{i}] {sh!r} evaluates code or starts a shell", reasons)
+                rec = actions.propose(self.prop(argv, name="w"), self.root, source="test")
+                self.assertFalse(rec["check"]["ok"])
+                self.assertFalse(rec["trial"]["ran"])
+
+
+class SymlinkedRoot(Base):
+    """rev 2 send-back: the project root reached through a symlink is resolved before any containment test."""
+
+    def setUp(self):
+        super().setUp()
+        self.outer = Path(tempfile.mkdtemp(prefix="ga42-link-"))
+        self.addCleanup(__import__("shutil").rmtree, self.outer, True)
+        (self.outer / "outside.py").write_text("print('outside')\n")
+        self.real = self.outer / "real"
+        __import__("shutil").copytree(self.root, self.real)
+        self.link = self.outer / "link"
+        self.link.symlink_to(self.real, target_is_directory=True)
+
+    def test_a_path_inside_is_accepted_through_the_symlinked_root(self):
+        from ga.actions import check as C
+        self.assertIsNone(C.confined(self.link, "src/a.py"))
+        reasons, _ = C.check({"name": "ok", "argv": ["python3", "tool.py", "src/a.py"], "cwd": "src", "timeout_s": 5,
+                              "writes": ["src/*"]}, self.link, ["python3"])
+        self.assertEqual(reasons, [])
+
+    def test_an_escape_through_the_symlinked_root_is_refused(self):
+        from ga.actions import check as C
+        self.assertIn("escapes the project", C.confined(self.link, "../outside.py"))
+        reasons, _ = C.check({"name": "esc", "argv": ["python3", "../outside.py"], "cwd": ".", "timeout_s": 5,
+                              "writes": []}, self.link, ["python3"])
+        self.assertTrue(any("escapes the project" in r for r in reasons), reasons)
+
+
 if __name__ == "__main__":
     unittest.main()
