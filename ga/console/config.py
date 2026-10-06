@@ -8,6 +8,7 @@
      "token_sources": {"act": [dirs], "supervise": [files]},     ledgers read by /api/tokens
      "bridge": {"argv", "cwd", "config_path"},                   the agy bridge, run as the service named "bridge"
      "events": null,                                             ga.events/1 file for 실시간 (default ~/.ga/events.jsonl)
+     "hub_state": null,                                          the hub's state.json for the cap (default <supervise ledger dir>/hub/state.json)
      "services": {name: {"argv", "cwd", "env_file"?, "health_url"?, "port"?, "disabled"?}}}
 
 argv is a list (never a shell string); ``~`` is expanded in paths and argv words. An env file's values are loaded into
@@ -140,6 +141,8 @@ def check(cfg: Any) -> dict[str, Any]:
         out["ask_home"] = _x(out["ask_home"])
     if out.get("events"):
         out["events"] = _x(out["events"])
+    if out.get("hub_state"):
+        out["hub_state"] = _x(out["hub_state"])
     ts = out.get("token_sources") or {}
     out["token_sources"] = {k: [_x(p) for p in (ts.get(k) or [])] for k in ("act", "supervise")}
     services = {}

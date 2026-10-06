@@ -21,7 +21,7 @@ from ga.console import server as S  # noqa: E402
 from ga.runlog import WITHHELD  # noqa: E402
 from ga import ui as UI  # noqa: E402
 
-STATE_KEYS = {"now", "version", "bridge", "repos", "services", "counts"}  # version: CMD-GA50 (실시간 status bar)
+STATE_KEYS = {"now", "version", "bridge", "repos", "services", "counts", "cap"}  # version: CMD-GA50 (실시간 status bar)
 REPO_KEYS = {"name", "path", "branch", "head", "head_subject", "dirty", "integration_branch", "behind", "ahead"}
 SVC_KEYS = {"name", "state", "port", "health", "started_at", "pid"}
 WORK_KEYS = {"id", "title", "to", "kind", "status", "sent_at", "reported_at", "tokens", "bd", "summary_ko", "paths",

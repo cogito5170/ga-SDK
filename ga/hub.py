@@ -1363,6 +1363,7 @@ CARD_MAX = 6000      # bytes, the whole card (S1: <= 6 KB)
 ASKS_MAX = 6
 SENDBACK_CAP = 3
 DAILY_TURNS = 20
+ALERT_TO = "baseline-ops"  # CMD-GA56 S2
 SHADOW_TO = "baseline-shadow"  # CMD-GA45 S2: the shadow rows' recipient — never the hub's own inbox
 MAILBOX_URL = "https://github.com/cogito5170/baseline"
 _DECIDE = re.compile(r"^\s*(ACCEPT|SEND_BACK|ASK_HUMAN)\b[ \t:]*(.*)$")
@@ -1571,10 +1572,48 @@ class MailHub(Hub):
         return self.ga / "hub" / "ledger" / f"{self.today()}.jsonl"
 
     def turns_today(self) -> int:
+        """CMD-GA56 S1: only the turns that spent model tokens count; a row decided without a model call is free."""
+        pos = lambda v: isinstance(v, int) and not isinstance(v, bool) and v > 0  # noqa: E731
         if self.shadow:
-            return sum(r.get("at", "").startswith(self.today()) for r in self._shadow_rows())
-        f = self._ledger_today()
-        return len(f.read_text(encoding="utf-8").splitlines()) if f.exists() else 0
+            return sum(r.get("at", "").startswith(self.today()) and any(pos((r.get("tokens") or {}).get(k)) for k in ("input", "output"))
+                       for r in self._shadow_rows())
+        n = 0
+        for r in read_jsonl(self._ledger_today()):
+            n += any(pos(r.get(k)) for k in ("input", "output"))
+        return n
+
+    def _cap_alert(self, res: TickResult, limit: int, waiting: int) -> None:
+        """CMD-GA56 S2: the cap holds mail -> ONE notify/1 alert to baseline-ops per UTC day (state ``cap_alerted``)."""
+        from datetime import datetime, timedelta, timezone
+        from .forms import dump_wire
+        to = str(self.conf.get("alert_to", ALERT_TO))
+        if to == self.name:  # never into the hub's own inbox
+            return
+        st = self.load_state()
+        day = self.today()
+        if st.get("cap_alerted") == day:
+            return
+        nxt = (datetime.strptime(day, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%dT00:00Z")
+        at = f"{day}T{datetime.now(timezone.utc).strftime('%H:%M')}Z"
+        note = f"daily turn cap {limit} reached at {at}; {waiting} reports waiting; resumes {nxt}"
+        head = {"schema": "notify/1", "to": to, "kind": "alert", "ref": str(self.conf.get("mailbox_url", MAILBOX_URL)),
+                "note": note}
+        try:
+            self._mail(to, dump_wire(head))
+        except Exception as e:  # retried next tick
+            res.plan.append(f"cap alert mail failed: {type(e).__name__}"[:200])
+            return
+        st["cap_alerted"] = day
+        self.save_state(st)
+        res.sent.append(f"alert cap -> {to}")
+
+    def _note_cap(self, limit: int, waiting: int) -> None:
+        """CMD-GA56 S3: {limit, used, waiting} in the hub state, which the console shows."""
+        cap = {"limit": limit, "used": self.turns_today(), "waiting": waiting}
+        st = self.load_state()
+        if st.get("cap") != cap:
+            st["cap"] = cap
+            self.save_state(st)
 
     def _shadow_rows(self) -> list[dict[str, Any]]:
         return read_jsonl(self.shadow_path)
@@ -1673,15 +1712,22 @@ class MailHub(Hub):
         st = self.load_state()
         done = {r.get("mail") for r in self._shadow_rows()} if self.shadow else st["handled"]
         msgs = [m for m in self.mailbox.unread(self.name) if m.path not in done]
+        limit = int(self.conf.get("daily_turns", DAILY_TURNS))
         if not msgs:
             if self.shadow:
                 self._mail_shadow(res)
+            if not dry_run and (self.load_state().get("cap") or {}).get("waiting"):  # a quiet tick writes nothing new
+                self._note_cap(limit, 0)
             res.writes = self._writes
             res.quiet = not res.sent and not res.plan
             return res
-        for m in msgs:
-            if self.turns_today() >= int(self.conf.get("daily_turns", DAILY_TURNS)):
-                res.plan.append(f"daily turn cap {self.conf.get('daily_turns', DAILY_TURNS)} reached; {m.path} waits")
+        waiting = 0
+        for i, m in enumerate(msgs):
+            if self.turns_today() >= limit:
+                res.plan.append(f"daily turn cap {limit} reached; {m.path} waits")
+                waiting = len(msgs) - i
+                if not dry_run:
+                    self._cap_alert(res, limit, waiting)
                 break
             if dry_run:
                 res.plan.append(f"would judge and decide {m.path}")
@@ -1694,6 +1740,8 @@ class MailHub(Hub):
             self.save_state(st)
         if self.shadow and not dry_run:
             self._mail_shadow(res)
+        if not dry_run:
+            self._note_cap(limit, waiting)
         res.writes = self._writes
         res.quiet = not res.sent and not res.plan and not res.integrated
         return res

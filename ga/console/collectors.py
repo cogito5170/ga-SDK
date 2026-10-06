@@ -475,6 +475,20 @@ def bridge_state(cfg: dict[str, Any], services: Any = None) -> dict[str, Any]:
             "config_path": b.get("config_path") or None}
 
 
+def hub_cap(cfg: dict[str, Any]) -> dict[str, Any] | None:
+    """CMD-GA56 S3: the hub's daily turn cap {limit, used, waiting}, from the hub state next to the supervise ledger
+    (or ``hub_state`` in the config); None when no hub has written one."""
+    f = cfg.get("hub_state")
+    if not f:
+        sup = (cfg.get("token_sources") or {}).get("supervise") or []
+        f = Path(sup[0]).parent / "hub" / "state.json" if sup else None
+    try:
+        cap = json.loads(Path(f).read_text(encoding="utf-8")).get("cap") if f else None
+    except (OSError, ValueError):
+        return None
+    return {k: cap[k] for k in ("limit", "used", "waiting")} if isinstance(cap, dict) and all(k in cap for k in ("limit", "used", "waiting")) else None
+
+
 def state(cfg: dict[str, Any], reader: MailReader | None = None, services: Any = None,
           clock: Callable[[], float] = time.time) -> dict[str, Any]:
     svc = services.snapshot() if services is not None else []
@@ -482,7 +496,7 @@ def state(cfg: dict[str, Any], reader: MailReader | None = None, services: Any =
     w = work(cfg, reader, running)
     heads = reader.heads() if reader else []
     from .. import __version__
-    return clean({"now": iso(clock()), "version": __version__, "bridge": bridge_state(cfg, services), "repos": repos(cfg), "services": svc,
+    return clean({"now": iso(clock()), "version": __version__, "bridge": bridge_state(cfg, services), "cap": hub_cap(cfg), "repos": repos(cfg), "services": svc,
                   "counts": {"work_open": sum(x["status"] in OPEN for x in w),
                              "mail_unread": reader.unread(heads) if reader else 0,
                              "services_running": sum(s["state"] == "running" for s in svc)}})
