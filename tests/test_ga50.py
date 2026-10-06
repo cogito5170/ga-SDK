@@ -93,6 +93,13 @@ class Schema(EvCase):
         self.assertEqual(EV.tail(f"a\nb {SECRET}\nc"), ["a", "(withheld: it looked like it held a secret)", "c"])
         self.assertLessEqual(len(EV.short("x" * 500)), EV.SUMMARY_CHARS)
 
+    def test_a_broken_secret_rule_withholds_never_leaks(self):
+        with mock.patch("ga.runlog.redact", side_effect=RuntimeError("rule broke")):
+            self.assertEqual(EV.short(f"x {SECRET}"), "(withheld)")
+            EV.emit("CODE", "act", "x", "DONE", out=f"key {SECRET}")
+        self.assertNotIn(SECRET, self.evf.read_text())
+        self.assertEqual(self.evs()[0]["metadata"]["out"], "(withheld)")
+
     def test_rotation_keeps_three(self):
         with mock.patch.object(EV, "ROTATE_BYTES", 2000):
             for i in range(60):
@@ -223,6 +230,21 @@ class Act(EvCase):
         # the red done_when measure is FAILED but not an ERROR (red is expected before the fix)
         first = [e for e in evs if e["type"] == "CODE" and e["action"] == "done_when"][:2]
         self.assertEqual([e for e in evs if e["type"] == "ERROR" and e["parent_id"] == first[0]["event_id"]], [])
+
+    def test_need_that_raises_is_a_failed_tool(self):
+        import test_ga38 as T
+        from ga.act import loop as A
+        with mock.patch.object(A.Act, "serve_need", side_effect=RuntimeError("retriever broke")):
+            self.run_act(["NEED symbol calc.add\n", T.FIX])
+        need = [e for e in self.evs() if e["type"] == "TOOL" and e["action"] == "NEED"]
+        self.assertEqual([e["status"] for e in need], ["STARTED", "FAILED"])
+        self.assertIn("failed", need[1]["metadata"]["result"])
+
+    def test_need_found_is_done_and_missing_is_failed(self):
+        import test_ga38 as T
+        self.run_act(["NEED symbol calc.add\nNEED symbol calc.nothing_here\n", T.FIX])
+        need = [e for e in self.evs() if e["type"] == "TOOL" and e["action"] == "NEED" and e["status"] != "STARTED"]
+        self.assertEqual([e["status"] for e in need], ["DONE", "FAILED"])
 
     def test_secrets_in_command_output_are_withheld(self):
         import test_ga38 as T
@@ -511,6 +533,20 @@ class Console(EvCase):
                 srv.events_once()
         self.assertEqual(self.get(srv, "/api/events/recent?limit=1")[0]["action"], "r29")
         self.assertEqual(len(self.get(srv, "/api/events/recent?limit=100")), 30)
+
+    def test_recent_is_capped_and_the_ring_is_bounded(self):
+        from collections import deque
+        srv = self.serve()
+        self.assertEqual(srv.evring.maxlen, 5000)
+        line = json.dumps(EV.make("SYSTEM", "t", "x", "DONE")) + "\n"
+        with self.evf.open("a", encoding="utf-8") as f:
+            f.write(line * 5100)
+        srv.events_once()
+        self.assertEqual(len(srv.evring), 5000)  # the ring keeps the newest 5000, not every line ever seen
+        srv.evring = deque(srv.evring, maxlen=6000)
+        srv.evring.extend([json.loads(line)] * 500)
+        self.assertEqual(len(self.get(srv, "/api/events/recent?limit=99999")), 5000)  # the answer is capped
+        self.assertEqual(len(self.get(srv, "/api/events/recent?limit=x")), 200)
 
     def test_state_has_version(self):
         import ga
