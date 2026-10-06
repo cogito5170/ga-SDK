@@ -136,6 +136,9 @@ class Services:
         if s.state in ("starting", "running") and s.proc and s.proc.poll() is None:
             return s.snapshot()
         spec = s.spec
+        if spec.get("disabled"):
+            self._note(s, f"console: disabled ({spec['disabled']}); not started")
+            return s.snapshot()
         env = dict(os.environ)
         s.masks = []
         if spec.get("env_file"):

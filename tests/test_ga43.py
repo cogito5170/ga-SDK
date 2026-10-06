@@ -53,8 +53,8 @@ def measure_bounded(target: str, limit_s: float, **kw) -> "tuple[dict | None, fl
 class S5Version(unittest.TestCase):
     def test_version_0_11_0_in_both_places(self):
         import ga
-        self.assertEqual(ga.__version__, "0.11.0")
-        self.assertIn('version = "0.11.0"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(tuple(map(int, ga.__version__.split("."))), (0, 11, 0))  # OPS2 moved it on to 0.12.0
+        self.assertIn(f'version = "{ga.__version__}"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
 class D1Bridge(unittest.TestCase):
