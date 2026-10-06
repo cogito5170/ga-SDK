@@ -352,6 +352,10 @@ class Bridge(Full):
             self.assertIn("not adopted", out)
             self.assertNotIn("enable", self.logtext())
             self.adopt()
+            rc, out = enable()  # everything ready but no --yes: still refused
+            self.assertEqual(rc, 1)
+            self.assertIn("give --yes", out)
+            self.assertNotIn("enable", self.logtext())
             rc, out = enable("--yes")
         self.assertEqual(rc, 0, out)
         self.assertTrue(out.startswith(core.TWO_BRIDGES))
