@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..act.route import LADDER, LEVELS
 from .lessons import CHECKLIST
 
 CARD_MAX = 8 * 1024          # bytes, UTF-8: the whole card
@@ -33,8 +34,11 @@ TEMPLATE = """Answer with ONE ```json block and nothing else:
   "scope": [{"id": "S1", "text": "<what to build; acting scopes have a shadow / dry-run mode>"}],
   "done_when": [{"id": "D1", "text": "<a test or command that proves it>"}],
   "budget": {"claude_p_runs": 0}},
- "item": {"goal": "<code work only: the item goal>", "files": ["<paths>"], "done_when": ["<checks>"]}}
-Leave "item" out when the request is not code work."""
+ "item": {"goal": "<code work only: the item goal>", "files": ["<paths>"], "done_when": ["<checks>"],
+  "route": {"difficulty": 1-5, "start": "<model>", "max_turns": 1-10}}}
+Leave "item" out when the request is not code work.
+route (CMD-GA47): the cheapest model likely to finish the item; models, cheapest first: """ + ", ".join(LADDER) + """
+difficulty, one line per level:\n""" + "\n".join(LEVELS)
 
 
 @dataclass

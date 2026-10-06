@@ -27,6 +27,7 @@ from ..net.pool import owned
 from . import card as C
 from . import commands as K
 from . import retrieve as R
+from . import route as RT
 from .apply import apply, secret_path
 from .fmt import SPEC as FORM, parse
 
@@ -56,12 +57,15 @@ class Result:
     changed: list[str] = field(default_factory=list)
     rows: list[dict] = field(default_factory=list)
     rungs: list[dict] = field(default_factory=list)  # CMD-GA45 S3: one {model, status, reason, turns, tokens} per rung
+    route: dict | None = None         # CMD-GA47 S1: {difficulty, start, max_turns, source} when --route chose the start
 
     def to_dict(self) -> dict[str, Any]:
         d = {"schema": SPEC, "id": self.id, "status": self.status, "reason": self.reason, "turns": self.turns,
              "failing": self.failing, "tokens": self.tokens, "changed": self.changed}
         if self.rungs:
             d["rungs"] = self.rungs
+        if self.route:
+            d["route"] = self.route
         return d
 
 
@@ -424,11 +428,17 @@ class Tree:
 
 def run_item(root: Path, raw_item: dict[str, Any], *, backend: str, model: str, options: dict | None = None,
              runner: Any = None, config: str | None = None, state_dir: Path | None = None,
-             ladder: Any = None, make_runner: Callable[[str], Any] | None = None, **kw: Any) -> Result:
+             ladder: Any = None, make_runner: Callable[[str], Any] | None = None,
+             rung_turns: dict[str, int] | None = None, **kw: Any) -> Result:
     """Load the repo's commands, make the runner (bare, tools off) and run the item. With a ladder (CMD-GA45 S3) the
     item runs on each rung in turn, from the same clean tree, until one is done or ends blocked for a reason other
-    than a cap or no progress."""
+    than a cap or no progress. ``rung_turns`` (CMD-GA47) gives a rung its own turn cap."""
     options = dict(options or {})
+    routed = options.pop("route", None)
+    rkeys = {k: options.pop(k) for k in ("climb", "triage_model", "triage_compare") if k in options}
+    if kw.pop("route", None) or routed:
+        return _routed(root, raw_item, backend=backend, options=options, config=config, state_dir=state_dir,
+                       make_runner=make_runner, **dict(rkeys, **kw))
     rungs = parse_ladder(ladder if ladder is not None else options.pop("ladder", None))
     options.pop("ladder", None)
     if not rungs:
@@ -447,8 +457,9 @@ def run_item(root: Path, raw_item: dict[str, Any], *, backend: str, model: str, 
         if i:
             tree.restore()
         r = make_runner(m) if make_runner else None
+        kr = dict(kw, max_turns=rung_turns[m]) if rung_turns and m in rung_turns else kw
         res = _run_one(root, raw_item, backend=backend, model=m, options=options, runner=r, config=config,
-                       state_dir=state_dir, **kw)
+                       state_dir=state_dir, **kr)
         rows.append({"model": m, "status": res.status, "reason": res.reason, "turns": res.turns,
                      "tokens": dict(res.tokens)})
         if res.status == "done" or not res.reason.startswith(ESCALATE):
@@ -459,6 +470,55 @@ def run_item(root: Path, raw_item: dict[str, Any], *, backend: str, model: str, 
         for k, v in g["tokens"].items():
             total[k] = total.get(k, 0) + (v or 0)
     res.tokens, res.rungs, res.turns = total, rows, sum(g["turns"] for g in rows)
+    return res
+
+
+def _triage_runner(backend: str, options: dict, root: Path, state: Path) -> Callable[[str], Any]:
+    """A tool-less triage runner: agent ga-plan where the backend takes an agent (agv), the same options otherwise."""
+    def make(m: str) -> Any:
+        from .. import backends
+        opts = dict(options)
+        if "agent" in getattr(backends.get(backend), "options", ()):
+            opts["agent"] = RT.TRIAGE_AGENT
+        return backends.create(backend, m, opts, {"cwd": str(root), "timeout_s": 600, "state_dir": str(state)})
+    return make
+
+
+def _routed(root: Path, raw_item: dict[str, Any], *, backend: str, options: dict, config: str | None,
+            state_dir: Path | None, make_runner: Callable[[str], Any] | None, climb: Any = None,
+            triage_model: str | None = None, triage_compare: Any = None,
+            make_triage: Callable[[str], Any] | None = None, **kw: Any) -> Result:
+    """CMD-GA47 S1: route once (item, ledger, triage, fallback), run start and at most ``climb`` rungs above it on
+    GA45's ladder, add the triage tokens to the totals and record the outcome in <state>/routes.jsonl."""
+    kw.pop("ladder", None)
+    cfg = K.load(Path(root), config)
+    make_item(raw_item, cfg)  # a bad item stops before any call
+    state = Path(state_dir or Path(root) / ".ga" / "act")
+    climb = RT.climb_of(climb)
+    compare = parse_ladder(triage_compare) or None
+    if compare and len(compare) != 2:
+        raise K.ActConfigError("triage-compare takes two models: m1,m2")
+    tm = triage_model or RT.TRIAGE_MODEL
+    if make_triage is None:
+        make_triage = _triage_runner(backend, options, Path(root), state)
+    try:
+        dec = RT.decide(Path(root), raw_item, cfg, state, make_triage=make_triage, triage_model=tm, compare=compare)
+    except ValueError as e:
+        raise K.ActConfigError(str(e)) from None
+    route = dec["route"]
+    run, caps = RT.plan_rungs(route, RT.rungs(cfg["models"]), climb)
+    res = run_item(root, raw_item, backend=backend, model=run[0], options=options, config=config,
+                   state_dir=state_dir, ladder=run, make_runner=make_runner, rung_turns=caps, **kw)
+    tri = int(dec["triage_tokens"])
+    res.tokens = dict(res.tokens, triage=tri, total=int(res.tokens.get("total", 0)) + tri)
+    res.route = dict(route)
+    used = [g["model"] for g in res.rungs] or [run[0]]
+    row = {"id": res.id, "bucket": dec["bucket"], "route": dict(route), "rungs": used, "success": res.status == "done",
+           "tokens": res.tokens["total"], "triage_tokens": tri, "turns": res.turns,
+           "turns_last": res.rungs[-1]["turns"] if res.rungs else res.turns, "reason": res.reason[:200]}
+    if "predictions" in dec:
+        row["predictions"] = dec["predictions"]
+    RT.append(state, row)
     return res
 
 

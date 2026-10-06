@@ -81,6 +81,18 @@ def extract(answer: str) -> tuple[Any, list[str]]:
     return doc, probs
 
 
+def with_route(item: dict[str, Any]) -> dict[str, Any]:
+    """CMD-GA47 S2: the item keeps its route only when valid (difficulty 1-5, a listed model, max_turns 1-10)."""
+    from ..act.route import LADDER, valid
+    item = dict(item)
+    r = valid(item.get("route"), list(LADDER))
+    if r is None:
+        item.pop("route", None)
+    else:
+        item["route"] = r
+    return item
+
+
 def turn(runner: Any, text: str) -> str:
     t = runner.run_turn(text, None)
     return getattr(t, "answer", t if isinstance(t, str) else "")
@@ -107,6 +119,8 @@ def plan(request: str, repo: Path, runner: Any, *, to: str | None = None, decisi
     if to:
         head.setdefault("to", to)
     item = doc.get("item") if isinstance(doc.get("item"), dict) else None
+    if item is not None:
+        item = with_route(item)
     heads = len(doc["heads"]) if isinstance(doc.get("heads"), list) else 1
     hid = head.get("id") if isinstance(head.get("id"), str) else "CMD-X"
     wp = doc.get("worker_prompt") or WORKER_RULES.format(branch=hid.lower().replace("cmd-", ""), id=hid)
@@ -143,4 +157,4 @@ def write(d: Draft, home: Path, clock: Callable[[], float] = time.time) -> Path:
     return d.path
 
 
-__all__ = ["Draft", "MAX_REPAIRS", "PlanFailed", "WORKER_RULES", "draft_id", "extract", "plan", "render", "write"]
+__all__ = ["Draft", "MAX_REPAIRS", "PlanFailed", "WORKER_RULES", "draft_id", "extract", "plan", "render", "with_route", "write"]
