@@ -47,3 +47,15 @@ CATALOG = {
             _e("gemini-3.8-flash", "gemini", ("text", "vision", "tools"), 1_000_000, ("R0", "R1"), quota="agv"),
             _e("gemini-3.8-flash-high", "gemini", ("text", "vision", "tools"), 1_000_000, ("R2",), quota="agv")],
 }
+
+
+def price_for(model: str) -> dict[str, float]:
+    """USD per Mtok {input, output, cache_read, cache_write} for a model (R1 gateway). Not declared (or an unknown
+    model) = the most expensive declared price. cache_read / cache_write default to the first-party ratios
+    (0.1x and 1.25x the input price) when an entry does not declare them."""
+    declared = [e["price"] for es in CATALOG.values() for e in es if e["price"]]
+    hit = next((e["price"] for es in CATALOG.values() for e in es if e["model"] == model and e["price"]), None)
+    p = hit or {"in": max(d["in"] for d in declared), "out": max(d["out"] for d in declared)}
+    return {"input": float(p["in"]), "output": float(p["out"]),
+            "cache_read": float(p.get("cache_read", 0.1 * p["in"])),
+            "cache_write": float(p.get("cache_write", 1.25 * p["in"]))}
