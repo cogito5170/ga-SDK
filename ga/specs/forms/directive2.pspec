@@ -18,6 +18,7 @@ in budget : DecisionContext @operator once
 in change_size : DecisionContext @operator once
 in contradicts : Evidence @operator once
 in note : Opinion @operator once
+in model : DecisionContext @operator once
 out directive/2
   schema : "directive/2"
   id : str+
@@ -35,6 +36,7 @@ out directive/2
   change_size? : str+ | null
   contradicts? : [str+] | null
   note? : str+ | null
+  model? : str+ | null
 --- en
 Directive {{ id }} rev {{ rev }} to {{ to }}{% if supersedes %}, superseding {{ supersedes.id }} rev {{ supersedes.rev }}{% end %}{% if after %}, after {{ after|json }}{% end %}
 Goal: {{ goal }}
@@ -51,6 +53,7 @@ Why: {{ why }}
 {% end %}{% if change_size %}Change size: {{ change_size }}
 {% end %}{% if contradicts %}Contradicts: {{ contradicts|json }}
 {% end %}{% if note %}Note: {{ note }}
+{% end %}{% if model %}Model: {{ model }}
 {% end %}
 --- ko
 지시 {{ id }} 판 {{ rev }} → {{ to }}{% if supersedes %} ({{ supersedes.id }} 판 {{ supersedes.rev }} 를 대신함){% end %}{% if after %} · 앞선 지시 {{ after|json }}{% end %}
@@ -68,4 +71,5 @@ Why: {{ why }}
 {% end %}{% if change_size %}바뀜 크기: {{ change_size }}
 {% end %}{% if contradicts %}어긋나는 결정: {{ contradicts|json }}
 {% end %}{% if note %}메모: {{ note }}
+{% end %}{% if model %}모델: {{ model }}
 {% end %}

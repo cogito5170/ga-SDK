@@ -94,7 +94,7 @@ class ActPathTest(unittest.TestCase):
         self.addCleanup(os.environ.pop, "GA_HOME", None)
 
     def pass_(self, act_run=None, runner=supervise_must_not_run):
-        handler = (lambda c, h, s: ACT.handle(c, h, s, runner=act_run)) if act_run else None
+        handler = (lambda c, h, s, m: ACT.handle(c, h, s, m, runner=act_run)) if act_run else None
         return bridge.one_pass(self.w.cfg, box=self.w.vm, runner=runner, log=self.logs.append, act_handler=handler)
 
     def reply(self):

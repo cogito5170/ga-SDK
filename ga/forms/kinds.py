@@ -148,6 +148,8 @@ DIRECTIVE2 = [
     Field("change_size", one_of(*CHANGE_SIZES), required=False),
     Field("contradicts", list_of(decision_id), required=False),
     Field("note", _note, required=False),
+    # VM-BRIDGE-MODEL-1: the model this one directive runs on (the receiver checks it against what it can run)
+    Field("model", lambda v: None if isinstance(v, str) and v.strip() else "must be a non-empty string", required=False),
 ]
 
 

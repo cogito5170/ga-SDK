@@ -29,6 +29,7 @@ from ..forms import FormError, hard, parse_text, validate
 from ..mailbox import Mailbox, MailError, secrets_in
 from ..runlog import Tail, TurnMeter, follow
 from . import act as ACT
+from . import models as MODELS
 from .tools import TOOLS, table
 
 DEFAULTS = {"name": "AGY", "hub": "baseline", "every_s": 300, "turn_timeout_s": 1800, "max_answer_chars": 4000,
@@ -60,7 +61,8 @@ def task_text(head: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def effective_config(cfg: dict[str, Any], directive_id: str | None = None, max_steps: int | None = None) -> Path:
+def effective_config(cfg: dict[str, Any], directive_id: str | None = None, max_steps: int | None = None,
+                     model: str | None = None) -> Path:
     """ga-supervise.json + ga's tool table; each directive gets its own state dir (<state_dir>/<id>). ``max_steps``
     (ga ask: the daily agy cap left) lowers the config's model-turn cap, never raises it."""
     base = json.loads((Path(cfg["workdir"]) / cfg["supervise_config"]).read_text(encoding="utf-8"))
@@ -69,9 +71,17 @@ def effective_config(cfg: dict[str, Any], directive_id: str | None = None, max_s
         base["state_dir"] = str(Path(base.get("state_dir") or ".ga-supervise") / directive_id)
     if max_steps is not None:
         base["max_model_steps"] = max(1, min(int(base.get("max_model_steps") or 20), int(max_steps)))
+    if model:  # VM-BRIDGE-MODEL-1: this directive's model, for this run only (the config file on disk is not changed)
+        base["model"] = model
     out = Path(cfg["workdir"]) / "ga-supervise.bridge.json"
     out.write_text(json.dumps(base, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     return out
+
+
+def supervise_backend(cfg: dict[str, Any]) -> str:
+    """The backend the supervise config names (agv when it names none)."""
+    base = json.loads((Path(cfg["workdir"]) / cfg["supervise_config"]).read_text(encoding="utf-8"))
+    return str(base.get("backend") or "agv")
 
 
 def run_supervise(cfg: dict[str, Any], conf: Path, task: str, progress: Callable[[str], None] | None = None,
@@ -222,7 +232,7 @@ def declined(cfg: dict[str, Any], form: str, why: str) -> str:
 def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
              runner: Callable[[dict, Path, str], dict] = run_supervise, log: Callable[[str], None] = print,
              sleep: Callable[[float], None] = time.sleep, max_steps: int | None = None, limit: int | None = None,
-             act_handler: Callable[[dict, dict, dict], tuple[str, bool]] | None = None) -> int:
+             act_handler: Callable[[dict, dict, dict, str | None], tuple[str, bool]] | None = None) -> int:
     """Answer the unread messages for ``cfg['name']`` (at most ``limit``): run the hub's directives, decline the rest."""
     box = box or Mailbox(cfg["mailbox_repo"])
     act_handler = act_handler or ACT.handle
@@ -251,14 +261,22 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
                 head, body = parse_text(m.text)
                 task_ev.update("step", step="run", goal=EV.short(head.get("goal", "")))
                 spec = ACT.item_spec(body)
+                model = head.get("model")
+                if model:  # VM-BRIDGE-MODEL-1: a model the receiver cannot run is declined before any model call
+                    backend = (cfg.get("act") or {}).get("backend", "agv") if spec is not None else supervise_backend(cfg)
+                    why = MODELS.check(cfg, model, backend)
+                    if why:
+                        reply = declined(cfg, head["id"], why)
+                        failed = "declined: model"
+                        head = None  # nothing runs
             if head is not None and spec is not None:  # VM-BRIDGE-ACT-1: code work through ga act
                 with EV.span("AGENT", "bridge", "ga act") as sp:
-                    reply, ok = act_handler(cfg, head, spec)
+                    reply, ok = act_handler(cfg, head, spec, head.get("model"))
                     (sp.done if ok else sp.fail)(result="met" if ok else "unmet")
                 if not ok:
                     failed = "ga act unmet"
             elif head is not None:
-                conf = effective_config(cfg, head["id"], max_steps)
+                conf = effective_config(cfg, head["id"], max_steps, head.get("model"))
                 task = task_text(head)
                 run = _run_ev(runner, cfg, conf, task)
                 capacity = is_capacity(run)
