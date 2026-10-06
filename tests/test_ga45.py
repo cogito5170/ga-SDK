@@ -47,7 +47,7 @@ class HubUnit(unittest.TestCase):
         self.assertEqual(c["repos"]["cogito5170/Token"]["path"], "/home/u/token")
         self.assertEqual({r["base"] for r in c["repos"].values()}, {"claude/gracious-meitner-vp49xe"})
         self.assertEqual((c["backend"], c["model"], c["options"], c["shadow"], c["daily_turns"]),
-                         ("agv", "gemini-3.1-pro-high", {"agent": "ga-plan"}, True, 40))
+                         ("agv", "auto", {"agent": "ga-plan"}, True, 40))  # GA51 S2
 
 
 class HubJson(Full):

@@ -7,6 +7,7 @@
      "ask_home": null,                                           ga ask's folder (default $GA_ASK_HOME or ~/.ga-ask)
      "token_sources": {"act": [dirs], "supervise": [files]},     ledgers read by /api/tokens
      "bridge": {"argv", "cwd", "config_path"},                   the agy bridge, run as the service named "bridge"
+     "events": null,                                             ga.events/1 file for 실시간 (default ~/.ga/events.jsonl)
      "services": {name: {"argv", "cwd", "env_file"?, "health_url"?, "port"?, "disabled"?}},
      "cloud": {"repo"?, "remote"?, "integration_branch"?, "path"?, "fetch_every_s"?}}   optional (CMD-GA52): where the
                                                                  hub's cloud-sessions/1 snapshot is read (ga.console.cloud;
@@ -144,6 +145,8 @@ def check(cfg: Any) -> dict[str, Any]:
         if not isinstance(out["cloud"], dict):
             raise ConfigError("cloud: not an object")
         out["cloud"] = {**out["cloud"], **({"repo": _x(out["cloud"]["repo"])} if out["cloud"].get("repo") else {})}
+    if out.get("events"):
+        out["events"] = _x(out["events"])
     ts = out.get("token_sources") or {}
     out["token_sources"] = {k: [_x(p) for p in (ts.get(k) or [])] for k in ("act", "supervise")}
     services = {}

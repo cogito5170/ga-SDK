@@ -92,6 +92,7 @@ const S = {
   err: null, downSince: null, denied: false, lastId: 0,
   limit: {}, pending: {}, said: {}, confirm: null,
   ask: { q: "", mode: "ask", plan: null, busy: false, said: null, confirmModel: false }, run: null, runBuf: {}, past: loadPast(),
+  ev: null, evSel: null, evType: "",
 };
 
 function loadPast() {
@@ -128,6 +129,7 @@ const LOADERS = {
   mail: () => api("/api/mail?limit=20"),
   dec: () => api("/api/decisions?q=" + encodeURIComponent(S.decQ)),
   cloud: () => api("/api/cloud"),
+  ev: () => api("/api/events/recent?limit=" + EV_KEEP),
 };
 
 async function load(key) {
@@ -153,7 +155,7 @@ async function load(key) {
 // The stream opens once the first reads have answered (STREAM_AFTER_MS after load): the page shows fetched data first,
 // then follows the stream. EventSource resends the last id as Last-Event-ID when it reconnects by itself; after a
 // refusal (a dead server, a new token) the page reopens it with ?after=<last id>, slower each time.
-const TYPES = ["state", "work", "mail", "service", "log", "act_turn", "bridge", "cloud"];
+const TYPES = ["state", "work", "mail", "service", "log", "act_turn", "bridge", "cloud", "ev"];
 const STREAM_AFTER_MS = 1500;
 let retry = 1000;
 let started = false;
@@ -243,6 +245,13 @@ const ON = {
     changed("state");
   },
   cloud(d) { S.cloud = d; changed("cloud"); },
+  ev(d) {  // CMD-GA50: one ga.events/1 line; the newest first, at most EV_KEEP kept
+    if (!S.ev) return;
+    if (S.ev.some((e) => e.event_id === d.event_id)) return;
+    S.ev.unshift(d);
+    if (S.ev.length > EV_KEEP) S.ev.length = EV_KEEP;
+    changed("ev");
+  },
 };
 
 function live() {
@@ -322,6 +331,8 @@ function nav() {
   document.getElementById("n-work").textContent = c ? String(c.work_open) : "";
   document.getElementById("n-svc").textContent = S.state ? `${c.services_running}/${S.state.services.length}` : "";
   document.getElementById("n-cloud").textContent = S.cloud && S.cloud.available ? String(S.cloud.sessions.filter(active).length) : "";
+  const nl = document.getElementById("n-live");
+  if (nl) nl.textContent = S.ev ? (spans().open.length ? String(spans().open.length) : "") : "";
 }
 
 const have = (r) => r.need.every((k) => S[k] !== null && S[k] !== undefined) && (r.name !== "decisions" || S.decFor === S.decQ);
@@ -988,6 +999,231 @@ const CLOUD = {
   },
 };
 
+// ---- 실시간 (CMD-GA50) ----------------------------------------------------------------------------------------------
+// ga.events/1 lines: an activity (span) is its STARTED event plus the events carrying its span_id; children name it as
+// parent_id. What is open now is computed from the stream, never asked of a model.
+const EV_KEEP = 1000;
+const EV_TYPES = ["TASK", "AGENT", "LLM", "TOOL", "CODE", "NET", "FILE", "QUEUE", "MEMORY", "DB", "ERROR", "USER", "SYSTEM"];
+const EV_WORD = { STARTED: "시작", RUNNING: "도는 중", DONE: "끝", FAILED: "실패", RETRY: "다시", WAITING: "기다림" };
+const EV_STALE_MS = 30 * 60 * 1000;  // an open activity with no news for 30 min is not called alive
+let spanMemo = null;
+
+function spans() {
+  if (spanMemo && spanMemo.of === S.ev) return spanMemo;
+  const by = new Map();
+  const list = (S.ev || []).slice().reverse();  // oldest first
+  for (const e of list) {
+    const id = e.span_id || null;
+    if (e.status === "STARTED" && id) by.set(id, { id, start: e, last: e, end: null, parent: e.parent_id || null, step: null });
+    else if (id && by.has(id)) {
+      const sp = by.get(id);
+      sp.last = e;
+      if (e.status === "DONE" || e.status === "FAILED") sp.end = e;
+      if (e.type === "TASK" && e.action === "step" && e.metadata && e.metadata.step) sp.step = { name: e.metadata.step, status: e.status };
+    }
+  }
+  const now = Date.now();
+  const open = [...by.values()].filter((sp) => !sp.end && now - new Date(sp.last.ts).getTime() < EV_STALE_MS);
+  spanMemo = { of: S.ev, by, open };
+  return spanMemo;
+}
+
+function within(sp, rootId, by) {  // sp is rootId or hangs under it
+  let cur = sp;
+  for (let k = 0; cur && k < 50; k++) {
+    if (cur.id === rootId) return true;
+    cur = cur.parent ? by.get(cur.parent) : null;
+  }
+  return false;
+}
+
+function secsSince(iso) { return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000)); }
+function dur(s) {
+  if (s < 60) return s + "초";
+  if (s < 3600) return Math.floor(s / 60) + "분 " + (s % 60) + "초";
+  return Math.floor(s / 3600) + "시간 " + Math.floor((s % 3600) / 60) + "분";
+}
+function ms(v) {
+  if (v === null || v === undefined) return "—";
+  return v < 1000 ? v + " ms" : (v / 1000).toFixed(v < 10000 ? 1 : 0) + "초";
+}
+// a ticking "n초 전 시작": only its text changes, once a second (no motion)
+const since = (iso, word) => h("span", { class: "since", "data-since": iso, "data-word": word || "전 시작" }, `${dur(secsSince(iso))} ${word || "전 시작"}`);
+function tick() {
+  for (const n of document.querySelectorAll("[data-since]")) n.textContent = `${dur(secsSince(n.dataset.since))} ${n.dataset.word}`;
+}
+
+function evMark(e, sp) {
+  if (e.status === "FAILED" || e.type === "ERROR") return ["fail", EV_WORD.FAILED];
+  if (e.status === "DONE") return ["ok", EV_WORD.DONE];
+  const alive = sp && !sp.end && spans().open.includes(sp) && sp.last === e;
+  return [alive && !S.downSince ? "live" : "wait", EV_WORD[e.status] || e.status];
+}
+
+function evDetail(e) {
+  const m = e.metadata || {};
+  const bits = [];
+  if (m.input && typeof m.input === "string") bits.push(m.input);
+  if (m.result) bits.push(m.result);
+  if (m.label) bits.push(m.label);
+  if (m.path) bits.push(m.path + (m.added !== undefined ? ` +${m.added} −${m.removed}` : m.lines !== undefined ? ` ${m.lines}줄` : ""));
+  if (m.host) bits.push(m.host);
+  if (m.goal) bits.push(m.goal);
+  if (m.step) bits.push("단계 " + m.step);
+  if (m.turn !== undefined && m.turn !== null) bits.push("턴 " + m.turn);
+  if (typeof m.input === "number" || typeof m.output === "number") bits.push(`입력 ${num(m.input)} · 출력 ${num(m.output)}`);
+  if (m.exit !== undefined && m.exit !== null && !bits.length) bits.push("exit " + m.exit);
+  if (m.form) bits.push(m.form);
+  return bits.slice(0, 2).join(" · ");
+}
+
+function currentTask() {
+  const { by, open } = spans();
+  const tasks = [...by.values()].filter((sp) => sp.start.type === "TASK");
+  const live = tasks.filter((sp) => open.includes(sp));
+  const pick = (l) => l.sort((a, b) => (a.last.ts < b.last.ts ? 1 : -1))[0] || null;
+  return pick(live.filter((sp) => !sp.parent || !by.has(sp.parent) || !open.includes(by.get(sp.parent))).length
+    ? live.filter((sp) => !sp.parent || !by.has(sp.parent) || !open.includes(by.get(sp.parent))) : live) || pick(tasks);
+}
+
+function deepest(task) {  // the innermost open TASK under task (bridge directive -> ga act item), for its steps
+  const { by, open } = spans();
+  const inner = open.filter((sp) => sp.start.type === "TASK" && sp !== task && within(sp, task.id, by));
+  return inner.sort((a, b) => (a.start.ts < b.start.ts ? 1 : -1))[0] || task;
+}
+
+const LIVE = {
+  mast() {
+    const { open } = spans();
+    const newest = (S.ev || [])[0];
+    const running = open.some((sp) => sp.start.type === "TASK" || sp.start.type === "AGENT");
+    const ver = S.state && S.state.version;
+    const cap = ["실시간 · ", h("b", null, running ? "VM 도는 중" : "VM 쉬는 중"), ver ? ` · ga ${ver}` : null,
+      newest ? [" · 마지막 이벤트 ", since(newest.ts, "전")] : " · 이벤트 없음"];
+    const t = currentTask();
+    if (!t) {
+      return mast(ROUTES.live, cap, [mark("off"), "쉬는 중"],
+        ["아직 이벤트가 없어요. ga act, 브리지, 허브가 일을 하면 여기에 한 줄씩 보입니다. ",
+          h("span", { class: "sub" }, "이벤트 = ga 가 한 일 한 줄 (ga.events/1).")]);
+    }
+    const goal = (deepest(t).start.metadata || {}).goal || (t.start.metadata || {}).goal || (t.step && null);
+    const failed = t.end && t.end.status === "FAILED";
+    const alive = open.includes(t);
+    const word = alive ? "도는 중" : failed ? "실패" : "끝";
+    return mast(ROUTES.live, cap, [mark(alive ? (S.downSince ? "wait" : "live") : failed ? "fail" : "ok"), `${t.start.component} ${word}`],
+      [goal ? goal + " " : alive ? "" : "지금 도는 일은 없어요. 마지막 일이 위에 있습니다. ",
+        h("span", { class: "sub" }, "이벤트 = ga 가 한 일 한 줄 (ga.events/1). 모델에 보낸 글과 답은 적지 않습니다.")]);
+  },
+  task() {
+    const t = currentTask();
+    if (!t) return section("task", "지금 하는 일", null, h("p", { class: "note" }, "도는 일이 없어요."));
+    const { by, open } = spans();
+    const inner = deepest(t);
+    const steps = ((inner.start.metadata || {}).steps || []).map(String);
+    const at = inner.step ? steps.indexOf(inner.step.name) : -1;
+    const done = inner.end && inner.end.status === "DONE";
+    const fail = inner.end && inner.end.status === "FAILED";
+    const items = steps.map((s, i) => {
+      const k = done || i < at ? "done" : i === at ? "now" : "";
+      const mk = k === "done" ? "ok" : k === "now" ? (fail ? "fail" : open.includes(inner) && !S.downSince ? "live" : "wait") : "wait";
+      return h("li", { class: k || null }, mark(mk), s);
+    });
+    const n = done ? steps.length : Math.max(0, at);
+    const pct = steps.length ? Math.round((100 * n) / steps.length) : 0;
+    const latest = (type) => {
+      const l = [...by.values()].filter((sp) => sp.start.type === type && within(sp, t.id, by))
+        .sort((a, b) => (a.last.ts < b.last.ts ? 1 : -1));
+      return l.find((sp) => open.includes(sp)) || l[0] || null;
+    };
+    const line = (label, type) => {
+      const sp = latest(type);
+      if (!sp) return [h("dt", null, label), h("dd", null, "—")];
+      const alive = open.includes(sp);
+      const m = { ...(sp.start.metadata || {}), ...(sp.last.metadata || {}) };
+      const what = type === "LLM" ? [sp.last.action, m.model ? " · " + m.model : ""]
+        : type === "NET" ? [sp.start.action, m.host ? " · " + m.host : ""]
+        : type === "AGENT" ? [sp.last.action, " · ", sp.start.component]
+        : [sp.start.type === "TOOL" ? (m.input || sp.start.action) : sp.start.action];
+      const sub = alive ? since(sp.start.ts, "째") : sp.end ? `${EV_WORD[sp.end.status]} · ${ms(sp.end.duration_ms)}` : "";
+      const tok = type === "LLM" && (typeof m.input === "number" || typeof m.output === "number") ? ` 입력 ${num(m.input)} · 출력 ${num(m.output)}` : "";
+      return [h("dt", null, label), h("dd", null, mark(alive ? (S.downSince ? "wait" : "live") : sp.end && sp.end.status === "FAILED" ? "fail" : "wait"),
+        what, " ", h("span", { class: "sub" }, sub, tok))];
+    };
+    const toolish = latest("CODE") && latest("TOOL") && open.includes(latest("CODE")) ? "CODE" : "TOOL";
+    return section("task", "지금 하는 일", [t.start.component, inner !== t ? " · " + inner.start.component : "", " · ", since(t.start.ts, "째")],
+      h("div", { class: "row" }, h("span", { class: "id" }, inner.start.component),
+        open.includes(inner) ? state(S.downSince ? "wait" : "live", "도는 중") : fail ? state("fail", "실패") : state("ok", "끝")),
+      steps.length ? h("ol", { class: "steps", "aria-label": "단계" }, items) : h("p", { class: "note" }, "알려진 단계가 없어요."),
+      steps.length ? h("div", { class: "prog" },
+        h("div", { class: "bar", role: "progressbar", "aria-label": "진행", "aria-valuemin": "0", "aria-valuemax": String(steps.length), "aria-valuenow": String(n) },
+          h("i", { style: `width:${pct}%` })),
+        h("span", { class: "v" }, `${n} / ${steps.length} 단계`)) : null,
+      h("dl", { class: "lines" }, line("Agent", "AGENT"), line("LLM", "LLM"), line("Tool", toolish), line("Network", "NET")));
+  },
+  act() {
+    const { by, open } = spans();
+    if (!open.length) return section("act", "도는 중", null, h("p", { class: "note" }, "지금 도는 도구나 명령이 없어요."));
+    const kids = (pid) => open.filter((sp) => sp.parent === pid).sort((a, b) => (a.start.ts < b.start.ts ? -1 : 1));
+    const roots = open.filter((sp) => !sp.parent || !open.includes(by.get(sp.parent)));
+    const node = (sp, depth) => h("li", null, mark(S.downSince ? "wait" : "live"), h("span", { class: "t" }, sp.start.type),
+      sp.start.component, " · ", sp.last.status === "STARTED" ? sp.start.action : sp.last.action === "step" ? "단계 " + ((sp.last.metadata || {}).step || "") : sp.last.action,
+      since(sp.start.ts), depth < 8 && kids(sp.id).length ? h("ul", null, kids(sp.id).map((c) => node(c, depth + 1))) : null);
+    return section("act", "도는 중", `${open.length}개`, h("ul", { class: "tree" }, roots.map((r) => node(r, 0))));
+  },
+  stream() {
+    const all = S.ev || [];
+    const l = S.evType ? all.filter((e) => e.type === S.evType) : all;
+    const lim = S.limit.ev || 50;
+    const { by } = spans();
+    const present = EV_TYPES.filter((t) => all.some((e) => e.type === t));
+    const chip = (t) => h("button", { type: "button", "aria-pressed": String(S.evType === t), "data-key": "chip-" + (t || "all"),
+      on: { click: () => { S.evType = t; changed("ev"); } } }, t || "모두");
+    const rows = l.slice(0, lim).map((e) => {
+      const [mk, word] = evMark(e, e.span_id ? by.get(e.span_id) : null);
+      const bad = mk === "fail";
+      return h("tr", { class: [bad ? "fail" : "", S.evSel === e.event_id ? "sel" : ""].join(" ").trim() || null },
+        h("td", { "data-label": "시각" }, when(e.ts, true)),
+        h("td", { class: "mono", "data-label": "종류" }, e.type),
+        h("td", { "data-label": "어디" }, e.component),
+        h("td", { "data-label": "무엇" }, h("button", { type: "button", class: "row-open", "data-key": "ev-" + e.event_id,
+          "aria-label": `${e.type} ${e.action} 자세히 보기`, on: { click: () => { S.evSel = e.event_id; changed("evsel"); changed("ev"); } } }, e.action)),
+        h("td", { "data-label": "상태" }, state(mk, word)),
+        h("td", { class: "num", "data-label": "걸린 시간" }, ms(e.duration_ms)),
+        h("td", { class: "detail", "data-label": "자세히" }, evDetail(e) || "—"));
+    });
+    return section("stream", "이벤트", `최근 먼저 · ${num(l.length)}개`,
+      h("div", { class: "chips", role: "group", "aria-label": "종류로 거르기" }, chip(""), present.map(chip)),
+      l.length ? h("table", { class: "tbl" },
+        h("thead", null, h("tr", null, ["시각", "종류", "어디", "무엇", "상태"].map((x) => h("th", null, x)),
+          h("th", { class: "num" }, "걸린 시간"), h("th", null, "자세히"))),
+        h("tbody", null, rows)) : h("p", { class: "note" }, "이 종류의 이벤트가 아직 없어요."),
+      more("ev", l.length, lim, "이벤트"));
+  },
+  drawer() {
+    const e = (S.ev || []).find((x) => x.event_id === S.evSel);
+    if (!e) return section("detail", "자세히", null, h("p", { class: "note" }, "표에서 한 줄을 고르면 그 이벤트의 내용과 부모 사슬이 여기에 보입니다."));
+    const { by } = spans();
+    const m = e.metadata || {};
+    const val = (v) => (v !== null && typeof v === "object" ? JSON.stringify(v) : String(v));
+    const kv = [["시각", when(e.ts, true) + "." + String(new Date(e.ts).getMilliseconds()).padStart(3, "0")], ["상태", e.status],
+      ["어디", e.component], ["걸린 시간", ms(e.duration_ms)], ["id", e.event_id]]
+      .concat(Object.entries(m).filter(([k, v]) => k !== "tail" && v !== null && v !== undefined).map(([k, v]) => [k, val(v)]));
+    const chain = [];
+    let cur = e.parent_id ? by.get(e.parent_id) : null;
+    for (let k = 0; cur && k < 20; k++) { chain.unshift(cur); cur = cur.parent ? by.get(cur.parent) : null; }
+    const link = (n) => h("span", null, h("span", { class: "t" }, n.start.type), n.start.component, " · ", n.start.action);
+    let tree = h("li", null, h("span", { class: "t" }, e.type), e.component, " · ", e.action);
+    for (const c of chain.slice().reverse()) tree = h("li", null, link(c), h("ul", null, tree));
+    const tail = Array.isArray(m.tail) ? m.tail : null;
+    return h("section", { "aria-labelledby": "h-detail", class: "drawer" },
+      h("h2", { id: "h-detail" }, "자세히", h("span", { class: "sub" }, `${e.type} · ${e.action}`)),
+      h("dl", { class: "kv" }, kv.map(([k, v]) => [h("dt", null, k), h("dd", null, v)])),
+      h("h3", null, "부모 사슬"),
+      h("ul", { class: "tree" }, tree),
+      tail ? [h("h3", null, `출력 (마지막 ${tail.length}줄)`), h("pre", { class: "out" }, tail.join("\n") || "(없음)")] : null);
+  },
+};
+
 // ---- routes -------------------------------------------------------------------------------------------------------
 const P = (id, deps, render, pair) => ({ id, deps, render, pair });
 const ROUTES = {};
@@ -1002,6 +1238,9 @@ function defineRoutes() {
   const LOGIN = "로그인 없음: ga console 이 연 이 주소와 한 번 쓰는 열쇠로만 열립니다. 이 Mac 밖으로는 아무것도 보내지 않습니다.";
   r("now", "지금", ["state", "work", "mail"], LOGIN, [
     ["mast", [], NOW.mast], ["figs", [], NOW.figs], ["run", ["turns"], NOW.run, "a"], ["mail", [], NOW.mail, "a"]]);
+  r("live", "실시간", ["ev"], "이 화면은 읽기만 합니다. 이벤트는 이 컴퓨터의 ~/.ga/events.jsonl 에서 읽고, 모델에 보낸 글과 답은 처음부터 적지 않습니다.", [
+    ["mast", ["ev", "state"], LIVE.mast], ["task", ["ev"], LIVE.task, "a"], ["act", ["ev"], LIVE.act, "a"],
+    ["stream", ["ev", "more"], LIVE.stream, "b"], ["drawer", ["evsel", "ev"], LIVE.drawer, "b"]]);
   r("work", "작업", ["state", "work"], "상태는 다섯 칸으로만 읽습니다: 초안 → 보냄 → 도는 중 → 보고됨 → 통합됨. 옆으로 빠지는 길은 돌려보냄과 실패 둘뿐입니다.", [
     ["mast", [], WORKS.mast], ["open", ["more"], WORKS.open], ["done", ["more"], WORKS.done]]);
   r("branches", "브랜치", ["state", "branches"], "이 화면은 읽기만 합니다. 합치기와 지우기는 허브가 합니다.", [
@@ -1026,6 +1265,7 @@ function route() {
 }
 
 function go() {
+  if (location.hash === "#live") history.replaceState(null, "", "#/live");  // the short address the user opens
   const r = route();
   if (!location.hash || !/^#\/[a-z]+/.test(location.hash)) history.replaceState(null, "", "#/now");
   if (r.name === "decisions") { S.decQ = r.params.get("q") || ""; S.decDraft = null; }
@@ -1043,5 +1283,6 @@ document.getElementById("where").textContent = `${location.host} · 이 Mac 에�
 window.addEventListener("hashchange", go);
 go();
 setInterval(() => { if (S.downSince) { banner(); changed("stale"); } }, 5000);
+setInterval(tick, 1000);
 if (TOKEN) setTimeout(stream, STREAM_AFTER_MS);
 else { S.denied = true; banner(); }
