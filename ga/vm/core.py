@@ -171,8 +171,31 @@ def hub_conf(home: Path, *, branch: str = BRANCH) -> dict[str, Any]:
             "directives_dir": str(h / "baseline" / "directives"),
             "repos": {"cogito5170/ga-sdk": {"path": str(h / "ga-sdk"), "base": branch},
                       "cogito5170/Token": {"path": str(h / "token"), "base": branch}},
-            "backend": "agv", "model": "gemini-3.1-pro-high", "options": {"agent": "ga-plan"}, "shadow": True,
+            "backend": "agv", "model": "auto", "options": {"agent": "ga-plan"}, "shadow": True,
             "daily_turns": 40}
+
+
+GA_HUB_MODELS = ("gemini-3.1-pro-high", "gpt-oss-120b-medium")  # the hub.json models ga itself ever wrote (CMD-GA51 S2)
+
+
+def migrate_hub_model(home: Path, *, dry_run: bool = False, say: Callable[[str], None] = print) -> bool:
+    """CMD-GA51 S2: ~/.ga/hub.json "model" -> "auto" only when it still holds a value ga wrote; a model the user wrote
+    stays. One line when it changes. True when it was (or would be) rewritten."""
+    f = Path(home) / ".ga" / "hub.json"
+    try:
+        conf = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    old = conf.get("model") if isinstance(conf, dict) else None
+    if old not in GA_HUB_MODELS:
+        return False
+    if dry_run:
+        say(f"would: {f} model {old} -> auto (follow the bridge's served model)")
+        return True
+    conf["model"] = "auto"
+    f.write_text(json.dumps(conf, indent=2) + "\n", encoding="utf-8")
+    say(f"ga vm: {f} model {old} -> auto (follow the bridge's served model)")
+    return True
 
 
 def bridge_unit(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> str:
@@ -301,6 +324,8 @@ def install(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_
             hub_json = ga_dir / "hub.json"
             if not hub_json.exists():  # never the user's own file (CMD-GA45 S1)
                 w(hub_json, json.dumps(hub_conf(home, branch=branch), indent=2) + "\n", act)
+            else:
+                migrate_hub_model(home, dry_run=dry_run, say=say)
             ask = home / ".ga-ask" / "ask.json"
             if not ask.exists():  # never the user's own file
                 w(ask, json.dumps({"ask_agent": "ga-ask"}, indent=2) + "\n", act)
@@ -734,7 +759,9 @@ def update(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_G
     rc = 0
     if dry_run:
         say("would: pip install only when ga-sdk HEAD or pins changed; restart the enabled services whose code changed")
+        migrate_hub_model(home, dry_run=True, say=say)
         return 0
+    migrate_hub_model(home, say=say)
     try:
         if "ga-sdk" in before:
             pip = _pip(r, home, venv, sdk, lambda m: None, by_head=True)

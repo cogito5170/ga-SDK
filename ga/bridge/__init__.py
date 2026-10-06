@@ -134,6 +134,22 @@ def _served_model(turns: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def record_served(cfg: dict[str, Any], run: dict[str, Any], now: Callable[[], str] | None = None) -> str | None:
+    """CMD-GA51 S1: the served model of this run to ``served_file`` (default ~/.ga/bridge/served.json) as {model, at},
+    for the hub's ``"model": "auto"``. Nothing is written when no turn says which model served."""
+    served = _served_model([e for e in run.get("events") or [] if e.get("event") == "turn"])
+    if not served:
+        return None
+    model = served.split(",")[-1]
+    at = (now or (lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))()
+    path = Path(cfg.get("served_file") or "~/.ga/bridge/served.json").expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"model": model, "at": at}) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+    return model
+
+
 def build_report(cfg: dict[str, Any], head: dict[str, Any], run: dict[str, Any], capacity: bool = False) -> str:
     turns = [e for e in run["events"] if e.get("event") == "turn"]
     end = next((e for e in reversed(run["events"]) if e.get("event") == "end"), {})
@@ -214,6 +230,10 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
                     run = runner(cfg, conf, task)
                     capacity = is_capacity(run)
                 reply = build_report(cfg, head, run, capacity)
+                try:
+                    record_served(cfg, run)
+                except OSError as e:  # the report still goes; the hub falls back to its code default
+                    log(f"bridge: served model not recorded: {e}")
             problems = hard(validate(parse_text(reply)[0]))
             if problems:
                 raise FormError(problems)

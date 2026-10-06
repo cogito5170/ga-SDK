@@ -1437,6 +1437,33 @@ _SAME = {"ACCEPT": "ACCEPT", "ACCEPTED": "ACCEPT", "CONTINUE": "ACCEPT", "SEND_B
          "REFINE": "SEND_BACK", "ASK_HUMAN": "ASK_HUMAN", "ASK_USER": "ASK_HUMAN"}
 
 
+HUB_MODEL_DEFAULT = "gpt-oss-120b-medium"  # the code default when hub.json names no model (or auto has nothing served)
+SERVED_FILE = "~/.ga/bridge/served.json"  # CMD-GA51 S1: the bridge's {model, at} of the last served turn
+
+
+def read_served(path: str | Path | None = None) -> str | None:
+    """The model the bridge last saw served (``ga.bridge.record_served``), or None when there is no usable record."""
+    try:
+        d = json.loads(Path(path or SERVED_FILE).expanduser().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    m = d.get("model") if isinstance(d, dict) else None
+    return m.strip() if isinstance(m, str) and m.strip() else None
+
+
+def resolve_model(conf: dict[str, Any]) -> dict[str, Any]:
+    """CMD-GA51 S1: {configured, resolved[, note]} for hub.json ``model``. ``auto`` resolves to the bridge's last served
+    model; unknown falls back to the code default with a note. Anything else resolves to itself."""
+    configured = conf.get("model") or HUB_MODEL_DEFAULT
+    if configured != "auto":
+        return {"configured": configured, "resolved": configured}
+    served = read_served(conf.get("served_file"))
+    if served:
+        return {"configured": "auto", "resolved": served}
+    return {"configured": "auto", "resolved": HUB_MODEL_DEFAULT,
+            "note": f"auto: no served model recorded by the bridge; code default {HUB_MODEL_DEFAULT}"}
+
+
 GATE_N = 10  # CMD-GA49 S2: the last N compared rows must all agree
 
 
@@ -1524,6 +1551,7 @@ class MailHub(Hub):
         self.human = conf.get("human", "human")
         self.mailbox = mailbox or Mailbox(conf["mailbox_repo"], remote=conf.get("mailbox_remote", "origin"))
         self.runner = runner
+        self._own_runner = False
         self.judge_fn = judge_fn or J.judge
         self.apply_fn = apply_fn or J.apply
         self.shadow = bool(conf.get("shadow")) if shadow is None else bool(shadow)
@@ -1531,6 +1559,7 @@ class MailHub(Hub):
         self._usage: dict[str, Any] | None = None
         self._error: str = ""  # the backend error label of the last _decide (CMD-GA49 S1)
         self._served: str | None = None
+        self._model: dict[str, Any] = {}  # CMD-GA51 S1: {configured, resolved[, note]} of this tick
 
     # ---------------------------------------------------------------- state
     def load_state(self) -> dict[str, Any]:
@@ -1561,11 +1590,18 @@ class MailHub(Hub):
                "judge_class": getattr(j, "cls", None), "needs": list(getattr(j, "needs", None) or []),
                "decision": decision, "asks": [str(x)[:300] for x in lines][:3], "error": self._error or None,
                "served": self._served, "tokens": {"input": u.get("input"), "output": u.get("output")},
-               "mail": m.path}
+               "mail": m.path, **self._model_record()}
         self.shadow_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.shadow_path, "a", encoding="utf-8") as h:
             h.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
         self._writes += 1
+
+    def _model_record(self) -> dict[str, Any]:
+        m = self._model or {}
+        rec = {"model_configured": m.get("configured", self.conf.get("model")), "model_resolved": m.get("resolved")}
+        if m.get("note"):
+            rec["model_note"] = m["note"]
+        return rec
 
     def _shadow_to(self) -> str:
         to = str(self.conf.get("shadow_to", SHADOW_TO))
@@ -1610,18 +1646,30 @@ class MailHub(Hub):
             self.save_state(st)
             res.sent.append(f"shadow {row.get('id')} -> {self._shadow_to()}")
 
+    def _resolve_model(self) -> dict[str, Any]:
+        """CMD-GA51 S1: ``"model": "auto"`` follows the model the bridge last saw served; any other value is used as
+        written. The backend is made for the resolved model, so check_served holds against it."""
+        m = resolve_model(self.conf)
+        if self.runner is not None and self._own_runner and m["resolved"] != self._model.get("resolved"):
+            self.runner = None  # the served model moved: a backend for the new one
+        self._model = m
+        return m
+
     def _runner(self) -> Any:
         if self.runner is None:
             from . import backends
-            self.runner = backends.create(self.conf.get("backend", "agv"), self.conf.get("model", "gpt-oss-120b-medium"),
+            m = self._model or self._resolve_model()
+            self.runner = backends.create(self.conf.get("backend", "agv"), m["resolved"],
                                           dict(self.conf.get("options") or {}),
                                           {"cwd": str(self.ga), "state_dir": str(self.ga / "hub")})
+            self._own_runner = True
         return self.runner
 
     # ---------------------------------------------------------------- the tick
     def tick(self, dry_run: bool = False) -> TickResult:
         self._writes = 0
         res = TickResult()
+        self._resolve_model()
         st = self.load_state()
         done = {r.get("mail") for r in self._shadow_rows()} if self.shadow else st["handled"]
         msgs = [m for m in self.mailbox.unread(self.name) if m.path not in done]
@@ -1798,7 +1846,7 @@ class MailHub(Hub):
         if self.shadow:  # the tokens go to shadow.jsonl; no ledger, no L0
             return decision, lines, err
         row = {"id": did, "kind": "hub", "backend": self.conf.get("backend", "agv"), "model": self.conf.get("model"),
-               "served": served, "decision": decision, "error": err, "card_bytes": len(card.encode("utf-8")),
+               **self._model_record(), "served": served, "decision": decision, "error": err, "card_bytes": len(card.encode("utf-8")),
                "input": (usage or {}).get("input"), "output": (usage or {}).get("output"), "seconds": secs}
         l0.append(self._ledger_today(), row)
         ev = l0.run_end(f"hub:{did}:{self.turns_today()}", TurnResult(ended=True, usage=usage, model=served,
