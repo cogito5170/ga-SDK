@@ -122,7 +122,7 @@ S_ID = re.compile(r"^S\d+$")
 D_ID = re.compile(r"^D\d+$")
 ITEM_STATES = ("met", "unmet", "blocked", "na")
 BLOCKER_KINDS = ("env", "permission", "credential", "budget", "dependency", "design")
-NOTIFY_KINDS = ("directive", "report", "verdict", "question", "ack")
+NOTIFY_KINDS = ("directive", "report", "verdict", "question", "ack", "shadow")
 
 
 def _items(prefix: re.Pattern[str], what: str) -> Check:
@@ -177,11 +177,25 @@ REPORT2_ONLY = [
     Field("note", _note, required=False),
 ]
 
+def _shadow_row(v: Any) -> str | None:
+    """CMD-GA45 S2: one shadow decision {id, rev, sha, decision, judge_class, input, output, mail}; nulls allowed."""
+    keys = {"id": str, "rev": int, "sha": str, "decision": str, "judge_class": str, "input": int, "output": int,
+            "mail": str}
+    if not isinstance(v, dict) or set(v) - set(keys) or not isinstance(v.get("decision"), str):
+        return f"must be an object with decision and only {', '.join(keys)}"
+    for k, t in keys.items():
+        x = v.get(k)
+        if x is not None and (not isinstance(x, t) or isinstance(x, bool) or (isinstance(x, str) and len(x) > 200)):
+            return f"{k} must be {t.__name__} or null"
+    return None
+
+
 NOTIFY = [
     Field("to", is_str),
     Field("kind", one_of(*NOTIFY_KINDS)),
     Field("ref", matches(re.compile(r"^https?://\S+$"), "a URL")),
     Field("id", is_str, required=False),
+    Field("shadow", _shadow_row, required=False),
     Field("note", _note, required=False),
 ]
 

@@ -66,7 +66,8 @@ class NetworkUnapproved(Base):
 
 class Shadow(unittest.TestCase):
     def files(self, w):
-        return {k: v for k, v in w.snapshot().items() if not k.endswith("/hub/shadow.jsonl")}
+        # CMD-GA45 S2: the shadow hub also mails its row to baseline-shadow and keeps the mailed path in state.json
+        return {k: v for k, v in w.snapshot().items() if not k.endswith(("/hub/shadow.jsonl", "/hub/state.json"))}
 
     def check_shadow(self, answers, cls, decision, shadow=True, conf_shadow=False, **kw):
         w = World(self)
@@ -78,7 +79,7 @@ class Shadow(unittest.TestCase):
         res = h.tick()
         self.assertEqual(self.files(w), before)  # no file outside shadow.jsonl changed
         self.assertEqual(set(Path(tempfile.gettempdir()).glob("ga-hub-shadow-*")), tmp0)
-        self.assertEqual(w.mail.sent, [])  # no mail
+        self.assertEqual([r for r, _h, _t in w.mail.sent], ["baseline-shadow"])  # only the shadow row (CMD-GA45)
         self.assertEqual(w.mail.read, set())  # not even a read mark: the real hub still sees it
         self.assertEqual(w.applied, [])  # nothing integrated
         self.assertEqual((w.remote_main(), w.remote_main("base.git")),

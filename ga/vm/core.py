@@ -145,10 +145,22 @@ def unit_files(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> dict[str, str
                f"ExecStart={py} -m ga console --config {home}/.ga/console.json --port {PORT} --no-open\n"
                f"Restart=always\nRestartSec=5\nNoNewPrivileges=yes\n\n[Install]\nWantedBy=default.target\n")
     hub = (f"[Unit]\nDescription=GA hub tick, shadow mode (a timer runs it every 60 s)\n\n[Service]\nType=oneshot\n"
-           f"WorkingDirectory={wd}\nExecStartPre={guard}\nExecStart={py} -m ga hub tick --shadow\nNoNewPrivileges=yes\n")
+           f"WorkingDirectory={wd}\nExecStartPre={guard}\nExecStart={py} -m ga hub tick --shadow --config {home}/.ga/hub.json "
+           f"--ga-dir {home}/.ga\nNoNewPrivileges=yes\n")
     timer = ("[Unit]\nDescription=GA hub tick every 60 s\n\n[Timer]\nOnBootSec=60\nOnUnitActiveSec=60\n"
              f"Unit={HUB_UNIT}\n\n[Install]\nWantedBy=timers.target\n")
     return {CONSOLE_UNIT: console, HUB_UNIT: hub, HUB_TIMER: timer}
+
+
+def hub_conf(home: Path, *, branch: str = BRANCH) -> dict[str, Any]:
+    """~/.ga/hub.json for the VM's shadow hub (CMD-GA45 S1): absolute paths only (Mailbox does not expand ~)."""
+    h = Path(home)
+    return {"name": "baseline", "human": "human", "mailbox_repo": str(h / "baseline"), "baseline_repo": str(h / "baseline"),
+            "directives_dir": str(h / "baseline" / "directives"),
+            "repos": {"cogito5170/ga-sdk": {"path": str(h / "ga-sdk"), "base": branch},
+                      "cogito5170/Token": {"path": str(h / "token"), "base": branch}},
+            "backend": "agv", "model": "gemini-3.1-pro-high", "options": {"agent": "ga-plan"}, "shadow": True,
+            "daily_turns": 40}
 
 
 def bridge_unit(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> str:
@@ -273,6 +285,9 @@ def install(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_
         for name, text in units.items():
             changed.append(w(udir / name, text, act))
         if full:
+            hub_json = ga_dir / "hub.json"
+            if not hub_json.exists():  # never the user's own file (CMD-GA45 S1)
+                w(hub_json, json.dumps(hub_conf(home, branch=branch), indent=2) + "\n", act)
             ask = home / ".ga-ask" / "ask.json"
             if not ask.exists():  # never the user's own file
                 w(ask, json.dumps({"ask_agent": "ga-ask"}, indent=2) + "\n", act)

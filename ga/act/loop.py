@@ -55,10 +55,14 @@ class Result:
     tokens: dict[str, Any]
     changed: list[str] = field(default_factory=list)
     rows: list[dict] = field(default_factory=list)
+    rungs: list[dict] = field(default_factory=list)  # CMD-GA45 S3: one {model, status, reason, turns, tokens} per rung
 
     def to_dict(self) -> dict[str, Any]:
-        return {"schema": SPEC, "id": self.id, "status": self.status, "reason": self.reason, "turns": self.turns,
-                "failing": self.failing, "tokens": self.tokens, "changed": self.changed}
+        d = {"schema": SPEC, "id": self.id, "status": self.status, "reason": self.reason, "turns": self.turns,
+             "failing": self.failing, "tokens": self.tokens, "changed": self.changed}
+        if self.rungs:
+            d["rungs"] = self.rungs
+        return d
 
 
 def _label(e: BaseException) -> str:
@@ -365,9 +369,92 @@ def make_item(raw: dict[str, Any], cfg: dict[str, Any]) -> Item:
     return Item(raw["id"], raw["goal"], list(files), dw)
 
 
+# CMD-GA45 S3: a blocked run climbs to the next rung only when it ran out of turns, tokens or progress — never on the
+# model's own BLOCKED, a backend error or a refusal.
+ESCALATE = ("turn cap", "token cap", "no progress")
+
+
+def parse_ladder(v: Any) -> list[str]:
+    """``m1,m2`` or ["m1", "m2"] -> the rung list (empty: no ladder)."""
+    if v is None or v == "":
+        return []
+    items = v.split(",") if isinstance(v, str) else v
+    if not isinstance(items, list) or not all(isinstance(m, str) and m.strip() for m in items):
+        raise K.ActConfigError("ladder must be model names, comma-separated or a JSON list")
+    return [m.strip() for m in items]
+
+
+class Tree:
+    """The worktree as a ladder found it: HEAD and the untracked files then. ``restore`` puts it back so the next rung
+    starts from the same clean state (argv only, no shell). The state dir is never touched."""
+
+    def __init__(self, root: Path, keep: list[Path]):
+        import subprocess
+        self.root, self.keep = Path(root), [Path(k).resolve() for k in keep]
+        self._sp = subprocess
+        if self._git("diff", "HEAD", "--quiet").returncode != 0:
+            raise K.ActConfigError("a ladder needs a clean worktree (no changes to tracked files) to restart rungs from")
+        self.head = self._git("rev-parse", "HEAD").stdout.strip()
+        self.untracked = set(self._others())
+
+    def _git(self, *a: str) -> Any:
+        return self._sp.run(["git", *a], cwd=self.root, capture_output=True, text=True, timeout=120)
+
+    def _others(self) -> list[str]:
+        return [x for x in self._git("ls-files", "-z", "--others", "--exclude-standard").stdout.split("\0") if x]
+
+    def restore(self) -> None:
+        if self._git("reset", "-q", "--hard", self.head).returncode != 0:
+            raise K.ActConfigError("the ladder could not reset the worktree")
+        for rel in self._others():
+            f = (self.root / rel).resolve()
+            if rel in self.untracked or any(f == k or k in f.parents for k in self.keep):
+                continue
+            f.unlink(missing_ok=True)
+
+
 def run_item(root: Path, raw_item: dict[str, Any], *, backend: str, model: str, options: dict | None = None,
+             runner: Any = None, config: str | None = None, state_dir: Path | None = None,
+             ladder: Any = None, make_runner: Callable[[str], Any] | None = None, **kw: Any) -> Result:
+    """Load the repo's commands, make the runner (bare, tools off) and run the item. With a ladder (CMD-GA45 S3) the
+    item runs on each rung in turn, from the same clean tree, until one is done or ends blocked for a reason other
+    than a cap or no progress."""
+    options = dict(options or {})
+    rungs = parse_ladder(ladder if ladder is not None else options.pop("ladder", None))
+    options.pop("ladder", None)
+    if not rungs:
+        return _run_one(root, raw_item, backend=backend, model=model, options=options, runner=runner, config=config,
+                        state_dir=state_dir, **kw)
+    cfg = K.load(Path(root), config)
+    bad = [m for m in rungs if m not in cfg["models"]]
+    if bad:
+        raise K.ActConfigError(f"ladder: unknown model(s) {', '.join(bad)[:200]} (not in the models list)")
+    make_item(raw_item, cfg)  # a bad item stops before any run
+    keep = [Path(state_dir or Path(root) / ".ga" / "act"), Path(config) if config else Path(root) / K.CONFIG]
+    tree = Tree(Path(root), keep)
+    res: Result | None = None
+    rows: list[dict] = []
+    for i, m in enumerate(rungs):
+        if i:
+            tree.restore()
+        r = make_runner(m) if make_runner else None
+        res = _run_one(root, raw_item, backend=backend, model=m, options=options, runner=r, config=config,
+                       state_dir=state_dir, **kw)
+        rows.append({"model": m, "status": res.status, "reason": res.reason, "turns": res.turns,
+                     "tokens": dict(res.tokens)})
+        if res.status == "done" or not res.reason.startswith(ESCALATE):
+            break
+    assert res is not None
+    total: dict[str, Any] = {}
+    for g in rows:
+        for k, v in g["tokens"].items():
+            total[k] = total.get(k, 0) + (v or 0)
+    res.tokens, res.rungs, res.turns = total, rows, sum(g["turns"] for g in rows)
+    return res
+
+
+def _run_one(root: Path, raw_item: dict[str, Any], *, backend: str, model: str, options: dict | None = None,
              runner: Any = None, config: str | None = None, state_dir: Path | None = None, **kw: Any) -> Result:
-    """Load the repo's commands, make the runner (bare, tools off) and run the item."""
     cfg = K.load(Path(root), config)
     item = make_item(raw_item, cfg)
     if runner is None:

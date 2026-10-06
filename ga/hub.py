@@ -1363,6 +1363,8 @@ CARD_MAX = 6000      # bytes, the whole card (S1: <= 6 KB)
 ASKS_MAX = 6
 SENDBACK_CAP = 3
 DAILY_TURNS = 20
+SHADOW_TO = "baseline-shadow"  # CMD-GA45 S2: the shadow rows' recipient — never the hub's own inbox
+MAILBOX_URL = "https://github.com/cogito5170/baseline"
 _DECIDE = re.compile(r"^\s*(ACCEPT|SEND_BACK|ASK_HUMAN)\b[ \t:]*(.*)$")
 _BD = re.compile(r"^\| BD-(\d+) \|", re.M)
 _ROUND = re.compile(r"^- (\d+) 회차:", re.M)
@@ -1464,6 +1466,24 @@ def shadow_compare(baseline: list[dict[str, Any]], shadow: list[dict[str, Any]])
             "rows": rows, "gate_ok": bool(rows) and not false_accepts}
 
 
+def shadow_rows_from_mailbox(mailbox: Any, name: str = SHADOW_TO) -> list[dict[str, Any]]:
+    """The shadow rows mailed to ``name`` (notify/1 kind shadow), oldest first, as shadow.jsonl-shaped rows. Reads
+    every message (read or not) and marks nothing."""
+    from .forms import parse_text
+    tip = mailbox.tip()
+    rows = []
+    for path in mailbox._files(tip, f"to/{name}/"):
+        try:
+            head, _ = parse_text(mailbox.message(tip, path).text)
+        except Exception:
+            continue
+        sh = head.get("shadow")
+        if head.get("schema") != "notify/1" or head.get("kind") != "shadow" or not isinstance(sh, dict):
+            continue
+        rows.append({**sh, "tokens": {"input": sh.get("input"), "output": sh.get("output")}})
+    return rows
+
+
 class MailHub(Hub):
     """``ga hub tick``: the hub tick for mailed reports (CMD-GA42 S1). Reuses Hub's quiet writes (R9) and its
     directive rev+1 (``_next_rev``); the judge is ``ga judge``, the integration is ``ga judge --apply``.
@@ -1527,6 +1547,48 @@ class MailHub(Hub):
             h.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
         self._writes += 1
 
+    def _shadow_to(self) -> str:
+        to = str(self.conf.get("shadow_to", SHADOW_TO))
+        if to == self.name:  # never into the hub's own inbox
+            raise ValueError(f"ga hub: shadow_to must not be the hub's own name {self.name!r}")
+        return to
+
+    def shadow_form(self, row: dict[str, Any]) -> str:
+        """One shadow.jsonl row as a small notify/1 (kind shadow) form for baseline (CMD-GA45 S2)."""
+        from .forms import dump_wire
+        rev = row.get("rev")
+        rev = int(rev) if isinstance(rev, int) or (isinstance(rev, str) and rev.isdigit()) else None
+        tok = row.get("tokens") or {}
+        num = lambda v: v if isinstance(v, int) and not isinstance(v, bool) else None  # noqa: E731
+        txt = lambda v: str(v)[:200] if v is not None else None  # noqa: E731
+        sh = {"id": txt(row.get("id")), "rev": rev, "sha": txt(row.get("sha")), "decision": str(row.get("decision") or "?")[:40],
+              "judge_class": txt(row.get("judge_class")), "input": num(tok.get("input")), "output": num(tok.get("output")),
+              "mail": txt(row.get("mail"))}
+        head = {"schema": "notify/1", "to": self._shadow_to(), "kind": "shadow",
+                "ref": f"{self.conf.get('mailbox_url', MAILBOX_URL)}/blob/ga-mailbox/{row.get('mail') or ''}",
+                "shadow": sh}
+        if isinstance(row.get("id"), str):
+            head["id"] = row["id"]
+        return dump_wire(head)
+
+    def _mail_shadow(self, res: TickResult) -> None:
+        """Mail every shadow row not mailed yet; the mailed report paths are kept in the hub state (``shadow_mailed``)."""
+        st = self.load_state()
+        mailed = list(st.get("shadow_mailed", []))
+        for row in self._shadow_rows():
+            key = row.get("mail")
+            if not key or key in mailed:
+                continue
+            try:
+                self._mail(self._shadow_to(), self.shadow_form(row))
+            except Exception as e:  # mailed on a later tick
+                res.plan.append(f"shadow mail failed for {key}: {type(e).__name__}"[:200])
+                break
+            mailed.append(key)
+            st["shadow_mailed"] = mailed
+            self.save_state(st)
+            res.sent.append(f"shadow {row.get('id')} -> {self._shadow_to()}")
+
     def _runner(self) -> Any:
         if self.runner is None:
             from . import backends
@@ -1543,7 +1605,10 @@ class MailHub(Hub):
         done = {r.get("mail") for r in self._shadow_rows()} if self.shadow else st["handled"]
         msgs = [m for m in self.mailbox.unread(self.name) if m.path not in done]
         if not msgs:
-            res.quiet = True
+            if self.shadow:
+                self._mail_shadow(res)
+            res.writes = self._writes
+            res.quiet = not res.sent and not res.plan
             return res
         for m in msgs:
             if self.turns_today() >= int(self.conf.get("daily_turns", DAILY_TURNS)):
@@ -1558,6 +1623,8 @@ class MailHub(Hub):
             self._one(st, m, res)
             self.mailbox.mark_read(self.name, m.path)
             self.save_state(st)
+        if self.shadow and not dry_run:
+            self._mail_shadow(res)
         res.writes = self._writes
         res.quiet = not res.sent and not res.plan and not res.integrated
         return res

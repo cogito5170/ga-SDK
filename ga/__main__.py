@@ -100,7 +100,16 @@ def cmd_hub(args, sleep=None) -> int:
     from .hub import MailHub
     if args.hub_cmd == "shadow-compare":
         return cmd_hub_shadow_compare(args)
-    conf = json.loads(Path(args.config).expanduser().read_text(encoding="utf-8"))
+    cf = Path(args.config).expanduser()
+    if not cf.is_file():  # CMD-GA45 S1: one clear journal line, not a traceback every minute
+        print(f"ga hub: no config at {cf} — write it (ga vm install --full writes ~/.ga/hub.json) or give --config",
+              file=sys.stderr)
+        return 2
+    try:
+        conf = json.loads(cf.read_text(encoding="utf-8"))
+    except ValueError as e:
+        print(f"ga hub: {cf} is not JSON ({e})", file=sys.stderr)
+        return 2
     hub = MailHub(conf, ga_dir=args.ga_dir, shadow=True if args.shadow else None)
     while True:
         res = hub.tick(dry_run=args.dry_run)
@@ -125,8 +134,13 @@ def cmd_hub_shadow_compare(args) -> int:
         base = base if isinstance(base, list) else [base]
     except ValueError:
         base = read_jsonl(f)
-    out = shadow_compare([b for b in base if isinstance(b, dict)],
-                         read_jsonl(Path(args.shadow_file or Path(args.ga_dir) / "hub" / "shadow.jsonl")))
+    if args.mailbox:  # CMD-GA45 S2: the rows the VM's shadow hub mailed (notify/1 kind shadow)
+        from .hub import shadow_rows_from_mailbox
+        from .mailbox import Mailbox
+        rows = shadow_rows_from_mailbox(Mailbox(Path(args.mailbox).expanduser()), args.name)
+    else:
+        rows = read_jsonl(Path(args.shadow_file or Path(args.ga_dir) / "hub" / "shadow.jsonl"))
+    out = shadow_compare([b for b in base if isinstance(b, dict)], rows)
     print(f"agreement {out['agree']}/{out['compared']}" + (f" ({out['agreement']})" if out["compared"] else "")
           + f"; false accepts {len(out['false_accepts'])}; extra send-backs {len(out['extra_send_backs'])}"
           + f"; missing in shadow {len(out['missing_in_shadow'])}")
@@ -702,6 +716,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--shadow", action="store_true", help="judge, card and decision only; one line to "
                    "<ga dir>/hub/shadow.jsonl, nothing integrated, mailed or recorded")
     p.add_argument("--shadow-file", help="shadow-compare: shadow.jsonl (default <ga dir>/hub/shadow.jsonl)")
+    p.add_argument("--mailbox", help="shadow-compare: read the shadow rows from this mailbox repo instead (CMD-GA45)")
+    p.add_argument("--name", default="baseline-shadow", help="shadow-compare --mailbox: the recipient (default "
+                   "baseline-shadow)")
     p.add_argument("--config", default=".ga-hub.json", help="the hub config (JSON)")
     p.add_argument("--ga-dir", default=".ga")
     p.add_argument("--every", type=float, default=300.0, help="run: seconds between ticks")

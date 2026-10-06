@@ -81,6 +81,11 @@ pgrep -a pip
 ~/ga-venv/bin/python -m ga vm enable-hub
 ```
 
+허브 유닛은 `ga hub tick --shadow --config ~/.ga/hub.json --ga-dir ~/.ga` 로 돕니다. `ga vm install --full` 이
+`~/.ga/hub.json` 을 없을 때만 씁니다(절대 경로, 기존 파일은 건드리지 않음). 파일이 없으면 유닛은 한 줄 이유를 남기고
+실패합니다. shadow 결정마다 notify/1(kind shadow) 한 통이 mailbox 의 `baseline-shadow` 로 가고(한 번만), baseline 은
+VM 에 로그인하지 않고 `ga hub shadow-compare FILE --mailbox ~/baseline --name baseline-shadow` 로 비교합니다.
+
 ## VM 이 회수되어 새로 만들 때
 
 새 VM 에서 위 "처음 설치"를 그대로 다시 하면 됩니다. 상태는 git 에 있으므로 잃는 것이 없습니다. 클라우드의 매시간 점검은 안전망으로 그대로 둡니다.

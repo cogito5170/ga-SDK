@@ -41,6 +41,14 @@ def _argv(v: Any, where: str) -> list[str]:
     return list(v)
 
 
+# CMD-GA45 S3: the models a ladder may name (the agy list of 2026-10-06); ``models`` in .ga-act.json replaces it
+MODELS = ("gpt-oss-120b-medium",
+          *(f"gemini-3.{v}-flash-{e}" for v in (6, 7, 8) for e in ("low", "medium", "high")),
+          "gemini-3.1-pro-low", "gemini-3.1-pro-high",
+          *(f"claude-{f}-5-5-{e}" for f in ("sonnet", "opus") for e in ("low", "medium", "high")))
+MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$")
+
+
 def load(root: Path, path: str | None = None) -> dict[str, Any]:
     """{commands: {name: argv}, done_when: argv | None, timeout_s} from ``.ga-act.json`` (missing file = no commands)."""
     f = Path(path) if path else Path(root) / CONFIG
@@ -50,8 +58,8 @@ def load(root: Path, path: str | None = None) -> dict[str, Any]:
             raw = json.loads(f.read_text(encoding="utf-8"))
         except ValueError as e:
             raise ActConfigError(f"{f.name}: not JSON ({e})") from None
-    if not isinstance(raw, dict) or set(raw) - {"commands", "done_when", "timeout_s"}:
-        raise ActConfigError(f"{CONFIG} is {{commands, done_when?, timeout_s?}}")
+    if not isinstance(raw, dict) or set(raw) - {"commands", "done_when", "timeout_s", "models"}:
+        raise ActConfigError(f"{CONFIG} is {{commands, done_when?, timeout_s?, models?}}")
     cmds = raw.get("commands", {})
     if not isinstance(cmds, dict):
         raise ActConfigError("commands must map names to argv lists")
@@ -63,7 +71,11 @@ def load(root: Path, path: str | None = None) -> dict[str, Any]:
     t = raw.get("timeout_s", 300)
     if isinstance(t, bool) or not isinstance(t, (int, float)) or t <= 0:
         raise ActConfigError("timeout_s must be a positive number")
-    return {"commands": out, "done_when": resolve_done(raw.get("done_when"), out), "timeout_s": float(t)}
+    models = raw.get("models", list(MODELS))
+    if not (isinstance(models, list) and all(isinstance(m, str) and MODEL.match(m) for m in models)):
+        raise ActConfigError("models must be a list of model names ([A-Za-z0-9._:-], up to 80)")
+    return {"commands": out, "done_when": resolve_done(raw.get("done_when"), out), "timeout_s": float(t),
+            "models": list(models)}
 
 
 def resolve_done(v: Any, commands: dict[str, list[str]]) -> list[str] | None:

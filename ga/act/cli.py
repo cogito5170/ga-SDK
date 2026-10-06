@@ -1,6 +1,6 @@
 """``ga act`` (CMD-GA38): run one work item with the executor loop.
 
-    ga act --item item.json --backend claude_cli --model claude-haiku-4-5 [--repo .] [--options '{...}']
+    ga act --item item.json --backend claude_cli --model claude-haiku-4-5 [--ladder m1,m2] [--repo .] [--options '{...}']
            [--max-turns 10] [--max-tokens 400000] [--cap 6000] [--config .ga-act.json] [--state DIR]
 
 The item is work/1-shaped: {"id", "goal", "files": [globs], "done_when"?: command name or argv}. Prints the act/1
@@ -18,7 +18,9 @@ def add_parser(sub) -> None:
     p.add_argument("--item", required=True, help="work item JSON file, or - for stdin")
     p.add_argument("--repo", default=".", help="the worktree to work in (default: .)")
     p.add_argument("--backend", required=True)
-    p.add_argument("--model", required=True)
+    p.add_argument("--model", help="the model (the first rung when --ladder is given)")
+    p.add_argument("--ladder", help="m1,m2,...: start on m1, the next rung only when a run ends blocked by a cap or "
+                   "no progress (CMD-GA45); models from the models list (.ga-act.json `models`)")
     p.add_argument("--options", default="{}", help="backend options as JSON")
     p.add_argument("--config", help="the commands file (default: <repo>/.ga-act.json)")
     p.add_argument("--state", help="ledger and L0 directory (default: <repo>/.ga/act)")
@@ -36,7 +38,14 @@ def cmd_act(args) -> int:
     try:
         raw = json.loads(sys.stdin.read() if args.item == "-" else Path(args.item).read_text(encoding="utf-8"))
         opts = json.loads(args.options)
-        res = run_item(Path(args.repo), raw, backend=args.backend, model=args.model, options=opts, config=args.config,
+        if not isinstance(opts, dict):
+            raise ValueError("--options must be a JSON object")
+        ladder = args.ladder if args.ladder else opts.get("ladder")
+        model = args.model or (ladder.split(",")[0] if isinstance(ladder, str) else (ladder or [None])[0])
+        if not model:
+            raise ValueError("give --model or --ladder")
+        res = run_item(Path(args.repo), raw, backend=args.backend, model=model, options=opts, config=args.config,
+                       ladder=args.ladder or None,
                        state_dir=Path(args.state) if args.state else None, max_turns=args.max_turns,
                        max_tokens=args.max_tokens, cap=args.cap)
     except (OSError, ValueError, KeyError, ActConfigError, ConfigError, CardError) as e:
