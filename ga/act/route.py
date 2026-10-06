@@ -5,7 +5,8 @@ turns it gets, then allow at most ``climb`` rungs up (default 1).
 
 Order: (a) the item's own ``route`` (ga plan writes it in the planning turn) when valid; (b) the outcome ledger
 ``<state>/routes.jsonl``: >= 3 past items of the same feature bucket succeeded -> the cheapest rung that succeeded for
-all of them, 0 model calls; (c) one triage turn on ``triage_model`` (agent ga-plan, tools off) with a card of at most
+all of the last ``route_window`` (default 5; ``route_min`` default 3) of them, 0 model calls, so it can step
+down again when cheaper rungs keep winning; (c) one triage turn on ``triage_model`` (agent ga-plan, tools off) with a card of at most
 CARD_MAX bytes - goal, file paths with sizes and kinds, done_when command names, test file names, never a file's
 contents; an invalid or failed triage -> the cheapest rung with 3 turns (source fallback).
 
@@ -38,6 +39,7 @@ CARD_MAX = 2048          # bytes, UTF-8
 LOW_CAP = 3              # the cheapest rung's turn cap
 FALLBACK_TURNS = 3
 LEDGER_MIN = 3           # successful past items of a bucket before the ledger routes
+LEDGER_WINDOW = 5        # DEV-R0b: only the last N successes of the bucket vote, so a start can step down again
 CLIMB, CLIMB_MAX = 1, 2
 LEDGER = "routes.jsonl"
 SOURCES = ("item", "ledger", "triage", "fallback")
@@ -235,15 +237,24 @@ def append(state: Path, row: dict[str, Any]) -> None:
         f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-def from_ledger(rows: list[dict[str, Any]], b: str, ladder: list[str]) -> dict[str, Any] | None:
-    """>= LEDGER_MIN successful items of bucket ``b`` -> start at the cheapest rung that succeeded for all of them."""
+def _count(v: Any, default: int) -> int:
+    return v if isinstance(v, int) and not isinstance(v, bool) and v >= 1 else default
+
+
+def from_ledger(rows: list[dict[str, Any]], b: str, ladder: list[str], *, window: int = LEDGER_WINDOW,
+                minimum: int = LEDGER_MIN) -> dict[str, Any] | None:
+    """>= ``minimum`` successful items of bucket ``b`` -> start at the cheapest rung that succeeded for all of the last
+    ``window`` of them (the ledger is in time order). Old wins on a dearer rung age out of the window, so when cheaper
+    rungs keep winning the start steps back down; a failure there climbs, wins higher, and the start goes back up.
+    The start is always a rung of ``ladder``: never below its first or above its last."""
     won = []
     for r in rows:
         used = r.get("rungs") if isinstance(r.get("rungs"), list) else []
         if r.get("bucket") == b and r.get("success") is True and used and used[-1] in ladder:
             won.append(r)
-    if len(won) < LEDGER_MIN:
+    if len(won) < minimum:
         return None
+    won = won[-max(window, minimum):]
     start = max((r["rungs"][-1] for r in won), key=ladder.index)
     turns = [int(r.get("turns_last") or 0) for r in won if isinstance(r.get("turns_last"), int)]
     diffs = [r["route"]["difficulty"] for r in won if isinstance(r.get("route"), dict)
@@ -299,7 +310,8 @@ def decide(root: Path, raw: dict[str, Any], cfg: dict[str, Any], state: Path, *,
     if own:
         out["route"] = dict(own, source="item")
         return out
-    led = from_ledger(read(state), b, ladder)
+    led = from_ledger(read(state), b, ladder, window=_count(cfg.get("route_window"), LEDGER_WINDOW),
+                      minimum=_count(cfg.get("route_min"), LEDGER_MIN))
     if led:
         out["route"] = led
         return out
