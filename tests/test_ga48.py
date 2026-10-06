@@ -90,7 +90,7 @@ class Upd(unittest.TestCase):
         box = self.root / "baseline.git"
         files = sh("git", "--git-dir", str(box), "ls-tree", "-r", "--name-only", "ga-mailbox").split() \
             if "ga-mailbox" in sh("git", "--git-dir", str(box), "branch", "--list", "ga-mailbox") else []
-        return [f for f in files if f.startswith(f"to/{core.NOTICE_TO}/")]
+        return [f for f in files if f.startswith(f"to/{core.NOTICE_TO}/") and not f.endswith(f"-{core.R0_ASK}.md")]  # acks only (DEV-VMSHA: R0 reports are counted apart)
 
     def snapshot(self):
         return {str(p): p.read_bytes() for p in self.home.rglob("*") if p.is_file() and ".git/" not in str(p)}

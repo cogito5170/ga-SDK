@@ -680,6 +680,7 @@ def url(home: Path, *, runner: Runner | None = None, user: str | None = None, ho
 # --- self-update (CMD-GA48) ----------------------------------------------------------------------------------------
 
 UPDATE_LOG, NOTICED = "update.jsonl", "vm-noticed.json"
+SHA_ASK, R0_ASK, R0_TIMEOUT = "vm-sha", "vm-r0", 3600  # DEV-VMSHA: notify/1 questions to the VM (from baseline-ops); R0 run cap, s
 
 
 def last_update(home: Path) -> str:
@@ -706,26 +707,91 @@ def _installed_version(r: Runner, home: Path) -> str:
     return __version__
 
 
-def _notice(r: Runner, home: Path, heads: dict[str, str]) -> str:
-    """One notify/1 (ack) per new ga version; 'sent', 'same', or 'failed: ...' (the next run retries)."""
+def _commit_url(sha: str) -> str:
+    return f"https://github.com/cogito5170/ga-sdk/commit/{sha or 'HEAD'}"
+
+
+def _mail(home: Path, kind: str, fid: str, sha: str, note: str) -> str:
+    """One notify/1 to baseline-ops (fields: schema to kind ref id note); '' when sent, else 'failed: ...'."""
     from ..forms import dump_text
     from ..mailbox import MailError, Mailbox
-    ver = _installed_version(r, home)
-    f = home / ".ga" / NOTICED
-    try:
-        last = json.loads(f.read_text(encoding="utf-8")).get("version") if f.is_file() else None
-    except ValueError:
-        last = None
-    if last == ver:
-        return "same"
-    note = f"VM runs ga {ver}; heads " + ", ".join(f"{k} {v[:12] or '-'}" for k, v in heads.items())
-    head = {"schema": "notify/1", "to": NOTICE_TO, "kind": "ack", "ref": f"https://github.com/cogito5170/ga-sdk/commit/{heads.get('ga-sdk') or 'HEAD'}", "note": note}
+    head = {"schema": "notify/1", "to": NOTICE_TO, "kind": kind, "id": fid, "ref": _commit_url(sha), "note": note[:280]}
     try:
         Mailbox(home / "baseline").send(NOTICE_TO, dump_text(head), sender=NOTICE_FROM)
     except MailError as e:
         return f"failed: {str(e)[:120]}"
-    _write(f, json.dumps({"version": ver}) + "\n", lambda m: None)
+    return ""
+
+
+def _noticed(home: Path) -> dict[str, Any]:
+    f = home / ".ga" / NOTICED
+    try:
+        d = json.loads(f.read_text(encoding="utf-8")) if f.is_file() else {}
+    except ValueError:
+        d = {}
+    return d if isinstance(d, dict) else {}
+
+
+def _notice(r: Runner, home: Path, heads: dict[str, str]) -> str:
+    """One notify/1 (ack) per new (ga version, ga-sdk SHA); 'sent', 'same', or 'failed: ...' (the next run retries)."""
+    ver, sha = _installed_version(r, home), heads.get("ga-sdk") or ""
+    st = _noticed(home)
+    if st.get("version") == ver and (st.get("sha") or "") == sha:
+        return "same"
+    note = f"VM runs ga {ver} at {sha or '-'}; heads " + ", ".join(f"{k} {v[:12] or '-'}" for k, v in heads.items())
+    err = _mail(home, "ack", f"vm-{(sha or ver)[:12]}", sha, note)
+    if err:
+        return err
+    _write(home / ".ga" / NOTICED, json.dumps(dict(st, version=ver, sha=sha)) + "\n", lambda m: None)
     return "sent"
+
+
+def _r0(r: Runner, home: Path, sha: str, force: bool = False) -> str:
+    """DEV-VMSHA: the R0 test set (``pytest tests`` in ~/ga-sdk with the VM's venv) at ``sha``, once per SHA (or when
+    asked); the counts, sha and env go to baseline-ops as one notify/1 report. No model is called: the suite is offline."""
+    st = _noticed(home)
+    if not force and st.get("r0_sha") == sha:
+        return "same"
+    py = home / "ga-venv" / "bin" / "python"
+    rc, out = r.run([str(py), "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"], cwd=str(home / "ga-sdk"),
+                    timeout=R0_TIMEOUT)
+    counts = {k: int(n) for n, k in re.findall(r"(\d+) (passed|failed|error|errors|skipped)", out.strip().splitlines()[-1]
+                                               if out.strip() else "")}
+    env = (r.run([str(py), "-V"], timeout=60)[1].strip() or "python ?") + f", {_os_name()}"
+    res = (", ".join(f"{n} {k}" for k, n in counts.items()) or f"no summary (exit {rc})")
+    err = _mail(home, "report", R0_ASK, sha, f"R0 tests at {sha}: {res}; exit {rc}; env {env}")
+    if err:
+        return err
+    _write(home / ".ga" / NOTICED, json.dumps(dict(_noticed(home), r0_sha=sha)) + "\n", lambda m: None)
+    return "sent"
+
+
+def _requests(r: Runner, home: Path, heads: dict[str, str]) -> list[str]:
+    """DEV-VMSHA: answer the notify/1 questions anyone with mailbox access left for the VM (``to/vm/``): ``vm-sha`` gets an ack naming
+    the SHA now, ``vm-r0`` a fresh R0 run. Any other message is marked read and left alone; a failed answer stays unread."""
+    from ..forms import parse_text
+    from ..mailbox import Mailbox
+    box, done = Mailbox(home / "baseline"), []
+    ver, sha = _installed_version(r, home), heads.get("ga-sdk") or ""
+    for m in box.unread(NOTICE_FROM):
+        try:
+            head = parse_text(m.text)[0]
+        except Exception:  # noqa: BLE001 — not a form: nothing to answer
+            head = {}
+        ask = head.get("id") if m.valid and m.schema == "notify/1" and head.get("kind") == "question" else None
+        if ask == SHA_ASK:
+            err = _mail(home, "ack", SHA_ASK, sha, f"VM runs ga {ver} at {sha or '-'}")
+        elif ask == R0_ASK:
+            err = "" if _r0(r, home, sha, force=True) == "sent" else "failed"
+        else:
+            err = ""
+        if err:
+            done.append(f"{ask}: {err}")
+            continue
+        box.mark_read(NOTICE_FROM, m.path)
+        if ask:
+            done.append(f"{ask}: answered")
+    return done
 
 
 def update(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_GB, runner: Runner | None = None,
@@ -776,7 +842,7 @@ def _update(home: Path, sp: Any, *, dry_run: bool, min_free_gb: float, runner: R
             skipped.append(f"{name}: {str(e)[:160]}")
             say(f"ga vm update: {e}")
     sdk_changed = before.get("ga-sdk") != after.get("ga-sdk")
-    pip, restarted, mail = False, [], "skipped"
+    pip, restarted, mail, asked, r0 = False, [], "skipped", [], "skipped"
     venv, sdk = home / "ga-venv", home / "ga-sdk"
     rc = 0
     if dry_run:
@@ -803,8 +869,12 @@ def _update(home: Path, sp: Any, *, dry_run: bool, min_free_gb: float, runner: R
                 EV.emit("SYSTEM", "vm-update", "restart", "DONE", unit=unit)
     if rc == 0 and (home / "baseline").exists():
         mail = _notice(r, home, after)
+        asked = _requests(r, home, after)
+        r0 = _r0(r, home, after.get("ga-sdk") or "") if after.get("ga-sdk") else "skipped"
     line = {"at": (now or (lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))(),
             "heads": {"before": before, "after": after}, "pip": pip, "restarted": restarted, "skipped": skipped, "mail": mail}
+    if asked or r0 != "skipped":
+        line.update(asked=asked, r0=r0)
     log = home / ".ga" / UPDATE_LOG
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("a", encoding="utf-8") as fh:
