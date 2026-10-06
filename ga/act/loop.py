@@ -113,6 +113,7 @@ class Act:
         self.last = ""                  # the last turn's summary only: never a history
         self.needs: list[str] = []      # NEED results for the next card
         self.measure: K.Ran | None = None
+        self.answered: str | None = None  # DEV-R0a: the model that answered the last turn
         self.used = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0, "estimated": 0}
         self.cards: list[C.Card] = []
         self.changed: list[str] = []
@@ -216,6 +217,7 @@ class Act:
             self.ev_task.fail(error=type(e).__name__)
             raise
         meta = {"status": r.status, "reason": EV.short(r.reason), "turns": r.turns, "changed": len(r.changed),
+                "model": self.answered or self.model,
                 "input": r.tokens.get("input"), "output": r.tokens.get("output")}
         self._agent("COMPLETING", status=r.status)
         if r.status == "done":
@@ -284,7 +286,9 @@ class Act:
                         "cache_read": (usage or {}).get("cache_read"),
                         "cache_creation": (usage or {}).get("cache_creation"),
                         "usage_reported": usage is not None, "seconds": round(float(secs), 3), "served": served})
-            self._llm_end(llm, err, usage, secs, answer=answer)
+            if l0.answering(served):  # DEV-R0a: the row's model is the one that answered, not the configured rung
+                row["model"] = self.answered = l0.answering(served)
+            self._llm_end(llm, err, usage, secs, answer=answer, model=row["model"])
             if err:
                 row.update({"error": err, "applied": 0, "rejected": 0, "commands": []})
                 self._log(row, rows, usage, served, secs)
@@ -315,12 +319,13 @@ class Act:
         return sp
 
     def _llm_end(self, sp: EV.Span, err: str, usage: Any, secs: Any, answer: str = "",
-                 repair_next: bool = False) -> None:
+                 repair_next: bool = False, model: str | None = None) -> None:
+        model = model or self.model
         u = usage or {}
         meta = {"input": u.get("input"), "output": u.get("output"), "cache_read": u.get("cache_read"),
-                "usage_reported": usage is not None, "seconds": round(float(secs or 0), 3), "model": self.model}
+                "usage_reported": usage is not None, "seconds": round(float(secs or 0), 3), "model": model}
         if err:
-            sp.error(err, model=self.model)
+            sp.error(err, model=model)
             sp.fail("RESPONSE_READY", error=EV.short(err), **meta)
             return
         sp.update("RECEIVING_RESULT")
@@ -489,7 +494,7 @@ class Act:
         rows.append(row)
         day = time.strftime("%Y-%m-%d", time.gmtime(self.clock()))
         l0.append(self.state / "ledger" / f"{day}.jsonl", row)
-        tr = TurnResult(ended=True, usage=usage, model=served, seconds=float(secs), error=row.get("error", ""))
+        tr = TurnResult(ended=True, usage=usage, model=l0.answering(served), seconds=float(secs), error=row.get("error", ""))
         ev = l0.run_end(f"act:{self.item.id}:t{row['turn']}", tr, decision_ref=self.item.id, source="ga_act")
         ev["data"]["backend"] = self.backend
         ev["data"]["edits"] = {"applied": row.get("applied", 0), "rejected": row.get("rejected", 0)}

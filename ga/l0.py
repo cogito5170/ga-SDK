@@ -25,6 +25,13 @@ def _num(v: Any) -> float | int | None:
     return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
 
 
+def answering(served: Any) -> str | None:
+    """DEV-R0a: the model that answered the final turn: the last name of a served chain ("a,b" or ["a", "b"]), else None."""
+    names = [served] if isinstance(served, str) else list(served or [])
+    names = [n.strip() for x in names for n in str(x).split(",") if n and n.strip()]
+    return names[-1] if names else None
+
+
 def run_end(run_id: str, result: Any, *, decision_ref: str | None = None, source: str = "ga_turn") -> dict[str, Any]:
     raw = result.raw if isinstance(getattr(result, "raw", None), dict) else {}
     u = result.usage or {}

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .. import events as EV
+from .. import l0
 from ..forms import FormError, hard, parse_text, validate
 from ..mailbox import Mailbox, MailError, secrets_in
 from ..runlog import Tail, TurnMeter, follow
@@ -126,12 +127,12 @@ def is_capacity(run: dict[str, Any]) -> bool:
 def _served_model(turns: list[dict[str, Any]]) -> str | None:
     """The model of the rung that actually answered (a turn's ``served``), never the configured default: None when no
     turn says (then results has no model entry) (CMD-GA49 S3)."""
-    for t in turns:
+    for t in reversed(turns):  # the LAST turn that names one: the rung that answered after any climb
         sv = t.get("served")
         sv = [sv] if isinstance(sv, str) else sv
-        names = [str(x) for x in sv or [] if x]
-        if names:
-            return ",".join(names)
+        name = l0.answering(sv)
+        if name:
+            return name
     return None
 
 
@@ -141,7 +142,7 @@ def record_served(cfg: dict[str, Any], run: dict[str, Any], now: Callable[[], st
     served = _served_model([e for e in run.get("events") or [] if e.get("event") == "turn"])
     if not served:
         return None
-    model = served.split(",")[-1]
+    model = served
     at = (now or (lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))()
     path = Path(cfg.get("served_file") or "~/.ga/bridge/served.json").expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -1862,7 +1862,7 @@ class MailHub(Hub):
         decision, lines = parse_decision(answer) if not err else ("ASK_HUMAN", ["the model turn failed"])
         secs = round(_t.time() - t0, 3)
         meta = {"input": (usage or {}).get("input"), "output": (usage or {}).get("output"), "seconds": secs,
-                "model": served or self.conf.get("model")}
+                "model": l0.answering(served) or self.conf.get("model")}
         if err:
             llm.error(err)
             llm.fail("RESPONSE_READY", error=err, **meta)
@@ -1872,11 +1872,11 @@ class MailHub(Hub):
         self._usage, self._error, self._served = usage, err, served
         if self.shadow:  # the tokens go to shadow.jsonl; no ledger, no L0
             return decision, lines, err
-        row = {"id": did, "kind": "hub", "backend": self.conf.get("backend", "agv"), "model": self.conf.get("model"),
-               **self._model_record(), "served": served, "decision": decision, "error": err, "card_bytes": len(card.encode("utf-8")),
+        row = {"id": did, "kind": "hub", "backend": self.conf.get("backend", "agv"),
+               "model": l0.answering(served) or self.conf.get("model"), **self._model_record(), "served": served, "decision": decision, "error": err, "card_bytes": len(card.encode("utf-8")),
                "input": (usage or {}).get("input"), "output": (usage or {}).get("output"), "seconds": secs}
         l0.append(self._ledger_today(), row)
-        ev = l0.run_end(f"hub:{did}:{self.turns_today()}", TurnResult(ended=True, usage=usage, model=served,
+        ev = l0.run_end(f"hub:{did}:{self.turns_today()}", TurnResult(ended=True, usage=usage, model=l0.answering(served),
                                                                      seconds=float(secs), error=err),
                         decision_ref=did, source="ga_hub")
         l0.append(self.ga / "telemetry" / "hub.jsonl", ev)
