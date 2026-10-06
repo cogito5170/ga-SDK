@@ -16,7 +16,6 @@ from tests.test_ga42_shadow import hub
 
 class Host:
     """A fake agv: serves ``serves`` whatever it was made for, and enforces check_served like the real backends."""
-    made: list = []
 
     def __init__(self, model, serves):
         self.model, self.serves, self.bare = model, serves, True
