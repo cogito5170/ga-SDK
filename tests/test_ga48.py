@@ -246,8 +246,8 @@ class Units(unittest.TestCase):
 class Version(unittest.TestCase):
     def test_version_0_17_0(self):
         import ga
-        self.assertEqual(ga.__version__, "0.17.0")
-        self.assertIn('version = "0.17.0"', (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
+        self.assertEqual(ga.__version__, "0.18.0")
+        self.assertIn('version = "0.18.0"', (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
 
 
 from tests.test_ops2 import Full  # noqa: E402

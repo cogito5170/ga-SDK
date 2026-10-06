@@ -7,6 +7,7 @@
      "ask_home": null,                                           ga ask's folder (default $GA_ASK_HOME or ~/.ga-ask)
      "token_sources": {"act": [dirs], "supervise": [files]},     ledgers read by /api/tokens
      "bridge": {"argv", "cwd", "config_path"},                   the agy bridge, run as the service named "bridge"
+     "events": null,                                             ga.events/1 file for 실시간 (default ~/.ga/events.jsonl)
      "services": {name: {"argv", "cwd", "env_file"?, "health_url"?, "port"?, "disabled"?}}}
 
 argv is a list (never a shell string); ``~`` is expanded in paths and argv words. An env file's values are loaded into
@@ -137,6 +138,8 @@ def check(cfg: Any) -> dict[str, Any]:
     out["mailbox"] = mb
     if out.get("ask_home"):
         out["ask_home"] = _x(out["ask_home"])
+    if out.get("events"):
+        out["events"] = _x(out["events"])
     ts = out.get("token_sources") or {}
     out["token_sources"] = {k: [_x(p) for p in (ts.get(k) or [])] for k in ("act", "supervise")}
     services = {}

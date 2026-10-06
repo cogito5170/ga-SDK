@@ -8,7 +8,8 @@ the strict CSP and no-store on every answer, nothing remote. The static console 
     GET  /api/services/{name}/logs?after=n
     POST /api/services/{name}/start|stop   /api/bridge/start|stop
     POST /api/ask {q, mode: ask|do} -> {plan, cost_estimate, confirm_id};  POST /api/ask/confirm {confirm_id} -> {run_id}
-    GET  /api/events  (SSE; Last-Event-ID resumes)  types: state work mail service log act_turn bridge
+    GET  /api/events  (SSE; Last-Event-ID resumes)  types: state work mail service log act_turn bridge ev
+    GET  /api/events/recent?limit=&type=&task=   ga.events/1 history, newest first (CMD-GA50)
 
 Changes reach /api/events by code (file mtimes, git heads, the mailbox tip, service events), never by a model.
 """
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .. import events as EV
 from ..runlog import redact
 from ..ui import BIND, HEADERS, Handler as UiHandler
 from . import collectors as C
@@ -212,7 +214,7 @@ class Console(ThreadingHTTPServer):
                  engine_factory: Callable | None = None, do_argv: Callable[[str], list[str]] | None = None,
                  reader: C.MailReader | None = None, services: Services | None = None,
                  clock: Callable[[], float] = time.time, watch_every_s: float = 1.0, sse_keepalive_s: float = 15.0,
-                 health: Callable[[str], bool] | None = None):
+                 health: Callable[[str], bool] | None = None, events_every_s: float = 0.3):
         super().__init__((BIND, int(port)), ConsoleHandler)
         self.cfg, self.clock = cfg, clock
         self.token = token or secrets.token_urlsafe(24)
@@ -231,6 +233,38 @@ class Console(ThreadingHTTPServer):
         self._act: dict[str, int] = {}
         self._act_started = False
         self._watcher: threading.Thread | None = None
+        # CMD-GA50: ga.events/1 — the file every ga writes; history in a ring, new lines to the bus as type "ev"
+        ef = cfg.get("events") or EV.path()
+        self.events_path = Path(ef).expanduser() if ef else None
+        self.events_every_s = events_every_s
+        self.evring: deque[dict[str, Any]] = deque(maxlen=5000)
+        self._evfollow: EV.Follow | None = None
+
+    # -- the live event stream (CMD-GA50 S3) ---------------------------------------------------------------------------
+    def events_start(self) -> None:
+        if self.events_path is None:
+            return
+        self.evring.extend(reversed(EV.read(self.events_path, limit=self.evring.maxlen or 5000)))
+        self._evfollow = EV.Follow(self.events_path, start_at_end=True)
+
+    def events_once(self) -> int:
+        if self._evfollow is None:
+            if self.events_path is None:
+                return 0
+            self._evfollow = EV.Follow(self.events_path, start_at_end=False)
+        new = self._evfollow.read()
+        for ev in new:
+            ev = C.clean(ev)
+            self.evring.append(ev)
+            self.bus.publish("ev", ev)
+        return len(new)
+
+    def events_recent(self, q: dict[str, list[str]]) -> list[dict[str, Any]]:
+        lim = (q.get("limit") or ["200"])[0]
+        types = ",".join(q.get("type") or []).split(",")
+        task = (q.get("task") or [""])[0] or None
+        return EV.select(list(self.evring), limit=min(int(lim), 5000) if lim.isdigit() else 200, types=types,
+                         task=task)
 
     @property
     def url(self) -> str:
@@ -292,6 +326,15 @@ class Console(ThreadingHTTPServer):
 
     def start_watcher(self) -> None:
         self.watch_once()
+        self.events_start()
+
+        def evloop() -> None:
+            while not self._stop.wait(self.events_every_s):
+                try:
+                    self.events_once()
+                except Exception:  # a read that failed this round is retried next round
+                    pass
+        threading.Thread(target=evloop, daemon=True).start()
 
         def loop() -> None:
             while not self._stop.wait(self.watch_every_s):
@@ -355,6 +398,8 @@ class ConsoleHandler(UiHandler):
             return self.json(200, C.mail(srv.reader, int(lim) if lim.isdigit() else 50))
         if path == "/api/events":
             return self.events(q)
+        if path == "/api/events/recent":
+            return self.json(200, srv.events_recent(q))
         m = re.match(r"^/api/services/([A-Za-z0-9_.-]+)/logs$", path)
         if m:
             if m.group(1) not in srv.services:

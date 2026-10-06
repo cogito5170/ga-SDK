@@ -161,3 +161,36 @@ mark{background:var(--bg);color:var(--ink);padding:0 .1em}
 
 .foot{padding-top:var(--space-5);padding-bottom:var(--space-5);color:var(--sub);font-size:var(--step-m1)}
 .foot p{max-width:70ch}
+
+/* 실시간 (CMD-GA50): the current task, what is live now, the event stream and one event's detail */
+.steps{list-style:none;margin:var(--space-2) 0 0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-4);font-size:var(--step-m1)}
+.steps li{white-space:nowrap;color:var(--sub)}
+.steps li.done,.steps li.now{color:var(--ink)}
+.steps li.now{font-weight:700}
+.prog{margin-top:var(--space-2);display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:var(--space-2);align-items:center;max-width:640px;font-size:var(--step-m1)}
+.prog .bar{height:10px;background:var(--surface)}
+.prog .bar i{display:block;height:100%;background:var(--line-fill)}
+.prog .v{font-variant-numeric:tabular-nums}
+.lines{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:var(--space-1) var(--space-3);margin:var(--space-3) 0 0;font-size:var(--step-m1)}
+.lines dt{font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sub)}
+.lines dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.tree,.tree ul{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-1)}
+.tree ul{padding-left:var(--space-4);margin-top:var(--space-1)}
+.tree li{min-width:0;overflow-wrap:anywhere;font-size:var(--step-m1)}
+.tree .t{font-family:var(--font-mono);font-weight:600;margin-right:var(--space-1)}
+.tree .since{color:var(--sub);margin-left:var(--space-1);font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:var(--space-1);margin-bottom:var(--space-3)}
+.chips button{min-height:44px;padding:0 var(--space-2);font-family:var(--font-mono);font-weight:400;border-color:var(--line-track)}
+.chips button[aria-pressed=true]{font-weight:700;border-color:var(--line-control);background:var(--surface)}
+.tbl button.row-open{all:unset;cursor:pointer;font:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em;overflow-wrap:anywhere}
+.tbl button.row-open:focus-visible{outline:3px solid var(--line-focus);outline-offset:2px}
+.tbl tr.sel td{font-weight:700}
+.tbl td.detail{max-width:28ch;overflow-wrap:anywhere;color:var(--sub)}
+.drawer{background:var(--surface);padding:var(--space-4);display:grid;gap:var(--space-3);min-width:0}
+.drawer dl.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:var(--space-0) var(--space-3);margin:0;font-size:var(--step-m1)}
+.drawer dl.kv dt{color:var(--sub);letter-spacing:.08em;text-transform:uppercase}
+.drawer dl.kv dd{margin:0;min-width:0;overflow-wrap:anywhere;font-family:var(--font-mono)}
+.drawer h3{font-size:var(--step-m1);letter-spacing:.12em;text-transform:uppercase}
+.drawer .out{background:var(--bg)}
+.out{background:var(--surface);margin:0;padding:var(--space-2) var(--space-3);font-family:var(--font-mono);font-size:var(--step-m1);
+  line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;max-height:24em;overflow:auto}

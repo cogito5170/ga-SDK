@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from .. import events as EV
 from .. import l0
 from ..adapters.base import TurnResult
 from ..backends.base import TRANSIENT_BACKOFF_S, BackendError, ModelMismatch, RateLimited, Transient, retry_transient
@@ -35,6 +36,7 @@ REPAIR_SYSTEM = "ga act: answer only with the actions of the form below; nothing
 
 SPEC = "act/1"
 MAX_TURNS, MAX_TOKENS = 10, 400_000
+STEPS = ["measure", "edit", "verify", "finish"]  # CMD-GA50: the known steps of an item, as the live screen shows them
 NO_PROGRESS_TURNS = 2
 
 
@@ -117,8 +119,30 @@ class Act:
 
     # ---------------------------------------------------------------- code side
     def done_when(self) -> K.Ran:
-        self.measure = K.run("done_when", self.item.done_when, self.root, self.timeout_s)
+        self.measure = self._cmd("done_when", self.item.done_when, red_ok=True)
         return self.measure
+
+    def _cmd(self, name: str, argv: list[str], red_ok: bool = False) -> K.Ran:
+        """K.run with its CODE event (CMD-GA50): the exit code and the last 20 lines, secrets withheld. A timeout or a
+        start failure is an ERROR; so is a non-zero exit, except a done_when measure (red is expected there)."""
+        sp = EV.span("CODE", "act", name, argv=EV.short(" ".join(map(str, argv))), item=self.item.id).start()
+        r = K.run(name, argv, self.root, self.timeout_s)
+        meta = {"exit": r.code, "tail": EV.tail(r.out), "failing": len(r.failing), "note": r.note or None}
+        if r.ok:
+            sp.done(**meta)
+        else:
+            if r.code is None or not red_ok:
+                sp.error(r.note or f"exit {r.code}", exit=r.code)
+            sp.fail(**meta)
+        return r
+
+    def _step(self, step: str, **meta: Any) -> None:
+        if getattr(self, "ev_task", None) is not None:
+            self.ev_task.update("step", step=step, **meta)
+
+    def _agent(self, state: str, **meta: Any) -> None:
+        if getattr(self, "ev_agent", None) is not None:
+            self.ev_agent.update(state, **meta)
 
     def failing_set(self) -> frozenset[str]:
         m = self.measure
@@ -153,6 +177,14 @@ class Act:
     def total(self) -> int:
         return sum(v for k, v in self.used.items() if k != "estimated")
 
+    def _need_ev(self, a: Any) -> str:
+        sp = self._tool("NEED", f"{a.need} {a.arg}")
+        got = self._need(a)
+        body = got.split("\n", 1)[1] if "\n" in got else got
+        miss = "(not found)" in body[:20] or ": refused" in got.splitlines()[0] or " failed: " in got.splitlines()[0]
+        (sp.fail if miss else sp.done)(result=EV.short(got.splitlines()[0]), lines=len(body.splitlines()))
+        return got
+
     def _need(self, a: Any) -> str:
         try:
             return self.serve_need(a)
@@ -172,8 +204,34 @@ class Act:
 
     # ---------------------------------------------------------------- loop
     def run(self) -> Result:
+        """CMD-GA50: the loop inside its TASK (the item) and AGENT spans; DONE when the item is done, FAILED else."""
+        self.ev_task = EV.span("TASK", self.item.id, "item", goal=EV.short(self.item.goal), steps=list(STEPS),
+                               backend=self.backend, model=self.model, max_turns=self.max_turns).start()
+        self.ev_agent = EV.span("AGENT", "act", "agent", item=self.item.id).start()
+        try:
+            r = self._run()
+        except BaseException as e:
+            self.ev_agent.error(f"{type(e).__name__}: {e}")
+            self.ev_agent.fail("COMPLETING")
+            self.ev_task.fail(error=type(e).__name__)
+            raise
+        meta = {"status": r.status, "reason": EV.short(r.reason), "turns": r.turns, "changed": len(r.changed),
+                "input": r.tokens.get("input"), "output": r.tokens.get("output")}
+        self._agent("COMPLETING", status=r.status)
+        if r.status == "done":
+            self._step("finish")
+            self.ev_agent.done("COMPLETING", **meta)
+            self.ev_task.done(**meta)
+        else:
+            self.ev_agent.fail("COMPLETING", **meta)
+            self.ev_task.fail(**meta)
+        return r
+
+    def _run(self) -> Result:
         self.state.mkdir(parents=True, exist_ok=True)
         rows: list[dict] = []
+        self._step("measure")
+        self._agent("ANALYZING", why="first measure")
         self.done_when()
         if self.measure.ok:
             return self._result("done", "done_when already passes", 0, rows)
@@ -181,6 +239,8 @@ class Act:
         for turn in range(1, self.max_turns + 1):
             if self.total() >= self.max_tokens:
                 return self._result("blocked", f"token cap ({self.total()} >= {self.max_tokens})", turn - 1, rows)
+            self._step("edit", turn=turn)
+            self._agent("PLANNING", turn=turn)
             units, withheld = self.units(turn), 0
             for u in units:  # defence in depth: nothing secret-shaped reaches the provider
                 u.text, k = C.redact(u.text)
@@ -192,15 +252,18 @@ class Act:
                                    "backend": self.backend, "model": self.model, "card_tokens": cd.tokens,
                                    "prefix_tokens": tokens(cd.prefix), "dropped": cd.dropped,
                                    "withheld": withheld}
-            err, answer, usage, served, secs = self._call(cd.body, cd.prefix, cd.text, t0)
+            llm = self._llm(turn)
+            err, answer, usage, served, secs = self._call(cd.body, cd.prefix, cd.text, t0, llm)
             row["repairs"], row["thinking"] = 0, getattr(self, "thinking", None)
             if not err and _broken(answer):  # GA41 S1: one repair turn: the problems, the form, the answer; no card
                 from .. import repair
                 row["repairs"] = 1
                 labels = parse(answer).problems or ["no action found: the answer holds none of the actions"]
                 text = repair.prompt(labels, FORM, answer)
+                self._llm_end(llm, "", usage, secs, repair_next=True)
+                llm = self._llm(turn, repair=True)
                 err, answer2, usage2, served, secs2 = self._call(text, REPAIR_SYSTEM, REPAIR_SYSTEM + "\n\n" + text,
-                                                                  self.clock())
+                                                                  self.clock(), llm)
                 answer = answer2 if not err else answer
                 secs = float(secs) + float(secs2)
                 if usage is not None or usage2 is not None:
@@ -221,6 +284,7 @@ class Act:
                         "cache_read": (usage or {}).get("cache_read"),
                         "cache_creation": (usage or {}).get("cache_creation"),
                         "usage_reported": usage is not None, "seconds": round(float(secs), 3), "served": served})
+            self._llm_end(llm, err, usage, secs, answer=answer)
             if err:
                 row.update({"error": err, "applied": 0, "rejected": 0, "commands": []})
                 self._log(row, rows, usage, served, secs)
@@ -242,10 +306,43 @@ class Act:
                 return self._result(status, reason, turn, rows)
         return self._result("blocked", f"turn cap ({self.max_turns})", self.max_turns, rows)
 
-    def _call(self, body: str, system: str, whole: str, t0: float) -> tuple[str, str, Any, str | None, float]:
+    def _llm(self, turn: int, repair: bool = False) -> EV.Span:
+        """CMD-GA50: one LLM span per model call: REQUEST, PROCESSING … RESPONSE_READY. Only states, the model,
+        token counts and seconds: never the card, the answer or any reasoning."""
+        sp = EV.span("LLM", "act", "REQUEST", turn=turn, model=self.model, backend=self.backend,
+                     repair=repair or None).start()
+        sp.update("PROCESSING", turn=turn)
+        return sp
+
+    def _llm_end(self, sp: EV.Span, err: str, usage: Any, secs: Any, answer: str = "",
+                 repair_next: bool = False) -> None:
+        u = usage or {}
+        meta = {"input": u.get("input"), "output": u.get("output"), "cache_read": u.get("cache_read"),
+                "usage_reported": usage is not None, "seconds": round(float(secs or 0), 3), "model": self.model}
+        if err:
+            sp.error(err, model=self.model)
+            sp.fail("RESPONSE_READY", error=EV.short(err), **meta)
+            return
+        sp.update("RECEIVING_RESULT")
+        if repair_next:
+            sp.done("RESPONSE_READY", repair="format broken: one repair turn", **meta)
+            return
+        kinds: dict[str, int] = {}
+        for a in parse(answer).actions:
+            kinds[a.kind] = kinds.get(a.kind, 0) + 1
+        sp.update("SELECTING_TOOL", actions=kinds)
+        sp.done("RESPONSE_READY", **meta)
+
+    def _call(self, body: str, system: str, whole: str, t0: float,
+              llm: EV.Span | None = None) -> tuple[str, str, Any, str | None, float]:
         """One model turn: (error label or "", answer, usage counts, served, seconds). A transient server error is
         retried once after the backoff (GA41 S3); a second one is the error ``transient:<code>``."""
+        tries = [0]
+
         def turn() -> Any:
+            tries[0] += 1
+            if tries[0] > 1 and llm is not None:
+                llm.retry("REQUEST", attempt=tries[0], why="transient server error")
             if getattr(self.runner, "bare", False):
                 return self.runner.run_turn(body, None, system=system)
             return self.runner.run_turn(whole, None)
@@ -265,9 +362,36 @@ class Act:
         except BackendError as e:
             return f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200], "", None, None, self.clock() - t0
 
+    def _tool(self, kind: str, arg: str, **meta: Any) -> EV.Span:
+        return EV.span("TOOL", "act", kind, input=EV.short(f"{kind} {arg}"), item=self.item.id, **meta).start()
+
+    def _apply(self, p: Any) -> Any:
+        """apply() inside one TOOL span with a FILE event per EDIT / NEW (path, line counts, applied or rejected)."""
+        writes = [a for a in p.actions if a.kind in ("EDIT", "NEW")]
+        if not writes:
+            return apply(self.root, p.actions, self.item.files)
+        self._agent("EXECUTING", edits=len(writes))
+        sp = self._tool("EDIT" if all(a.kind == "EDIT" for a in writes) else "NEW" if all(a.kind == "NEW" for a in writes)
+                        else "EDIT/NEW", ", ".join(a.arg for a in writes))
+        out = apply(self.root, p.actions, self.item.files)
+        for a in writes:
+            if a.kind == "NEW":
+                lines = {"lines": len(a.content.splitlines())}
+            else:
+                old = sum(len(b.search.splitlines()) for b in a.blocks)
+                new = sum(len(b.replace.splitlines()) for b in a.blocks)
+                lines = {"removed": old, "added": new, "blocks": len(a.blocks)}
+            bad = [r for r in out.rejected if r.startswith(f"{a.kind} {a.arg}")]
+            EV.emit("FILE", "act", a.kind, "FAILED" if bad and a.arg not in out.changed else "DONE",
+                    path=a.arg, **lines, rejected=EV.short(bad[0]) if bad else None)
+        res = {"result": EV.short(f"applied {len(out.applied)}, rejected {len(out.rejected)}"),
+               "changed": out.changed[:20]}
+        (sp.done if out.applied or not out.rejected else sp.fail)(**res)
+        return out
+
     def _act(self, answer: str, row: dict) -> tuple[str | None, str]:
         p = parse(answer)
-        out = apply(self.root, p.actions, self.item.files)
+        out = self._apply(p)
         for f in out.changed:
             if f not in self.changed:
                 self.changed.append(f)
@@ -275,27 +399,41 @@ class Act:
         ran: list[str] = []
         status, reason = None, ""
         if out.changed:
+            self._step("verify")
+            self._agent("ANALYZING", why="a file changed")
             m = self.done_when()
             if m.ok:
                 status, reason = "done", "done_when passes"
         for a in p.actions:
             if a.kind == "PROPOSE":
+                sp = self._tool("PROPOSE", a.arg)
                 notes.append(self._propose(a))
+                (sp.fail if "refused" in notes[-1] or "must be" in notes[-1] else sp.done)(result=EV.short(notes[-1]))
             if a.kind == "RUN" and a.arg not in self.commands and a.arg in self.actions:
                 ran.append(a.arg)
+                self._agent("WAITING_TOOL", tool=a.arg)
+                sp = self._tool("RUN", a.arg, action=True)
                 notes.append(self._action(a))
+                (sp.done if ": exit 0" in notes[-1].splitlines()[0] else sp.fail)(result=EV.short(notes[-1].splitlines()[0]))
                 continue
             if a.kind == "RUN":
                 if a.arg not in self.commands:
                     notes.append(f"RUN {a.arg}: rejected, not a listed command name ({', '.join(sorted(self.commands)) or 'none'})")
+                    EV.emit("TOOL", "act", "RUN", "FAILED", input=EV.short(f"RUN {a.arg}"), result="not a listed command")
                     continue
                 ran.append(a.arg)
+                self._agent("WAITING_TOOL", tool=a.arg)
+                sp = self._tool("RUN", a.arg)
                 try:
-                    r = K.run(a.arg, self.commands[a.arg], self.root, self.timeout_s)
+                    r = self._cmd(a.arg, self.commands[a.arg])
                     notes.append(K.summarize(r, self.root))
+                    (sp.done if r.ok else sp.fail)(result=EV.short(notes[-1].splitlines()[0] if notes[-1] else ""),
+                                                   exit=r.code)
                 except Exception as e:  # GA41 S2: a failed command is a note the next card shows, never a crash
                     notes.append(f"RUN {a.arg} failed: {_label(e)}")
-        self.needs = [self._need(a) for a in p.actions if a.kind == "NEED"][:6]
+                    sp.error(_label(e))
+                    sp.fail(result=EV.short(notes[-1]))
+        self.needs = [self._need_ev(a) for a in p.actions if a.kind == "NEED"][:6]
         for a in p.actions:
             if status:
                 break

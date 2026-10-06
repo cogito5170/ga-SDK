@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>실시간 · GA Console</title>
+<link rel="stylesheet" href="../static/tokens.css">
+<link rel="stylesheet" href="golden.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span>127.0.0.1:8765 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="now.html">지금</a></li>
+      <li><a href="live.html" aria-current="page">실시간</a></li>
+      <li><a href="work.html">작업<span class="n">4</span></a></li>
+      <li><a href="branches.html">브랜치</a></li>
+      <li><a href="services.html">서비스<span class="n">3/4</span></a></li>
+      <li><a href="tokens.html">토큰</a></li>
+      <li><a href="ask.html">묻기</a></li>
+      <li><a href="decisions.html">결정</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="mast">
+  <p class="cap">실시간 · <b>VM 도는 중</b> · ga 0.18.0 · 마지막 이벤트 2초 전</p>
+  <h1><span class="mark live" data-line="functional" aria-hidden="true"></span>CMD-GA50 도는 중</h1>
+  <span class="hot" aria-hidden="true"></span>
+  <p class="lede">GA Console 에 실시간 화면을 더하는 중. <span class="sub">이벤트 = ga 가 한 일 한 줄 (ga.events/1). 모델에 보낸 글과 답은 적지 않습니다.</span></p>
+</div>
+
+<main id="main">
+  <div class="two">
+    <section aria-labelledby="h-task">
+      <h2 id="h-task">지금 하는 일 <span class="sub">act · 턴 3 · 1분 12초째</span></h2>
+      <div class="row"><span class="id">CMD-GA50</span><span class="state"><span class="mark live" data-line="functional" aria-hidden="true"></span>도는 중</span></div>
+      <ol class="steps" aria-label="단계">
+        <li class="done"><span class="mark ok" aria-hidden="true"></span>measure</li>
+        <li class="done"><span class="mark ok" aria-hidden="true"></span>edit</li>
+        <li class="now"><span class="mark live" data-line="functional" aria-hidden="true"></span>verify</li>
+        <li><span class="mark wait" data-line="functional" aria-hidden="true"></span>finish</li>
+      </ol>
+      <div class="prog"><div class="bar" role="progressbar" aria-label="진행" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2"><i style="width:50%"></i></div><span class="v">2 / 4 단계</span></div>
+      <dl class="lines">
+        <dt>Agent</dt><dd><span class="mark live" data-line="functional" aria-hidden="true"></span>ANALYZING · act <span class="sub">파일이 바뀜</span></dd>
+        <dt>LLM</dt><dd><span class="mark wait" data-line="functional" aria-hidden="true"></span>RESPONSE_READY · gemini-2.5-flash <span class="sub">입력 5,104 · 출력 822 · 4.2초</span></dd>
+        <dt>Tool</dt><dd><span class="mark live" data-line="functional" aria-hidden="true"></span>CODE done_when <span class="sub">8초째</span></dd>
+        <dt>Network</dt><dd><span class="mark wait" data-line="functional" aria-hidden="true"></span>git fetch · github.com <span class="sub">끝 · 640 ms</span></dd>
+      </dl>
+    </section>
+
+    <section aria-labelledby="h-act">
+      <h2 id="h-act">도는 중 <span class="sub">3개</span></h2>
+      <ul class="tree">
+        <li><span class="mark live" data-line="functional" aria-hidden="true"></span><span class="t">TASK</span>CMD-GA50 · directive<span class="since">3분 2초 전 시작</span>
+          <ul>
+            <li><span class="mark live" data-line="functional" aria-hidden="true"></span><span class="t">AGENT</span>act · ANALYZING<span class="since">1분 12초 전 시작</span>
+              <ul>
+                <li><span class="mark live" data-line="functional" aria-hidden="true"></span><span class="t">CODE</span>act · done_when<span class="since">8초 전 시작</span></li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="two">
+    <section aria-labelledby="h-stream">
+      <h2 id="h-stream">이벤트 <span class="sub">최근 먼저 · 9개</span></h2>
+      <div class="chips" role="group" aria-label="종류로 거르기">
+        <button type="button" aria-pressed="true">모두</button>
+        <button type="button" aria-pressed="false">TASK</button>
+        <button type="button" aria-pressed="false">AGENT</button>
+        <button type="button" aria-pressed="false">LLM</button>
+        <button type="button" aria-pressed="false">TOOL</button>
+        <button type="button" aria-pressed="false">CODE</button>
+        <button type="button" aria-pressed="false">NET</button>
+        <button type="button" aria-pressed="false">FILE</button>
+        <button type="button" aria-pressed="false">ERROR</button>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>시각</th><th>종류</th><th>어디</th><th>무엇</th><th>상태</th><th class="num">걸린 시간</th><th>자세히</th></tr></thead>
+        <tbody>
+          <tr><td data-label="시각">14:32:08</td><td data-label="종류" class="mono">CODE</td><td data-label="어디">act</td><td data-label="무엇"><button type="button" class="row-open">done_when</button></td><td data-label="상태"><span class="state"><span class="mark live" data-line="functional" aria-hidden="true"></span>시작</span></td><td class="num" data-label="걸린 시간">—</td><td class="detail" data-label="자세히">python -m unittest</td></tr>
+          <tr><td data-label="시각">14:32:08</td><td data-label="종류" class="mono">FILE</td><td data-label="어디">act</td><td data-label="무엇"><button type="button" class="row-open">EDIT</button></td><td data-label="상태"><span class="state"><span class="mark ok" aria-hidden="true"></span>끝</span></td><td class="num" data-label="걸린 시간">—</td><td class="detail" data-label="자세히">ga/events.py +12 −3</td></tr>
+          <tr class="fail sel"><td data-label="시각">14:31:40</td><td data-label="종류" class="mono">ERROR</td><td data-label="어디">act</td><td data-label="무엇"><button type="button" class="row-open">exit 1</button></td><td data-label="상태"><span class="state"><span class="mark fail" aria-hidden="true"></span>실패</span></td><td class="num" data-label="걸린 시간">—</td><td class="detail" data-label="자세히">RUN lint</td></tr>
+          <tr class="fail"><td data-label="시각">14:31:39</td><td data-label="종류" class="mono">CODE</td><td data-label="어디">act</td><td data-label="무엇"><button type="button" class="row-open">lint</button></td><td data-label="상태"><span class="state"><span class="mark fail" aria-hidden="true"></span>실패</span></td><td class="num" data-label="걸린 시간">1.2초</td><td class="detail" data-label="자세히">exit 1</td></tr>
+          <tr><td data-label="시각">14:31:37</td><td data-label="종류" class="mono">LLM</td><td data-label="어디">act</td><td data-label="무엇"><button type="button" class="row-open">RESPONSE_READY</button></td><td data-label="상태"><span class="state"><span class="mark ok" aria-hidden="true"></span>끝</span></td><td class="num" data-label="걸린 시간">4.2초</td><td class="detail" data-label="자세히">입력 5,104 · 출력 822</td></tr>
+          <tr><td data-label="시각">14:31:33</td><td data-label="종류" class="mono">LLM</td><td data-label="어디">act</td><td data-label="무엇"><button type="button" class="row-open">PROCESSING</button></td><td data-label="상태"><span class="state"><span class="mark wait" data-line="functional" aria-hidden="true"></span>도는 중</span></td><td class="num" data-label="걸린 시간">—</td><td class="detail" data-label="자세히">턴 3</td></tr>
+          <tr><td data-label="시각">14:31:33</td><td data-label="종류" class="mono">AGENT</td><td data-label="어디">act</td><td data-label="무엇"><button type="button" class="row-open">PLANNING</button></td><td data-label="상태"><span class="state"><span class="mark wait" data-line="functional" aria-hidden="true"></span>도는 중</span></td><td class="num" data-label="걸린 시간">—</td><td class="detail" data-label="자세히">턴 3</td></tr>
+          <tr><td data-label="시각">14:30:02</td><td data-label="종류" class="mono">NET</td><td data-label="어디">mailbox</td><td data-label="무엇"><button type="button" class="row-open">git fetch</button></td><td data-label="상태"><span class="state"><span class="mark ok" aria-hidden="true"></span>끝</span></td><td class="num" data-label="걸린 시간">640 ms</td><td class="detail" data-label="자세히">github.com</td></tr>
+          <tr><td data-label="시각">14:29:58</td><td data-label="종류" class="mono">QUEUE</td><td data-label="어디">bridge</td><td data-label="무엇"><button type="button" class="row-open">mail received</button></td><td data-label="상태"><span class="state"><span class="mark ok" aria-hidden="true"></span>끝</span></td><td class="num" data-label="걸린 시간">—</td><td class="detail" data-label="자세히">directive/2 from baseline</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="h-detail" class="drawer">
+      <h2 id="h-detail">자세히 <span class="sub">ERROR · exit 1</span></h2>
+      <dl class="kv">
+        <dt>시각</dt><dd>14:31:40.212</dd>
+        <dt>상태</dt><dd>FAILED</dd>
+        <dt>어디</dt><dd>act</dd>
+        <dt>id</dt><dd>0199b3c2a7f4e1d2c3b4a5968778</dd>
+        <dt>label</dt><dd>exit 1</dd>
+      </dl>
+      <h3>부모 사슬</h3>
+      <ul class="tree">
+        <li><span class="t">TASK</span>CMD-GA50 · item
+          <ul><li><span class="t">AGENT</span>act · agent
+            <ul><li><span class="t">TOOL</span>act · RUN lint
+              <ul><li><span class="t">ERROR</span>act · exit 1</li></ul></li></ul></li></ul></li>
+      </ul>
+      <h3>출력 (마지막 20줄)</h3>
+      <pre class="out">lint: calc.py:1: line too long (80 &gt; 79 characters)
+lint: calc.py:2: line too long (81 &gt; 79 characters)
+(withheld: it looked like it held a secret)</pre>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>이 화면은 읽기만 합니다. 이벤트는 이 Mac 의 <code>~/.ga/events.jsonl</code> 에서 읽고, 모델에 보낸 글과 답은 처음부터 적지 않습니다.</p>
+</footer>
+</body>
+</html>

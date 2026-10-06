@@ -1618,9 +1618,9 @@ class MailHub(Hub):
                 res.plan.append(f"would judge and decide {m.path}")
                 continue
             if self.shadow:  # nothing but shadow.jsonl: no read mark, no state
-                self._one(json.loads(json.dumps(st)), m, res)
+                self._one_ev(json.loads(json.dumps(st)), m, res)
                 continue
-            self._one(st, m, res)
+            self._one_ev(st, m, res)
             self.mailbox.mark_read(self.name, m.path)
             self.save_state(st)
         if self.shadow and not dry_run:
@@ -1628,6 +1628,16 @@ class MailHub(Hub):
         res.writes = self._writes
         res.quiet = not res.sent and not res.plan and not res.integrated
         return res
+
+    def _one_ev(self, st: dict[str, Any], m: Any, res: TickResult) -> None:
+        """CMD-GA50: ``_one`` inside a TASK event (the decision, shadow included); an exception is an ERROR + FAILED."""
+        from . import events as EV
+        n = len(res.sent) + len(res.plan)
+        with EV.span("TASK", "hub-shadow" if self.shadow else "hub", "decide", mail=Path(m.path).name,
+                     sender=m.sender, shadow=self.shadow or None, steps=["judge", "decide", "act"]) as sp:
+            self._one(st, m, res)
+            out = (res.sent + res.plan)[n:]
+            sp.done(decision=EV.short(out[-1] if out else "skipped"))
 
     def _one(self, st: dict[str, Any], m: Any, res: TickResult) -> None:
         from .forms import parse_text
@@ -1653,6 +1663,8 @@ class MailHub(Hub):
             return
         rc = self.conf["repos"][commit["repo"]]
         rp = Path(rc["path"]).expanduser()
+        from . import events as EV
+        EV.emit("TASK", "hub-shadow" if self.shadow else "hub", "step", "RUNNING", step="judge", directive=did)
         if self.shadow:  # the report goes to a throwaway file, not <ga dir>/hub/reports
             import tempfile
             tmp = Path(tempfile.mkdtemp(prefix="ga-hub-shadow-"))
@@ -1683,7 +1695,10 @@ class MailHub(Hub):
         from fnmatch import fnmatch
         outside = [f for f in changed if owned and not any(fnmatch(f, g) for g in owned)]
         card = verdict_card(directive, head, j, diffstat, outside, st["verdicts"].get(did, []))
+        EV.emit("TASK", "hub-shadow" if self.shadow else "hub", "step", "RUNNING", step="decide", directive=did,
+                judge=j.cls)
         decision, lines, err = self._decide(card, did)
+        EV.emit("TASK", "hub-shadow" if self.shadow else "hub", "step", "RUNNING", step="act", directive=did)
         if decision == "ACCEPT" and not (j.cls == "success" and not j.needs):
             decision, lines = "ASK_HUMAN", [f"the model said ACCEPT but the judge class is {j.cls}"
                                             f"{' with ' + str(len(j.needs)) + ' item(s) for judgement' if j.needs else ''}"]
@@ -1762,8 +1777,12 @@ class MailHub(Hub):
         import time as _t
         from . import l0
         from .act.loop import usage_counts
+        from . import events as EV
         runner = self._runner()
         t0, err, answer, usage, served = _t.time(), "", "", None, None
+        llm = EV.span("LLM", "hub-shadow" if self.shadow else "hub", "REQUEST", directive=did,
+                      model=self.conf.get("model"), backend=self.conf.get("backend", "agv")).start()
+        llm.update("PROCESSING")
         try:
             out = runner.run_turn(card, None, system=HUB_SPEC) if getattr(runner, "bare", False) else runner.run_turn(card, None)
             answer = out.answer or ""
@@ -1773,6 +1792,14 @@ class MailHub(Hub):
             err = f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200]
         decision, lines = parse_decision(answer) if not err else ("ASK_HUMAN", ["the model turn failed"])
         secs = round(_t.time() - t0, 3)
+        meta = {"input": (usage or {}).get("input"), "output": (usage or {}).get("output"), "seconds": secs,
+                "model": served or self.conf.get("model")}
+        if err:
+            llm.error(err)
+            llm.fail("RESPONSE_READY", error=err, **meta)
+        else:
+            llm.update("RECEIVING_RESULT")
+            llm.done("RESPONSE_READY", decision=decision, **meta)
         self._usage = usage
         if self.shadow:  # the tokens go to shadow.jsonl; no ledger, no L0
             return decision, lines, err

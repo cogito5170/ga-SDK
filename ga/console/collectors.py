@@ -166,7 +166,7 @@ class MailReader:
 
     def __init__(self, repo: str | Path | None, *, remote: str = "origin", name: str = "baseline",
                  fetch_every_s: float = 60.0, clock: Callable[[], float] = time.time):
-        self.box = Mailbox(repo, remote=remote) if repo and Path(repo).is_dir() else None
+        self.box = Mailbox(repo, remote=remote, quiet=True) if repo and Path(repo).is_dir() else None
         self.name, self.fetch_every_s, self.clock = name, float(fetch_every_s), clock
         self._tip: str | None = None
         self._at = -1e18
@@ -481,7 +481,8 @@ def state(cfg: dict[str, Any], reader: MailReader | None = None, services: Any =
     running = services.running_ids() if services is not None else set()
     w = work(cfg, reader, running)
     heads = reader.heads() if reader else []
-    return clean({"now": iso(clock()), "bridge": bridge_state(cfg, services), "repos": repos(cfg), "services": svc,
+    from .. import __version__
+    return clean({"now": iso(clock()), "version": __version__, "bridge": bridge_state(cfg, services), "repos": repos(cfg), "services": svc,
                   "counts": {"work_open": sum(x["status"] in OPEN for x in w),
                              "mail_unread": reader.unread(heads) if reader else 0,
                              "services_running": sum(s["state"] == "running" for s in svc)}})
