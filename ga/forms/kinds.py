@@ -178,9 +178,14 @@ REPORT2_ONLY = [
 ]
 
 def _shadow_row(v: Any) -> str | None:
-    """CMD-GA45 S2: one shadow decision {id, rev, sha, decision, judge_class, input, output, mail}; nulls allowed."""
+    """CMD-GA45 S2: one shadow decision {id, rev, sha, decision, judge_class, input, output, mail, error, served, asks}; nulls allowed."""
     keys = {"id": str, "rev": int, "sha": str, "decision": str, "judge_class": str, "input": int, "output": int,
-            "mail": str}
+            "mail": str, "error": str, "served": str}  # CMD-GA49 S1: error, served (and asks) are additive
+    if isinstance(v, dict) and v.get("asks") is not None:
+        a = v["asks"]
+        if not isinstance(a, list) or len(a) > 3 or not all(isinstance(x, str) and len(x) <= 300 for x in a):
+            return "asks must be at most 3 strings of at most 300 characters"
+        v = {k: x for k, x in v.items() if k != "asks"}
     if not isinstance(v, dict) or set(v) - set(keys) or not isinstance(v.get("decision"), str):
         return f"must be an object with decision and only {', '.join(keys)}"
     for k, t in keys.items():
