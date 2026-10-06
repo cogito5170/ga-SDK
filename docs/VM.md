@@ -3,7 +3,7 @@
 ## 무엇이 어디서 도나
 
 - **VM**: GA Engine 만. 콘솔(`ga console`, 127.0.0.1:8765)과 허브(`ga hub tick --shadow`, 1분마다, 지원되는 버전부터).
-- **Mac**: Token 개발 스택, agy 브리지. 이 둘은 VM 과 git 우편함(mailbox)으로만 이야기합니다.
+- **Mac**: Token 개발 스택, agy 브리지. 이 둘은 VM 과 git 우편함(mailbox)으로만 이야기합니다. (`--full` 이면 이것도 VM 으로: 아래 "Mac 을 끄고 전부 VM 으로")
 - 상태는 전부 git 에 있습니다. VM 은 언제든 버려도 되고, 명령 한 줄로 다시 만듭니다.
 - 설치기는 `sudo` 를 쓰지 않고, 비밀번호·토큰·ssh 키 파일을 읽지도 쓰지도 않습니다.
 
@@ -92,3 +92,56 @@ pgrep -a pip
 ```
 
 서비스를 멈추고 서비스 파일과 `~/.ga/console.json` 을 지웁니다. `~/baseline`, `~/ga-sdk`, `~/ga-venv` 는 그대로 둡니다.
+
+## Mac 을 끄고 전부 VM 으로 (`ga vm install --full`)
+
+`--full` 은 위 설치에 더해 Mac 이 하던 일을 VM 으로 옮깁니다: `~/token`(Token 스택: token-api, token-worker, token-web), agy 플러그인 에이전트(minimal, ga-plan, ga-act, ga-ask), agy 브리지(`ga-bridge.service`). 모든 서비스는 127.0.0.1 에만 열립니다. 포트를 여는 일은 없고, 다른 PC 에서는 SSH 터널로만 들어옵니다.
+
+```
+~/ga-venv/bin/python -m ga vm install --full --dry-run
+~/ga-venv/bin/python -m ga vm install --full
+```
+
+하는 일: `~/token` 을 받고, `~/token/.venv` 에 backend 를 설치하고, `~/token/frontend` 에서 `npm ci` 를 합니다(임시 폴더와 npm 캐시는 따로 만들고 끝나면 지움; `npm ci` 앞뒤로 디스크 검사, 모자라면 멈추고 새로 켜는 것은 없음). `~/.ga/console.json` 에 Token 서비스 셋과 브리지 항목을 VM 경로로 씁니다. `~/.ga-ask/ask.json` 이 없을 때만 `{"ask_agent": "ga-ask"}` 로 만듭니다(GA44 의 묻기 기본 에이전트)(있으면 건드리지 않음). agy 가 있으면 에이전트 셋을 설치하고, 없으면 실행할 명령만 보여 줍니다.
+
+설치기가 하지 않는 일(명령만 출력합니다 — sudo 도, 비밀 값도 없음):
+
+- **PostgreSQL 16** 과 `gaconsole` DB (`sudo apt-get install -y postgresql` 등).
+- **`~/token/.env`**: `python3 scripts/dev_env.py --db-host localhost` 를 직접 실행합니다. 값은 이 VM 에서 만들어지고 출력되지 않습니다. 필요한 이름만 `.env.example` 에서 읽어 보여 줍니다.
+- **`~/agy-bridge.json`**: Mac 의 것을 복사하고 경로를 VM 의 홈으로 바꿉니다.
+- agy 설치와 로그인.
+
+빠진 것이 있으면 해당 서비스는 console.json 에 `disabled` 로 남고(콘솔이 시작하지 않음), 준비한 뒤 `install --full` 을 한 번 더 돌리면 켜집니다. 브리지는 콘솔이 아니라 `ga-bridge.service` 가 돌립니다.
+
+## 다른 PC 에서 콘솔과 묻기 열기
+
+1. **SSH 키 로그인**: 그 PC 의 공개키를 VM 의 `~/.ssh/authorized_keys` 에 직접 넣습니다(설치기는 키 파일을 열지 않습니다).
+2. VM 에서 주소와 터널 명령을 봅니다:
+
+```
+~/ga-venv/bin/python -m ga vm url --host <vm 공인 IP>
+```
+
+3. 그 PC 에서 터널을 엽니다(같은 포트라서 콘솔의 Host 검사가 통과합니다):
+
+```
+ssh -N -L 8765:127.0.0.1:8765 <user>@<vm 공인 IP>
+```
+
+4. 출력된 주소를 브라우저에 붙여 넣습니다. 묻기는 같은 주소 끝의 `#/ask` 입니다.
+
+## Mac 끄기 체크리스트
+
+1. **Mac 의 브리지를 끕니다.** 브리지 둘이 같은 지시를 두 번 답합니다.
+2. VM 에서 `~/ga-venv/bin/python -m ga vm bridge-adopt` — 지금 `to/AGY` 에 있는 메시지를 모두 읽음으로 표시합니다(몇 개인지 출력). 새 브리지가 옛 지시를 다시 돌리지 않게 합니다.
+3. `~/ga-venv/bin/python -m ga vm enable-bridge --yes` — `--yes` 없이는 켜지 않습니다. agy, adopt 표시, `~/agy-bridge.json` 중 하나라도 없으면 서비스는 시작 전에 이유 한 줄을 로그에 남기고 멈춥니다.
+4. 시험 지시 하나를 `to/AGY` 로 보내고, VM 의 브리지가 답하는지 `journalctl --user -u ga-bridge -n 20` 으로 봅니다.
+5. 그다음 Mac 을 끕니다.
+
+## 되돌리기
+
+```
+systemctl --user disable --now ga-bridge.service
+```
+
+그다음 Mac 에서 `~/ga-venv/bin/python -m ga vm bridge-adopt` 를 한 번 돌리고(그동안 VM 이 답한 지시를 Mac 의 읽음 기록에도 표시) Mac 의 브리지를 다시 켭니다. 전부 지우려면 `ga vm uninstall`(서비스와 설정만 지우고 `~/token` 과 체크아웃은 남김).

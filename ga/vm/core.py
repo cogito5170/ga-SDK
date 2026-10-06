@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -19,10 +20,16 @@ from ..console import config as K
 BRANCH = "claude/gracious-meitner-vp49xe"
 BASELINE_URL = "https://github.com/cogito5170/baseline.git"
 SDK_URL = "https://github.com/cogito5170/ga-sdk.git"
+TOKEN_URL = "https://github.com/cogito5170/Token.git"
 MIN_FREE_GB = 3.0
 PORT = 8765
 CONSOLE_UNIT, HUB_UNIT, HUB_TIMER = "ga-console.service", "ga-hub.service", "ga-hub.timer"
 UNITS = (CONSOLE_UNIT, HUB_UNIT, HUB_TIMER)
+BRIDGE_UNIT = "ga-bridge.service"  # --full only
+AGENTS = ("minimal", "ga-plan", "ga-act", "ga-ask")  # the Mac's three + ga-ask, the ask default since GA44
+BRIDGE_NAME = "AGY"
+ADOPTED = "bridge-adopted"  # ~/.ga/bridge-adopted: written by `ga vm bridge-adopt`, required by the bridge unit
+TWO_BRIDGES = "turn the Mac bridge off first — two bridges answer the same directive twice"
 GB = 1024 ** 3
 STALE_GLOBS = ("pip-target-*", "pip-unpack-*", "pip-build-*")
 GIT_ENV = {"GIT_TERMINAL_PROMPT": "0"}
@@ -116,9 +123,14 @@ def check(home: Path, *, min_free_gb: float = MIN_FREE_GB, runner: Runner | None
         remotes[name] = git_ok and r.run(["git", "ls-remote", url, "HEAD"], env=GIT_ENV, timeout=30)[0] == 0
         if not remotes[name]:
             problems.append(f"git ls-remote {name} failed")
+    agy = shutil.which("agy") is not None
+    agy_version = None
+    if agy:
+        rc, out = r.run(["agy", "--version"], timeout=30)
+        agy_version = (out.strip().splitlines() or [""])[0][:80] if rc == 0 else None
     return {"ready": not problems, "arch": platform.machine(), "os": _os_name(), "python": platform.python_version(),
             "python_ok": py_ok, "git": git_ok, "systemctl_user": sc_ok, "linger": linger, "disk": disk,
-            "stale_pip": stale_pip(tmp), "remotes": remotes, "agy": shutil.which("agy") is not None,
+            "stale_pip": stale_pip(tmp), "remotes": remotes, "agy": agy, "agy_version": agy_version,
             "problems": problems}
 
 
@@ -137,6 +149,19 @@ def unit_files(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> dict[str, str
     timer = ("[Unit]\nDescription=GA hub tick every 60 s\n\n[Timer]\nOnBootSec=60\nOnUnitActiveSec=60\n"
              f"Unit={HUB_UNIT}\n\n[Install]\nWantedBy=timers.target\n")
     return {CONSOLE_UNIT: console, HUB_UNIT: hub, HUB_TIMER: timer}
+
+
+def bridge_unit(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> str:
+    """The agy bridge as a user unit (CMD-OPS2 S3). Installed by --full, enabled only by `ga vm enable-bridge --yes`;
+    ExecStartPre stops it with one clear line when agy, the adopt marker or ~/agy-bridge.json is missing."""
+    py = f"{home}/ga-venv/bin/python"
+    guard = f"{py} -m ga vm check --disk-only --home {home} --min-free-gb {min_free_gb:g}"
+    path = f"{home}/.local/bin:{home}/bin:/usr/local/bin:/usr/bin:/bin"
+    return (f"[Unit]\nDescription=agy bridge for to/{BRIDGE_NAME} (enable with `ga vm enable-bridge --yes` after the Mac "
+            f"bridge is off)\nAfter=network-online.target\n\n[Service]\nWorkingDirectory={home}/baseline\n"
+            f"Environment=PATH={path}\nExecStartPre={guard}\nExecStartPre={py} -m ga vm bridge-ready --home {home}\n"
+            f"ExecStart={py} {home}/baseline/ops/agy_bridge/bridge.py --config {home}/agy-bridge.json\n"
+            f"Restart=always\nRestartSec=30\nNoNewPrivileges=yes\n\n[Install]\nWantedBy=default.target\n")
 
 
 def has_shadow(home: Path, r: Runner) -> bool:
@@ -202,7 +227,8 @@ def sync_repo(r: Runner, repo: Path, url: str, branch: str, how: str, act: Calla
 
 def install(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_GB, runner: Runner | None = None,
             free: Callable[[Any], int] = disk_free, tmp: str | Path = "/tmp", baseline_url: str = BASELINE_URL,
-            sdk_url: str = SDK_URL, branch: str = BRANCH, say: Callable[[str], None] = print) -> int:
+            sdk_url: str = SDK_URL, branch: str = BRANCH, say: Callable[[str], None] = print, full: bool = False,
+            token_url: str = TOKEN_URL) -> int:
     r = runner or Runner()
 
     def act(msg: str) -> None:
@@ -213,27 +239,44 @@ def install(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_
         say(json.dumps(verdict, ensure_ascii=False))
         say("ga vm install: the check failed (" + "; ".join(verdict["problems"]) + ") — nothing was changed")
         return 1
-    base, sdk = home / "baseline", home / "ga-sdk"
+    base, sdk, token = home / "baseline", home / "ga-sdk", home / "token"
+    repos = [(base, baseline_url), (sdk, sdk_url)] + ([(token, token_url)] if full else [])
     try:
-        plans = {base: plan_repo(r, base), sdk: plan_repo(r, sdk)}  # every stop before the first write
+        plans = {repo: plan_repo(r, repo) for repo, _u in repos}  # every stop before the first write
     except VmError as e:
         say(f"ga vm install: {e}")
         return 1
     venv, ga_dir = home / "ga-venv", home / ".ga"
+    agy = bool(verdict.get("agy"))
     try:
         if dry_run:
-            for repo, url in ((base, baseline_url), (sdk, sdk_url)):
+            for repo, url in repos:
                 act(f"git {plans[repo]} {repo} ({branch})")
             act(f"python -m venv {venv}; pip install --no-cache-dir -e {sdk} (TMPDIR private, removed on exit)")
+            if full:
+                act(f"python -m venv {token}/.venv; pip install --no-cache-dir -e {token}/backend; npm ci in "
+                    f"{token}/frontend (TMPDIR and npm cache private; disk guard before and after)")
         else:
-            for repo, url in ((base, baseline_url), (sdk, sdk_url)):
+            for repo, url in repos:
                 sync_repo(r, repo, url, branch, plans[repo], act)
             _pip(r, home, venv, sdk, act)
+            if full:
+                _token(r, home, act, lambda stage: _guard(home, min_free_gb, free, stage))
         w = _would if dry_run else _write
-        changed = [w(ga_dir / "console.json", json.dumps(K.vm(str(home)), indent=2, ensure_ascii=False) + "\n", act)]
+        missing = _prereqs(r, home) if full else {}
+        cfg = K.vm_full(str(home), _disabled(missing)) if full else K.vm(str(home))
+        changed = [w(ga_dir / "console.json", json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", act)]
         udir = home / ".config" / "systemd" / "user"
-        for name, text in unit_files(home, min_free_gb=min_free_gb).items():
+        units = unit_files(home, min_free_gb=min_free_gb)
+        if full:
+            units[BRIDGE_UNIT] = bridge_unit(home, min_free_gb=min_free_gb)
+        for name, text in units.items():
             changed.append(w(udir / name, text, act))
+        if full:
+            ask = home / ".ga-ask" / "ask.json"
+            if not ask.exists():  # never the user's own file
+                w(ask, json.dumps({"ask_agent": "ga-ask"}, indent=2) + "\n", act)
+            _agents(r, home, agy, dry_run, act, say)
     except VmError as e:
         say(f"ga vm install: {e}")
         return 1
@@ -255,12 +298,162 @@ def install(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_
                 sc("enable", "--now", HUB_TIMER)
         else:
             say("ga-hub: installed but left disabled — this ga has no `ga hub tick --shadow` yet; after an update run `ga vm enable-hub`")
+    if full:
+        _say_missing(home, missing, say)
+        say(f"{BRIDGE_UNIT}: installed, not enabled — see `ga vm bridge-adopt` and `ga vm enable-bridge` (docs/VM.md)")
     if not verdict["linger"]:
         say("lingering is off, so the services stop when you log out. Run this yourself (the installer never runs sudo):")
         say("  sudo loginctl enable-linger $USER")
     say(f"ga vm install: done. On the Mac: ssh -N -L {PORT}:127.0.0.1:{PORT} <vm> — the console URL (with its one-time token) "
         f"is in `journalctl --user -u ga-console`")
     return 0
+
+
+def _guard(home: Path, min_free_gb: float, free: Callable[[Any], int], stage: str) -> None:
+    gb = free(home) / GB
+    if gb < min_free_gb:
+        raise VmError(f"disk guard {stage}: {gb:.1f} GB free < {min_free_gb:g} GB — stopped; nothing new was enabled")
+
+
+def _sha(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else ""
+
+
+def _state(home: Path) -> dict[str, Any]:
+    f = home / ".ga" / "vm-full.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.is_file() else {}
+    except ValueError:
+        return {}
+
+
+def _save_state(home: Path, st: dict[str, Any], act: Callable[[str], None]) -> None:
+    _write(home / ".ga" / "vm-full.json", json.dumps(st, sort_keys=True) + "\n", act)
+
+
+def _token(r: Runner, home: Path, act: Callable[[str], None], guard: Callable[[str], None]) -> None:
+    """~/token/.venv with the backend installed and ~/token/frontend's npm ci, each skipped when its pins are unchanged.
+    Private TMPDIR (and npm cache) removed on exit; the disk guard runs before each step and after npm ci."""
+    token, st = home / "token", _state(home)
+    venv_py = token / ".venv" / "bin" / "python"
+    want_be, want_fe = _sha(token / "backend" / "pyproject.toml"), _sha(token / "frontend" / "package-lock.json")
+    tmpdir = tempfile.mkdtemp(prefix="vm-full-", dir=home / ".ga")
+    try:
+        env = {"TMPDIR": tmpdir, "PIP_NO_CACHE_DIR": "1", "npm_config_cache": os.path.join(tmpdir, "npm-cache")}
+        if not (venv_py.exists() and st.get("backend_sha256") == want_be):
+            guard("before the Token backend install")
+            if not venv_py.exists():
+                act(f"python -m venv {token}/.venv")
+                rc, out = r.run([sys.executable, "-m", "venv", str(token / ".venv")], env=env)
+                if rc != 0:
+                    raise VmError(f"Token venv failed: {out.strip()[-200:]}")
+            act(f"pip install --no-cache-dir -e {token}/backend")
+            rc, out = r.run([str(venv_py), "-m", "pip", "install", "--no-cache-dir", "-e", str(token / "backend")],
+                            env=env, timeout=1800)
+            if rc != 0:
+                raise VmError(f"Token backend pip install failed: {out.strip()[-300:]}")
+            st["backend_sha256"] = want_be
+            _save_state(home, st, act)
+        if not ((token / "frontend" / "node_modules").is_dir() and st.get("frontend_sha256") == want_fe):
+            guard("before npm ci")
+            act(f"npm ci in {token}/frontend")
+            rc, out = r.run(["npm", "ci", "--no-audit", "--no-fund"], cwd=str(token / "frontend"), env=env, timeout=1800)
+            if rc != 0:
+                raise VmError(f"npm ci failed: {out.strip()[-300:]}")
+            guard("after npm ci")
+            st["frontend_sha256"] = want_fe
+            _save_state(home, st, act)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _prereqs(r: Runner, home: Path) -> dict[str, bool]:
+    """What the user must set up (never the installer): True = missing."""
+    pg = (r.run(["pg_isready", "-q", "-h", "127.0.0.1", "-p", "5432"], timeout=20)[0] == 0
+          and r.run(["psql", "-d", "gaconsole", "-Atqc", "select 1"], timeout=20)[0] == 0)
+    return {"postgresql": not pg, "env": not (home / "token" / ".env").is_file(),
+            "bridge_config": not (home / "agy-bridge.json").is_file()}
+
+
+def _disabled(missing: dict[str, bool]) -> dict[str, str]:
+    out = {"bridge": f"runs as {BRIDGE_UNIT} (ga vm enable-bridge), not from the console"}
+    why = [w for k, w in (("postgresql", "PostgreSQL / the gaconsole database"), ("env", "~/token/.env")) if missing.get(k)]
+    if why:
+        for n in ("token-api", "token-worker", "token-web"):
+            out[n] = "missing: " + ", ".join(why) + " (see `ga vm install --full` output)"
+    return out
+
+
+def env_names(example: Path) -> list[str]:
+    """The key NAMES of a .env.example (never its values)."""
+    names = []
+    try:
+        lines = example.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return names
+    for line in lines:
+        line = line.strip()
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        k, sep, _v = line.partition("=")
+        if sep and not line.startswith("#") and k.strip().isidentifier():
+            names.append(k.strip())
+    return names
+
+
+def _say_missing(home: Path, missing: dict[str, bool], say: Callable[[str], None]) -> None:
+    t = home / "token"
+    if missing.get("postgresql"):
+        say("PostgreSQL 16 (127.0.0.1:5432) with the gaconsole database is missing. Run this yourself (the installer never runs sudo):")
+        for c in ("sudo apt-get install -y postgresql", "sudo -u postgres createuser $USER",
+                  "sudo -u postgres createdb -O $USER gaconsole",
+                  f"psql gaconsole -v ON_ERROR_STOP=1 -qf {t}/docs/schema.sql"):
+            say(f"  {c}")
+    if missing.get("env"):
+        say(f"{t}/.env is missing. Make it yourself (dev-only values made on this machine; never printed, never committed):")
+        say(f"  cd {t} && python3 scripts/dev_env.py --db-host localhost")
+        say(f"  sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql:///gaconsole|; s|^GC_UPLOAD_DIR=.*|GC_UPLOAD_DIR={home}/.ga/gc-uploads|' .env")
+        say("  (postgresql:///gaconsole is the local socket: Ubuntu's peer login, no password)")
+        names = env_names(t / ".env.example")
+        if names:
+            say("  names it must hold (from .env.example): " + ", ".join(names))
+    if missing.get("postgresql") or missing.get("env"):
+        say("token-api, token-worker, token-web: left disabled in console.json — run `ga vm install --full` again afterwards")
+    if missing.get("bridge_config"):
+        say(f"{home}/agy-bridge.json is missing. Copy the Mac's and change its /Users/<you> paths to {home}:")
+        say(f"  scp <mac>:~/agy-bridge.json {home}/agy-bridge.json")
+        ex = sorted((home / "baseline" / "ops" / "agy_bridge").glob("*example*.json"))
+        if ex:
+            try:
+                keys = list(json.loads(ex[0].read_text(encoding="utf-8")))
+                say(f"  fields (from {ex[0].name}): " + ", ".join(map(str, keys)))
+            except (OSError, ValueError, TypeError):
+                pass
+
+
+def _agents(r: Runner, home: Path, agy: bool, dry_run: bool, act: Callable[[str], None], say: Callable[[str], None]) -> None:
+    py = str(home / "ga-venv" / "bin" / "python")
+    argvs = {n: [py, "-m", "ga", "agy-agent", "install", "--name", n] for n in AGENTS}
+    if not agy:
+        say("agy is not installed: install it and log in yourself, then run (or `ga vm install --full` again):")
+        for a in argvs.values():
+            say("  " + " ".join(a))
+        return
+    st = _state(home)
+    done = set(st.get("agents") or [])
+    for n, a in argvs.items():
+        if n in done:
+            continue
+        act(" ".join(a))
+        if dry_run:
+            continue
+        rc, out = r.run(a, timeout=180)
+        if rc != 0:
+            say(f"agy-agent {n}: failed ({out.strip()[-200:]}); run it yourself: " + " ".join(a))
+            continue
+        done.add(n)
+        st["agents"] = sorted(done)
+        _save_state(home, st, act)
 
 
 def _would(path: Path, text: str, act: Callable[[str], None]) -> bool:
@@ -329,13 +522,93 @@ def enable_hub(home: Path, *, runner: Runner | None = None, say: Callable[[str],
 def uninstall(home: Path, *, runner: Runner | None = None, say: Callable[[str], None] = print) -> int:
     r = runner or Runner()
     udir = home / ".config" / "systemd" / "user"
-    for u in (HUB_TIMER, HUB_UNIT, CONSOLE_UNIT):
+    for u in (BRIDGE_UNIT, HUB_TIMER, HUB_UNIT, CONSOLE_UNIT):
         r.run(["systemctl", "--user", "disable", "--now", u], timeout=60)
     gone = []
-    for p in [udir / u for u in UNITS] + [home / ".ga" / "console.json", home / ".ga" / "vm-install.json"]:
+    for p in [udir / u for u in UNITS + (BRIDGE_UNIT,)] + [home / ".ga" / n for n in ("console.json", "vm-install.json", "vm-full.json", ADOPTED)]:
         if p.is_file():
             p.unlink()
             gone.append(str(p))
     r.run(["systemctl", "--user", "daemon-reload"], timeout=60)
     say("ga vm uninstall: removed " + (", ".join(gone) if gone else "nothing") + " (checkouts and ~/ga-venv are left)")
     return 0
+
+
+# --- the bridge handoff and remote access (CMD-OPS2) ----------------------------------------------------------------
+
+def bridge_adopt(home: Path, *, name: str = BRIDGE_NAME, say: Callable[[str], None] = print) -> int:
+    """Mark every message now in to/<name> read in the VM's baseline clone (the bridge reads ``Mailbox.unread(name)``),
+    so a fresh bridge does not re-run the directives the Mac bridge already answered; then write the adopt marker."""
+    from ..mailbox import NAME, MailError, Mailbox
+    if not NAME.match(name or ""):
+        say(f"ga vm bridge-adopt: {name!r} is not a mailbox name")
+        return 2
+    box = Mailbox(home / "baseline")
+    try:
+        tip = box.tip()
+        paths = box._files(tip, f"to/{name}/")
+        seen = box.read_set(name)
+    except MailError as e:
+        say(f"ga vm bridge-adopt: {e} — nothing marked")
+        return 1
+    new = [p for p in paths if p not in seen]
+    for p in new:
+        box.mark_read(name, p)
+    marker = home / ".ga" / ADOPTED
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(json.dumps({"name": name, "tip": tip, "marked": len(new), "messages": len(paths)}) + "\n",
+                      encoding="utf-8")
+    say(f"ga vm bridge-adopt: marked {len(new)} message(s) in to/{name} read ({len(paths)} in all); wrote {marker}")
+    return 0
+
+
+def bridge_ready(home: Path, *, say: Callable[[str], None] = print) -> int:
+    """The bridge unit's ExecStartPre: one clear line and exit 1 when something it needs is missing."""
+    why = []
+    if shutil.which("agy") is None:
+        why.append("agy is not on PATH (install it and log in)")
+    if not (home / ".ga" / ADOPTED).is_file():
+        why.append("the mailbox is not adopted (run `ga vm bridge-adopt` after the Mac bridge is off)")
+    if not (home / "agy-bridge.json").is_file():
+        why.append(f"{home}/agy-bridge.json is missing")
+    if why:
+        say("ga-bridge not started: " + "; ".join(why))
+        return 1
+    return 0
+
+
+def enable_bridge(home: Path, *, yes: bool = False, runner: Runner | None = None, say: Callable[[str], None] = print) -> int:
+    say(TWO_BRIDGES)
+    if not yes:
+        say("ga vm enable-bridge: give --yes once the Mac bridge is off — nothing was enabled")
+        return 1
+    if not (home / ".config" / "systemd" / "user" / BRIDGE_UNIT).is_file():
+        say(f"ga vm enable-bridge: {BRIDGE_UNIT} is not installed — run `ga vm install --full` first")
+        return 1
+    if bridge_ready(home, say=lambda m: say("ga vm enable-bridge: " + m)) != 0:
+        return 1
+    r = runner or Runner()
+    rc, out = r.run(["systemctl", "--user", "enable", "--now", BRIDGE_UNIT], timeout=60)
+    say(f"ga vm enable-bridge: {BRIDGE_UNIT} enabled — send one test directive to to/{BRIDGE_NAME}" if rc == 0
+        else f"ga vm enable-bridge: systemctl failed: {out.strip()}")
+    return 0 if rc == 0 else 1
+
+
+CONSOLE_URL = re.compile(r"GA Console: (http://127\.0\.0\.1:\d+/\S*)")
+
+
+def url(home: Path, *, runner: Runner | None = None, user: str | None = None, host: str | None = None,
+        say: Callable[[str], None] = print) -> int:
+    """The console's current one-time URL (from the user journal) and the SSH tunnel line for another PC."""
+    r = runner or Runner()
+    _rc, out = r.run(["journalctl", "--user", "-u", CONSOLE_UNIT, "-n", "500", "--no-pager", "-o", "cat"], timeout=30)
+    found = CONSOLE_URL.findall(out or "")
+    if found:
+        say(f"console: {found[-1]}")
+        say(f"묻기:    {found[-1].split('#')[0]}#/ask")
+    else:
+        say("console: no URL in the journal yet — is it running? `systemctl --user status ga-console`")
+    say("on the other PC (key login, no port opened on the VM):")
+    say(f"  ssh -N -L {PORT}:127.0.0.1:{PORT} {user or getpass.getuser()}@{host or '<vm-ip>'}")
+    say("  then open the URL above there (the same port, so the console's Host check passes)")
+    return 0 if found else 1

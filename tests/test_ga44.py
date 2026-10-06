@@ -168,8 +168,8 @@ class D1Console(Base):
 class Version(unittest.TestCase):
     def test_version(self):
         import ga
-        self.assertEqual(ga.__version__, "0.12.0")
-        self.assertIn('version = "0.12.0"', (ROOT / "pyproject.toml").read_text())
+        self.assertGreaterEqual(tuple(map(int, ga.__version__.split("."))), (0, 12, 0))
+        self.assertIn(f'version = "{ga.__version__}"', (ROOT / "pyproject.toml").read_text())
 
 
 if __name__ == "__main__":

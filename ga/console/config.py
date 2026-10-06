@@ -7,7 +7,7 @@
      "ask_home": null,                                           ga ask's folder (default $GA_ASK_HOME or ~/.ga-ask)
      "token_sources": {"act": [dirs], "supervise": [files]},     ledgers read by /api/tokens
      "bridge": {"argv", "cwd", "config_path"},                   the agy bridge, run as the service named "bridge"
-     "services": {name: {"argv", "cwd", "env_file"?, "health_url"?, "port"?}}}
+     "services": {name: {"argv", "cwd", "env_file"?, "health_url"?, "port"?, "disabled"?}}}
 
 argv is a list (never a shell string); ``~`` is expanded in paths and argv words. An env file's values are loaded into
 that child's environment only: the console never logs, returns or writes them.
@@ -76,6 +76,43 @@ def vm(home: str = "~") -> dict[str, Any]:
     }
 
 
+def vm_full(home: str = "~", disabled: dict[str, str] | None = None) -> dict[str, Any]:
+    """The VM layout of ``ga vm install --full`` (CMD-OPS2): the Mac's repos, ledgers, Token services and bridge entry,
+    with VM paths (~/ga-sdk, ~/ga-venv). Every listener stays on 127.0.0.1 (next dev is told so; it would take all
+    interfaces). ``disabled`` maps a service name (or "bridge") to the reason the console must not start it."""
+    h = home.rstrip("/")
+    br = "claude/gracious-meitner-vp49xe"
+    venv = f"{h}/token/.venv/bin"
+    tok_env = f"{h}/token/.env"
+    out: dict[str, Any] = {
+        "schema": SCHEMA,
+        "baseline": f"{h}/baseline",
+        "repos": [{"name": "baseline", "path": f"{h}/baseline", "integration_branch": br},
+                  {"name": "token", "path": f"{h}/token", "integration_branch": br},
+                  {"name": "ga-sdk", "path": f"{h}/ga-sdk", "integration_branch": br}],
+        "mailbox": {"repo": f"{h}/baseline", "remote": "origin", "fetch_every_s": 60, "name": "baseline"},
+        "ask_home": None,
+        "token_sources": {"act": [f"{h}/ga-sdk/.ga/act/ledger", f"{h}/token/.ga/act/ledger"],
+                          "supervise": [f"{h}/ga-sdk/.ga/ledger.jsonl"]},
+        "bridge": {"argv": [f"{h}/ga-venv/bin/python", f"{h}/baseline/ops/agy_bridge/bridge.py", "--config",
+                            f"{h}/agy-bridge.json"], "cwd": f"{h}/baseline", "config_path": f"{h}/agy-bridge.json"},
+        "services": {
+            "token-api": {"argv": [f"{venv}/uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1",
+                                   "--port", "8000"],
+                          "cwd": f"{h}/token/backend", "env_file": tok_env,
+                          "health_url": "http://127.0.0.1:8000/healthz", "port": 8000},
+            "token-worker": {"argv": [f"{venv}/python", "-m", "app.worker"], "cwd": f"{h}/token/backend",
+                             "env_file": tok_env, "ready_line": "worker ready"},
+            "token-web": {"argv": ["npm", "run", "dev", "--", "--hostname", "127.0.0.1", "--port", "3000"],
+                          "cwd": f"{h}/token/frontend", "env_file": tok_env,
+                          "health_url": "http://127.0.0.1:3000", "port": 3000},
+        },
+    }
+    for name, why in (disabled or {}).items():
+        (out["bridge"] if name == "bridge" else out["services"][name])["disabled"] = why
+    return out
+
+
 def _x(s: Any) -> str:
     return str(Path(str(s)).expanduser()) if str(s).startswith("~") else str(s)
 
@@ -127,6 +164,8 @@ def _service(name: str, s: Any) -> dict[str, Any]:
            "env_file": _x(s["env_file"]) if s.get("env_file") else None,
            "health_url": s.get("health_url") or None, "port": int(s["port"]) if s.get("port") else None,
            "ready_line": s.get("ready_line") or None}
+    if s.get("disabled"):
+        out["disabled"] = str(s["disabled"])  # the console does not start it (ga vm install --full says why)
     if out["health_url"] and not re.match(r"^http://(127\.0\.0\.1|localhost)(:\d+)?(/|$)", out["health_url"]):
         raise ConfigError(f"service {name}: health_url must be http://127.0.0.1 or localhost")
     return out
