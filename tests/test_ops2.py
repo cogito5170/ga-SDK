@@ -332,6 +332,14 @@ class Bridge(Full):
         self.assertEqual(self.adopt(), 0)  # again: idempotent, the new one is now marked too
         self.assertIn("marked 1 message(s)", self.out)
 
+    def test_bridge_unit_runs_ga_bridge_not_the_baseline_checkout(self):
+        unit = core.bridge_unit(self.home)
+        self.assertNotIn("baseline", unit)  # VI-20: no path under ~/baseline
+        self.assertIn(f"ExecStart={self.home}/ga-venv/bin/python -m ga bridge --config {self.home}/agy-bridge.json\n", unit)
+        self.assertIn("ExecStartPre=", unit)
+        self.assertIn("bridge-ready", unit)
+        self.assertIn("--disk-only", unit)
+
     def test_enable_bridge_refusals(self):
         udir = self.home / ".config/systemd/user"
         udir.mkdir(parents=True)
