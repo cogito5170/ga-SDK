@@ -167,6 +167,8 @@ def _service(name: str, s: Any) -> dict[str, Any]:
            "env_file": _x(s["env_file"]) if s.get("env_file") else None,
            "health_url": s.get("health_url") or None, "port": int(s["port"]) if s.get("port") else None,
            "ready_line": s.get("ready_line") or None}
+    if s.get("start_timeout_s"):
+        out["start_timeout_s"] = float(s["start_timeout_s"])
     if s.get("disabled"):
         out["disabled"] = str(s["disabled"])  # the console does not start it (ga vm install --full says why)
     if out["health_url"] and not re.match(r"^http://(127\.0\.0\.1|localhost)(:\d+)?(/|$)", out["health_url"]):

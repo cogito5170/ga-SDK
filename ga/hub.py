@@ -1504,7 +1504,7 @@ def shadow_compare(baseline: list[dict[str, Any]], shadow: list[dict[str, Any]])
         if not r["agree"]:
             break
         run += 1
-    ok = run >= GATE_N and not false_accepts and all(r["agree"] for r in ordered[-GATE_N:])
+    ok = len(rows) > 0 and agree >= GATE_N and run >= GATE_N and not false_accepts and all(r["agree"] for r in ordered[-GATE_N:])
     return {"compared": len(rows), "agree": agree, "agreement": round(agree / len(rows), 3) if rows else None,
             "false_accepts": false_accepts, "extra_send_backs": extra, "missing_in_shadow": missing,
             "shadow_errors": errors, "gate": f"gate {min(run, GATE_N)}/{GATE_N}", "rows": rows, "gate_ok": ok}

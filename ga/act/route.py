@@ -38,6 +38,7 @@ CARD_MAX = 2048          # bytes, UTF-8
 LOW_CAP = 3              # the cheapest rung's turn cap
 FALLBACK_TURNS = 3
 LEDGER_MIN = 3           # successful past items of a bucket before the ledger routes
+LEDGER_WINDOW = 2 * LEDGER_MIN  # the most recent won rows of a bucket the ledger looks at
 CLIMB, CLIMB_MAX = 1, 2
 LEDGER = "routes.jsonl"
 SOURCES = ("item", "ledger", "triage", "fallback")
@@ -242,9 +243,14 @@ def from_ledger(rows: list[dict[str, Any]], b: str, ladder: list[str]) -> dict[s
         used = r.get("rungs") if isinstance(r.get("rungs"), list) else []
         if r.get("bucket") == b and r.get("success") is True and used and used[-1] in ladder:
             won.append(r)
+    won = won[-LEDGER_WINDOW:]
     if len(won) < LEDGER_MIN:
         return None
-    start = max((r["rungs"][-1] for r in won), key=ladder.index)
+    counts = {i: 0 for i in range(len(ladder))}
+    for r in won:
+        counts[ladder.index(r["rungs"][-1])] += 1
+    enough = [i for i, n in counts.items() if n >= LEDGER_MIN]
+    start = ladder[min(enough) if enough else max(i for i, n in counts.items() if n)]
     turns = [int(r.get("turns_last") or 0) for r in won if isinstance(r.get("turns_last"), int)]
     diffs = [r["route"]["difficulty"] for r in won if isinstance(r.get("route"), dict)
              and isinstance(r["route"].get("difficulty"), int)]

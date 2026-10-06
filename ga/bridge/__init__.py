@@ -126,7 +126,7 @@ def is_capacity(run: dict[str, Any]) -> bool:
 def _served_model(turns: list[dict[str, Any]]) -> str | None:
     """The model of the rung that actually answered (a turn's ``served``), never the configured default: None when no
     turn says (then results has no model entry) (CMD-GA49 S3)."""
-    for t in turns:
+    for t in reversed(turns):  # the LAST turn that names one: the rung that answered after any climb
         sv = t.get("served")
         sv = [sv] if isinstance(sv, str) else sv
         names = [str(x) for x in sv or [] if x]

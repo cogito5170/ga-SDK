@@ -284,7 +284,7 @@ class Act:
                         "cache_read": (usage or {}).get("cache_read"),
                         "cache_creation": (usage or {}).get("cache_creation"),
                         "usage_reported": usage is not None, "seconds": round(float(secs), 3), "served": served})
-            self._llm_end(llm, err, usage, secs, answer=answer)
+            self._llm_end(llm, err, usage, secs, answer=answer, served=served)
             if err:
                 row.update({"error": err, "applied": 0, "rejected": 0, "commands": []})
                 self._log(row, rows, usage, served, secs)
@@ -315,10 +315,12 @@ class Act:
         return sp
 
     def _llm_end(self, sp: EV.Span, err: str, usage: Any, secs: Any, answer: str = "",
-                 repair_next: bool = False) -> None:
+                 repair_next: bool = False, served: str | None = None) -> None:
         u = usage or {}
         meta = {"input": u.get("input"), "output": u.get("output"), "cache_read": u.get("cache_read"),
                 "usage_reported": usage is not None, "seconds": round(float(secs or 0), 3), "model": self.model}
+        if served:
+            meta["served"] = served
         if err:
             sp.error(err, model=self.model)
             sp.fail("RESPONSE_READY", error=EV.short(err), **meta)

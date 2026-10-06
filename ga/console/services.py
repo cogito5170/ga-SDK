@@ -56,6 +56,9 @@ class Service:
                 ("starting", "running") else None}
 
 
+START_TIMEOUT_S = 60.0  # a service still "starting" after this long is failed (spec start_timeout_s overrides)
+
+
 class Services:
     def __init__(self, specs: dict[str, dict[str, Any]], *, on_event: Callable[[str, dict], None] = lambda t, d: None,
                  clock: Callable[[], float] = time.time, health: Callable[[str], bool] = http_ok,
@@ -166,7 +169,7 @@ class Services:
         for stream, pipe in (("stdout", proc.stdout), ("stderr", proc.stderr)):
             threading.Thread(target=self._read, args=(s, stream, pipe), daemon=True).start()
         threading.Thread(target=self._wait, args=(s, proc), daemon=True).start()
-        if spec.get("health_url"):
+        if waits_for:
             self.ensure_poller()
         return s.snapshot()
 
@@ -221,6 +224,12 @@ class Services:
     # -- health ----------------------------------------------------------------------------------------------------------
     def poll_health(self) -> None:
         for s in self.svc.values():
+            if s.state == "starting" and s.proc is not None:
+                limit = float(s.spec.get("start_timeout_s") or START_TIMEOUT_S)
+                if self.clock() - (s.started_at or 0) > limit:
+                    self._note(s, f"console: still starting after {limit:g}s; marked failed")
+                    self._set(s, "failed", "down" if s.spec.get("health_url") else "unknown")
+                    continue
             url = s.spec.get("health_url")
             if not url or s.state not in ("starting", "running"):
                 continue
