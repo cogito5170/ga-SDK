@@ -8,6 +8,8 @@ refused tools become blockers; a secret-looking answer is withheld; each directi
 503 MODEL_CAPACITY_EXHAUSTED (or agy's exit 3) is retried once after a short backoff, then reported as a dependency
 blocker 'capacity' (not quota). Waiting is code: the supervise log is followed, one line per turn; no model is asked.
 The config keys are the ones ~/agy-bridge.json already has (``pull`` is accepted and ignored: Mailbox fetches).
+VM-BRIDGE-ACT-1: a directive whose mail carries a ```ga-act block is code work and runs ``ga act`` in a worktree
+(``ga.bridge.act``; config block ``act``); every directive from the hub gets a report/2, a failed run included.
 """
 from __future__ import annotations
 
@@ -26,6 +28,7 @@ from .. import l0
 from ..forms import FormError, hard, parse_text, validate
 from ..mailbox import Mailbox, MailError, secrets_in
 from ..runlog import Tail, TurnMeter, follow
+from . import act as ACT
 from .tools import TOOLS, table
 
 DEFAULTS = {"name": "AGY", "hub": "baseline", "every_s": 300, "turn_timeout_s": 1800, "max_answer_chars": 4000,
@@ -196,6 +199,19 @@ def build_report(cfg: dict[str, Any], head: dict[str, Any], run: dict[str, Any],
         "```text\n" + answer.replace("```", "'''") + "\n```\n"
 
 
+def failure_report(cfg: dict[str, Any], head: dict[str, Any], why: str) -> str:
+    """VM-BRIDGE-ACT-1 A3: a hub directive that could not be run still gets a report/2 (unmet + the reason)."""
+    reason = why if not secrets_in(why) else "(the error text was withheld: it looked like it held a secret)"
+    evidence = [f"bridge: not run: {reason}"[:300], "self-reported through the agy bridge; baseline verifies"]
+    items = [{"id": d["id"], "state": "unmet", "evidence": evidence}
+             for d in head.get("done_when") or [] if isinstance(d, dict) and re.match(r"^D\d+$", str(d.get("id", "")))]
+    report = {"schema": "report/2", "from": cfg["name"],
+              "handled": [{"id": head["id"], "rev_seen": int(head.get("rev", 1)), "status": "done"}],
+              "items": items or [{"id": "D1", "state": "unmet", "evidence": evidence}],
+              "blockers": [{"kind": "env", "what": f"bridge: {reason}"[:300]}]}
+    return "```ga\n" + json.dumps(report, ensure_ascii=False, separators=(",", ":")) + "\n```\n"
+
+
 def declined(cfg: dict[str, Any], form: str, why: str) -> str:
     did = form if re.match(r"^CMD-[A-Z]+\d+$", form) else "CMD-X0"
     report = {"schema": "report/2", "from": cfg["name"], "handled": [{"id": did, "rev_seen": 1, "status": "declined",
@@ -205,9 +221,11 @@ def declined(cfg: dict[str, Any], form: str, why: str) -> str:
 
 def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
              runner: Callable[[dict, Path, str], dict] = run_supervise, log: Callable[[str], None] = print,
-             sleep: Callable[[float], None] = time.sleep, max_steps: int | None = None, limit: int | None = None) -> int:
+             sleep: Callable[[float], None] = time.sleep, max_steps: int | None = None, limit: int | None = None,
+             act_handler: Callable[[dict, dict, dict], tuple[str, bool]] | None = None) -> int:
     """Answer the unread messages for ``cfg['name']`` (at most ``limit``): run the hub's directives, decline the rest."""
     box = box or Mailbox(cfg["mailbox_repo"])
+    act_handler = act_handler or ACT.handle
     handled = 0
     for m in box.unread(cfg["name"]):
         if limit is not None and handled >= limit:
@@ -219,6 +237,8 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
         task_ev = EV.span("TASK", m.form, "directive", parent_id=None, sender=m.sender, goal=None,
                           steps=["read", "run", "report", "ack"]).start()
         failed = ""
+        head: dict[str, Any] | None = None
+        spec: dict[str, Any] | None = None
         try:
             task_ev.update("step", step="read")
             if m.sender != cfg["hub"]:
@@ -228,8 +248,16 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
                 reply = declined(cfg, m.form, "not a valid directive/2: " + "; ".join(m.problems)[:150])
                 failed = "declined: not a valid directive/2"
             else:
-                head, _ = parse_text(m.text)
+                head, body = parse_text(m.text)
                 task_ev.update("step", step="run", goal=EV.short(head.get("goal", "")))
+                spec = ACT.item_spec(body)
+            if head is not None and spec is not None:  # VM-BRIDGE-ACT-1: code work through ga act
+                with EV.span("AGENT", "bridge", "ga act") as sp:
+                    reply, ok = act_handler(cfg, head, spec)
+                    (sp.done if ok else sp.fail)(result="met" if ok else "unmet")
+                if not ok:
+                    failed = "ga act unmet"
+            elif head is not None:
                 conf = effective_config(cfg, head["id"], max_steps)
                 task = task_text(head)
                 run = _run_ev(runner, cfg, conf, task)
@@ -256,10 +284,17 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
             box.send(cfg["hub"], reply, cfg["name"])
             EV.emit("QUEUE", "bridge", "report mailed", "DONE", to=cfg["hub"], form=m.form)
             log(f"bridge: report sent to {cfg['hub']} for {m.form}")
-        except (MailError, FormError, OSError, ValueError) as e:
-            log(f"bridge: {m.form} not answered: {type(e).__name__}: {str(e)[:200]}")
-            task_ev.error(f"{type(e).__name__}: {str(e)[:100]}")
+        except (MailError, FormError, OSError, ValueError, subprocess.SubprocessError) as e:
+            why = f"{type(e).__name__}: {str(e)[:200]}"
+            log(f"bridge: {m.form} not answered: {why}")
+            task_ev.error(why[:120])
             failed = failed or type(e).__name__
+            if head is not None and isinstance(head.get("id"), str):  # A3: never silent on a hub directive
+                try:
+                    box.send(cfg["hub"], failure_report(cfg, head, why), cfg["name"])
+                    log(f"bridge: failure report sent to {cfg['hub']} for {m.form}")
+                except (MailError, FormError, OSError, ValueError) as e2:
+                    log(f"bridge: failure report for {m.form} not sent: {type(e2).__name__}: {str(e2)[:200]}")
         task_ev.update("step", step="ack")
         box.mark_read(cfg["name"], m.path)  # once: a failing directive is not retried in a loop
         EV.emit("QUEUE", "bridge", "mail acked", "DONE", form=m.form)
