@@ -87,7 +87,7 @@ function ago(iso) {
 
 // ---- the store ----------------------------------------------------------------------------------------------------
 const S = {
-  state: null, work: null, branches: null, tokens: null, mail: null, dec: null, decQ: "",
+  state: null, work: null, branches: null, tokens: null, mail: null, dec: null, decQ: "", cloud: null,
   logs: {}, sel: null, turns: [], newMail: new Set(),
   err: null, downSince: null, denied: false, lastId: 0,
   limit: {}, pending: {}, said: {}, confirm: null,
@@ -127,6 +127,7 @@ const LOADERS = {
   tokens: () => api("/api/tokens"),
   mail: () => api("/api/mail?limit=20"),
   dec: () => api("/api/decisions?q=" + encodeURIComponent(S.decQ)),
+  cloud: () => api("/api/cloud"),
 };
 
 async function load(key) {
@@ -152,7 +153,7 @@ async function load(key) {
 // The stream opens once the first reads have answered (STREAM_AFTER_MS after load): the page shows fetched data first,
 // then follows the stream. EventSource resends the last id as Last-Event-ID when it reconnects by itself; after a
 // refusal (a dead server, a new token) the page reopens it with ?after=<last id>, slower each time.
-const TYPES = ["state", "work", "mail", "service", "log", "act_turn", "bridge"];
+const TYPES = ["state", "work", "mail", "service", "log", "act_turn", "bridge", "cloud"];
 const STREAM_AFTER_MS = 1500;
 let retry = 1000;
 let started = false;
@@ -241,6 +242,7 @@ const ON = {
     Object.assign(S.state.bridge, d);
     changed("state");
   },
+  cloud(d) { S.cloud = d; changed("cloud"); },
 };
 
 function live() {
@@ -319,6 +321,7 @@ function nav() {
   const c = S.state && S.state.counts;
   document.getElementById("n-work").textContent = c ? String(c.work_open) : "";
   document.getElementById("n-svc").textContent = S.state ? `${c.services_running}/${S.state.services.length}` : "";
+  document.getElementById("n-cloud").textContent = S.cloud && S.cloud.available ? String(S.cloud.sessions.filter(active).length) : "";
 }
 
 const have = (r) => r.need.every((k) => S[k] !== null && S[k] !== undefined) && (r.name !== "decisions" || S.decFor === S.decQ);
@@ -892,6 +895,99 @@ const DECISIONS = {
   },
 };
 
+// ---- 클라우드 ------------------------------------------------------------------------------------------------------
+// The user's cloud Claude sessions, from the snapshot the baseline hub publishes (GET /api/cloud). Read only.
+const CLOUD_ACTIVE = ["working", "review_ready", "blocked", "failed"];
+const active = (s) => CLOUD_ACTIVE.includes(s.bucket) || (!s.bucket && s.status === "running");
+const ROLE = { hub: "허브", worker: "작업", integrator: "통합", watcher: "감시" };
+const BUCKET = { working: ["live", "작업 중"], review_ready: ["ok", "검토 대기"], blocked: ["fail", "막힘"], failed: ["fail", "실패"],
+  completed: ["ok", "끝남"] };
+const STATUS = { running: ["live", "작업 중"], idle: ["off", "쉬는 중"], archived: ["off", "보관됨"] };
+const ORDER = { failed: 0, blocked: 1, review_ready: 2, working: 3 };
+const CTX_FULL = 200000;
+const CTX_OVER = 150000;
+const STALE_S = 2 * 3600;
+const usd = (v) => (v === null || v === undefined ? "—" : "$" + Number(v).toFixed(2));
+const ktok = (v) => (v === null || v === undefined ? "—" : v >= 1000 ? Math.round(v / 1000) + "k" : String(v));
+const newest = (a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+
+function chip(s) {
+  const [m, word] = BUCKET[s.bucket] || STATUS[s.status] || ["wait", s.status || "모름"];
+  return state(m, word);
+}
+
+function ctxBar(v) {
+  if (v === null || v === undefined) return h("span", null, "맥락 —");
+  const over = v > CTX_OVER;
+  const i = h("i");
+  i.style.width = Math.min(100, Math.round((v / CTX_FULL) * 100)) + "%";
+  return h("span", { class: "ctx" + (over ? " over" : "") },
+    h("span", { class: "bar", role: "progressbar", "aria-label": "맥락", "aria-valuemin": "0", "aria-valuemax": String(CTX_FULL),
+      "aria-valuenow": String(v), "data-line": "functional" }, i),
+    over ? h("mark", null, `맥락 ${ktok(v)} · 넘침`) : `맥락 ${ktok(v)}`);
+}
+
+function cloudStale(c) {
+  const t = new Date(c.at).getTime();
+  return Boolean(c.stale) || (!Number.isNaN(t) && (Date.now() - t) / 1000 > STALE_S);
+}
+
+function cloudLink(s) {
+  // the server builds url from the checked session id; anything else is not a link
+  return s.url ? h("a", { href: s.url, target: "_blank", rel: "noopener noreferrer" }, s.title || s.id) : (s.title || s.id);
+}
+
+const CLOUD = {
+  mast() {
+    const c = S.cloud;
+    const cap = ["클라우드 · ", h("b", null, "허브가 올린 세션 목록"), " · 읽기만"];
+    if (!c.available) {
+      return mast(ROUTES.cloud, cap, [mark("off"), "목록 없음"],
+        ["허브가 아직 세션 목록을 올리지 않았거나 읽을 수 없어요. ", h("span", { class: "sub" }, `까닭: ${c.reason || "모름"}`)]);
+    }
+    const l = c.sessions.filter(active);
+    const n = (b) => l.filter((s) => b.includes(s.bucket) || (b.includes("working") && !s.bucket)).length;
+    const cost = l.reduce((a, s) => a + (Number(s.cost_usd) || 0), 0);
+    const h1 = l.length ? `일하는 세션 ${l.length}` : "일하는 세션 없음";
+    return mast(ROUTES.cloud, cap, h1,
+      [`작업 중 ${n(["working"])} · 검토 대기 ${n(["review_ready"])} · 막힘·실패 ${n(["blocked", "failed"])} · 비용 ${usd(cost)}. `,
+        h("span", { class: "sub" }, "세션 = claude.ai 에서 도는 Claude 하나.")]);
+  },
+  when() {
+    const c = S.cloud;
+    if (!c.available) return section("when", "기준 시각", null, h("p", { class: "note" },
+      "허브가 ops/hub/cloud_sessions.json 을 공용 브랜치에 올리면 여기에 보입니다. 이 컴퓨터에는 Claude 열쇠가 없습니다."));
+    const stale = cloudStale(c);
+    return section("when", "기준 시각", c.source === "worktree" ? "작업 폴더의 파일" : "공용 브랜치",
+      h("p", { class: "say" }, stale ? state("wait", "오래됨") : state("ok", "새로움"), " ", when(c.at), " · ", ago(c.at) || "—"),
+      stale ? h("p", { class: "note warn" }, "목록이 2시간 넘게 그대로예요. 허브가 멈췄을 수 있어요. 아래 상태는 그때 값입니다.") : null);
+  },
+  live() {
+    const c = S.cloud;
+    if (!c.available) return null;
+    const l = c.sessions.filter(active).sort((a, b) => (ORDER[a.bucket] ?? 3) - (ORDER[b.bucket] ?? 3) || newest(a, b));
+    if (!l.length) return section("live", "일하는 세션", null, h("p", { class: "note" }, "지금 일하는 세션이 없어요."));
+    return section("live", "일하는 세션", "막힘·실패 먼저", h("ul", { class: "items" }, l.map((s) => h("li",
+      s.bucket === "blocked" || s.bucket === "failed" ? { class: "fail" } : null,
+      h("div", { class: "row" }, h("span", { class: "id" }, ROLE[s.role] || "세션"), h("h3", null, cloudLink(s)), chip(s)),
+      s.detail ? h("p", { class: "say" }, s.detail) : null,
+      h("p", { class: "meta" }, ctxBar(s.ctx), h("span", null, "비용 ", h("b", null, usd(s.cost_usd))),
+        s.model ? h("span", { class: "mono" }, s.model) : null,
+        s.repo ? h("span", { class: "mono" }, s.repo + (s.branch ? " · " + s.branch : "")) : null,
+        h("span", null, ago(s.updated_at) || "—"))))));
+  },
+  rest() {
+    const c = S.cloud;
+    if (!c.available) return null;
+    const l = c.sessions.filter((s) => !active(s)).sort(newest);
+    if (!l.length) return null;
+    return section("rest", "끝났거나 쉬는 세션", `${l.length}개`, h("details", null, h("summary", null, `펼쳐 보기 (${l.length}개)`),
+      h("ul", { class: "items" }, l.map((s) => h("li", null,
+        h("div", { class: "row" }, h("span", { class: "id" }, ROLE[s.role] || "세션"), h("h3", null, cloudLink(s)), chip(s)),
+        h("p", { class: "meta" }, h("span", null, "비용 ", h("b", null, usd(s.cost_usd))), h("span", null, ago(s.updated_at) || "—")))))));
+  },
+};
+
 // ---- routes -------------------------------------------------------------------------------------------------------
 const P = (id, deps, render, pair) => ({ id, deps, render, pair });
 const ROUTES = {};
@@ -918,6 +1014,8 @@ function defineRoutes() {
     ["mast", [], ASK.mast], ["box", ["askbox"], ASK.box, "a"], ["cost", ["ask"], ASK.cost, "a"], ["run", ["run"], ASK.run], ["past", ["past"], ASK.past]]);
   r("decisions", "결정", ["dec"], "결정은 허브의 기록 파일에서 읽습니다. 이 화면에서는 고칠 수 없습니다.", [
     ["mast", [], DECISIONS.mast], ["find", [], DECISIONS.find], ["hits", ["more"], DECISIONS.hits]]);
+  r("cloud", "클라우드", ["cloud"], "허브가 올린 목록을 읽기만 합니다. 이 컴퓨터에는 Claude 열쇠가 없고, 링크는 claude.ai 의 그 세션을 엽니다.", [
+    ["mast", [], CLOUD.mast], ["when", ["stale"], CLOUD.when], ["live", [], CLOUD.live], ["rest", [], CLOUD.rest]]);
 }
 
 function route() {
@@ -936,6 +1034,7 @@ function go() {
   for (const k of r.need) load(k);
   api("/api/ask/setting").then((v) => { S.ask.confirmModel = Boolean(v.confirm_model_turns); changed("askbox"); }).catch(() => {});
   if (!r.need.includes("state")) load("state");  // the nav counts
+  if (!r.need.includes("cloud")) load("cloud");
   window.scrollTo(0, 0);
 }
 

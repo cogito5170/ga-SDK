@@ -5,10 +5,10 @@ GET and SSE, header ``X-GA-Token`` for POST), Host / Origin / Sec-Fetch-Site che
 the strict CSP and no-store on every answer, nothing remote. The static console is ga/console/static.
 
     GET  /api/state  /api/work  /api/branches  /api/tokens  /api/decisions?q=  /api/mail?limit=
-    GET  /api/services/{name}/logs?after=n
+    GET  /api/services/{name}/logs?after=n   /api/cloud (the cloud sessions snapshot, CMD-GA52)
     POST /api/services/{name}/start|stop   /api/bridge/start|stop
     POST /api/ask {q, mode: ask|do} -> {plan, cost_estimate, confirm_id};  POST /api/ask/confirm {confirm_id} -> {run_id}
-    GET  /api/events  (SSE; Last-Event-ID resumes)  types: state work mail service log act_turn bridge
+    GET  /api/events  (SSE; Last-Event-ID resumes)  types: state work mail service log act_turn bridge cloud
 
 Changes reach /api/events by code (file mtimes, git heads, the mailbox tip, service events), never by a model.
 """
@@ -30,6 +30,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from ..runlog import redact
 from ..ui import BIND, HEADERS, Handler as UiHandler
+from . import cloud as CL
 from . import collectors as C
 from . import config as K
 from .services import Services
@@ -224,6 +225,7 @@ class Console(ThreadingHTTPServer):
         kw = {"health": health} if health else {}
         self.services = services if services is not None else Services(cfg.get("services") or {},
                                                                         on_event=self.bus.publish, clock=clock, **kw)
+        self.cloud = CL.CloudReader(cfg, clock=clock)
         self.asker = Asker(cfg, self.bus, engine_factory=engine_factory, do_argv=do_argv, clock=clock)
         self.watch_every_s, self.sse_keepalive_s = watch_every_s, sse_keepalive_s
         self._stop = threading.Event()
@@ -249,7 +251,8 @@ class Console(ThreadingHTTPServer):
 
     # -- the watcher (S4): code finds what changed ---------------------------------------------------------------------
     def watch_once(self) -> list[str]:
-        fp = C.fingerprint(self.cfg, self.reader)
+        cloud = self.cloud.key()  # first: its fetch may move a remote ref, which the fingerprint then sees once
+        fp = {**C.fingerprint(self.cfg, self.reader), "cloud": cloud}
         sent: list[str] = []
         old, self._fp = self._fp, fp
         for row in self._act_turns():
@@ -260,7 +263,10 @@ class Console(ThreadingHTTPServer):
         if fp["mail"] != old["mail"]:
             self.bus.publish("mail", C.mail(self.reader, 20))
             sent.append("mail")
-        if fp != old:
+        if fp["cloud"] != old["cloud"]:  # a new snapshot (its `at`) from the hub, not the clock
+            self.bus.publish("cloud", self.cloud.view())
+            sent.append("cloud")
+        if {k: v for k, v in fp.items() if k != "cloud"} != {k: v for k, v in old.items() if k != "cloud"}:
             self.bus.publish("work", self.work())
             self.bus.publish("state", self.state())
             sent += ["work", "state"]
@@ -346,6 +352,8 @@ class ConsoleHandler(UiHandler):
             return self.json(200, C.branches(srv.cfg))
         if path == "/api/ask/setting":
             return self.json(200, {"confirm_model_turns": srv.asker.confirm_model_turns()})
+        if path == "/api/cloud":
+            return self.json(200, srv.cloud.view())
         if path == "/api/tokens":
             return self.json(200, C.tokens(srv.cfg, srv.reader, clock=srv.clock))
         if path == "/api/decisions":

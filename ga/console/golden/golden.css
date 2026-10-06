@@ -161,3 +161,10 @@ mark{background:var(--bg);color:var(--ink);padding:0 .1em}
 
 .foot{padding-top:var(--space-5);padding-bottom:var(--space-5);color:var(--sub);font-size:var(--step-m1)}
 .foot p{max-width:70ch}
+
+/* 클라우드 (CMD-GA52): the context bar per session; over 150k the number is inverted (failure by inversion, no colour) */
+.ctx{display:inline-flex;align-items:center;gap:var(--space-1)}
+.ctx .bar{display:inline-block;width:5rem;height:8px;background:var(--surface)}
+.ctx .bar i{display:block;height:100%;background:var(--line-fill)}
+.ctx.over{font-weight:700}
+details{font-size:var(--step-m1);margin-top:var(--space-3)}
