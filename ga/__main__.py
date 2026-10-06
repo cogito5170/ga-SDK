@@ -727,6 +727,8 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(fn=cmd_hub)
     from .actions.cli import add_parser as _add_actions  # CMD-GA42: ga actions
     _add_actions(sub)
+    from .ops.cli import add_parser as _add_ops  # CMD-GA57: ga ops
+    _add_ops(sub)
     args = ap.parse_args(argv)
     if args.cmd == "prompt" and not args.hub and not args.session:
         ap.error("prompt needs SESSION or --hub")

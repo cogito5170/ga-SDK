@@ -4,7 +4,7 @@ Security is GA36's (``ga.ui``), reused, not copied: 127.0.0.1 only, a one-time t
 GET and SSE, header ``X-GA-Token`` for POST), Host / Origin / Sec-Fetch-Site checks (403), actions only by POST + token,
 the strict CSP and no-store on every answer, nothing remote. The static console is ga/console/static.
 
-    GET  /api/state  /api/work  /api/branches  /api/tokens  /api/decisions?q=  /api/mail?limit=
+    GET  /api/state  /api/work  /api/branches  /api/tokens  /api/decisions?q=  /api/mail?limit=  /api/ops
     GET  /api/services/{name}/logs?after=n
     POST /api/services/{name}/start|stop   /api/bridge/start|stop
     POST /api/ask {q, mode: ask|do} -> {plan, cost_estimate, confirm_id};  POST /api/ask/confirm {confirm_id} -> {run_id}
@@ -393,6 +393,9 @@ class ConsoleHandler(UiHandler):
             return self.json(200, C.tokens(srv.cfg, srv.reader, clock=srv.clock))
         if path == "/api/decisions":
             return self.json(200, C.decisions(srv.cfg, (q.get("q") or [""])[0]))
+        if path == "/api/ops":  # CMD-GA57 S5: the last ops decisions (<ga dir>/ops/decisions.jsonl)
+            from ..ops.core import last_decisions
+            return self.json(200, last_decisions(srv.cfg.get("ga_dir") or Path(srv.cfg["baseline"]).expanduser().parent / ".ga"))
         if path == "/api/mail":
             lim = (q.get("limit") or ["50"])[0]
             return self.json(200, C.mail(srv.reader, int(lim) if lim.isdigit() else 50))

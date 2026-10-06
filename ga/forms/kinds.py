@@ -122,7 +122,7 @@ S_ID = re.compile(r"^S\d+$")
 D_ID = re.compile(r"^D\d+$")
 ITEM_STATES = ("met", "unmet", "blocked", "na")
 BLOCKER_KINDS = ("env", "permission", "credential", "budget", "dependency", "design")
-NOTIFY_KINDS = ("directive", "report", "verdict", "question", "ack", "shadow")
+NOTIFY_KINDS = ("directive", "report", "verdict", "question", "ack", "shadow", "alert")  # alert: ga ops (CMD-GA57)
 
 
 def _items(prefix: re.Pattern[str], what: str) -> Check:

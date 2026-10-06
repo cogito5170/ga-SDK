@@ -148,7 +148,8 @@ def unit_files(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> dict[str, str
                f"Restart=always\nRestartSec=5\nNoNewPrivileges=yes\n\n[Install]\nWantedBy=default.target\n")
     hub = (f"[Unit]\nDescription=GA hub tick, shadow mode (a timer runs it every 60 s)\n\n[Service]\nType=oneshot\n"
            f"WorkingDirectory={wd}\nExecStartPre={guard}\nExecStart={py} -m ga hub tick --shadow --config {home}/.ga/hub.json "
-           f"--ga-dir {home}/.ga\nNoNewPrivileges=yes\n")
+           f"--ga-dir {home}/.ga\nExecStart={py} -m ga ops tick --config {home}/.ga/hub.json --ga-dir {home}/.ga\n"
+           "NoNewPrivileges=yes\n")  # CMD-GA57 S5: the ops tick runs after the hub tick
     timer = ("[Unit]\nDescription=GA hub tick every 60 s\n\n[Timer]\nOnBootSec=60\nOnUnitActiveSec=60\n"
              f"Unit={HUB_UNIT}\n\n[Install]\nWantedBy=timers.target\n")
     return {CONSOLE_UNIT: console, HUB_UNIT: hub, HUB_TIMER: timer}

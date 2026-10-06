@@ -87,7 +87,7 @@ function ago(iso) {
 
 // ---- the store ----------------------------------------------------------------------------------------------------
 const S = {
-  state: null, work: null, branches: null, tokens: null, mail: null, dec: null, decQ: "",
+  state: null, work: null, branches: null, tokens: null, mail: null, dec: null, ops: null, decQ: "",
   logs: {}, sel: null, turns: [], newMail: new Set(),
   err: null, downSince: null, denied: false, lastId: 0,
   limit: {}, pending: {}, said: {}, confirm: null,
@@ -128,6 +128,7 @@ const LOADERS = {
   tokens: () => api("/api/tokens"),
   mail: () => api("/api/mail?limit=20"),
   dec: () => api("/api/decisions?q=" + encodeURIComponent(S.decQ)),
+  ops: () => api("/api/ops"),
   ev: () => api("/api/events/recent?limit=" + EV_KEEP),
 };
 
@@ -901,6 +902,14 @@ const DECISIONS = {
           parts.slice(1).filter((x) => x.trim() !== d.id).length ? h("span", { class: "mono" }, parts.slice(1).join(" · ")) : null));
     })), more("dec", l.length, n, "결정"));
   },
+  ops() {  // CMD-GA57: the ops tick's last decisions (rule -> action -> guard -> verify), read from <ga dir>/ops
+    const l = S.ops || [];
+    if (!l.length) return null;
+    return section("ops", "운영 결정", `${Math.min(10, l.length)} / ${l.length}`, h("ol", { class: "items" }, l.slice(0, 10).map((d) =>
+      h("li", null, h("p", null, h("span", { class: "id" }, d.id || d.subject || "-"), " ",
+        `${d.rule || "model"} → ${d.action || "-"}${d.verify ? " · verify " + d.verify : ""}${d.guard ? " · " + d.guard : ""}`),
+        h("p", { class: "meta" }, h("span", { class: "mono" }, d.at || ""), " ", h("span", null, String(d.result || "")))))));
+  },
 };
 
 // ---- 실시간 (CMD-GA50) ----------------------------------------------------------------------------------------------
@@ -1155,8 +1164,8 @@ function defineRoutes() {
     ["mast", [], TOKENS.mast], ["today", [], TOKENS.today], ["per", [], TOKENS.per], ["ledger", ["more"], TOKENS.ledger]]);
   r("ask", "묻기", [], "확인 없이 모델을 부르는 버튼은 없습니다. 기록만 읽어 답할 수 있으면 0 토큰으로 답합니다.", [
     ["mast", [], ASK.mast], ["box", ["askbox"], ASK.box, "a"], ["cost", ["ask"], ASK.cost, "a"], ["run", ["run"], ASK.run], ["past", ["past"], ASK.past]]);
-  r("decisions", "결정", ["dec"], "결정은 허브의 기록 파일에서 읽습니다. 이 화면에서는 고칠 수 없습니다.", [
-    ["mast", [], DECISIONS.mast], ["find", [], DECISIONS.find], ["hits", ["more"], DECISIONS.hits]]);
+  r("decisions", "결정", ["dec", "ops"], "결정은 허브의 기록 파일에서 읽습니다. 이 화면에서는 고칠 수 없습니다.", [
+    ["mast", [], DECISIONS.mast], ["find", [], DECISIONS.find], ["hits", ["more"], DECISIONS.hits], ["ops", [], DECISIONS.ops]]);
 }
 
 function route() {
