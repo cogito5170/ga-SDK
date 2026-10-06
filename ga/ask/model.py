@@ -108,13 +108,15 @@ def one_turn(text: str, *, cli: list[str] | None = None, model: str | None = Non
     if tokens(text) > PROMPT_MAX:
         raise ModelTurnError("prompt_over_cap")
     t0 = time.monotonic()
+    from .. import llm as L
+    from ..backends.base import BackendError
+    from ..llm.oneshot import AgyOneShot
+    shot = AgyOneShot(lambda t: argv(cli, model, t), agy_cli.clean_env(), model, cwd, timeout_s)
     try:
-        p = subprocess.run(argv(cli, model, text), cwd=cwd, env=agy_cli.clean_env(), stdin=subprocess.DEVNULL,
-                           capture_output=True, text=True, timeout=timeout_s)
-    except FileNotFoundError:
-        raise ModelTurnError("agy_not_found") from None
-    except subprocess.TimeoutExpired:
-        raise ModelTurnError("timeout") from None
+        L.run_turn(shot, text, None, purpose="opinion", item_id="ask", model=model)
+    except BackendError as e:
+        raise ModelTurnError(e.reason if e.reason in ("agy_not_found", "timeout") else "budget") from None
+    p = shot.proc
     if p.returncode != 0 and UNKNOWN_AGENT.search(p.stdout + "\n" + p.stderr):
         raise ModelTurnError("agent_missing")
     o = agy_cli.parse_output(p.stdout, p.stderr)

@@ -1657,9 +1657,9 @@ class MailHub(Hub):
 
     def _runner(self) -> Any:
         if self.runner is None:
-            from . import backends
+            from .llm import create_runner
             m = self._model or self._resolve_model()
-            self.runner = backends.create(self.conf.get("backend", "agv"), m["resolved"],
+            self.runner = create_runner(self.conf.get("backend", "agv"), m["resolved"],
                                           dict(self.conf.get("options") or {}),
                                           {"cwd": str(self.ga), "state_dir": str(self.ga / "hub")})
             self._own_runner = True
@@ -1845,6 +1845,7 @@ class MailHub(Hub):
         """One model turn; it goes to the ledger and L0 whatever happens."""
         import time as _t
         from . import l0
+        from . import llm as L
         from .act.loop import usage_counts
         from . import events as EV
         runner = self._runner()
@@ -1853,7 +1854,8 @@ class MailHub(Hub):
                       model=self.conf.get("model"), backend=self.conf.get("backend", "agv")).start()
         llm.update("PROCESSING")
         try:
-            out = runner.run_turn(card, None, system=HUB_SPEC) if getattr(runner, "bare", False) else runner.run_turn(card, None)
+            out = L.run_turn(runner, card, None, system=HUB_SPEC if getattr(runner, "bare", False) else None,
+                             purpose="coordination", item_id=str(did), model=str(self.conf.get("model") or ""))
             answer = out.answer or ""
             usage = usage_counts(out.usage, getattr(out, "usage_format", None))
             served = ",".join(getattr(out, "served", []) or []) or None

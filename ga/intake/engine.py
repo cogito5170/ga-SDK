@@ -24,6 +24,7 @@ from types import SimpleNamespace
 from typing import Any, Callable
 
 from .. import l0
+from .. import llm as L
 from ..forms import hard, soft, validate
 from ..forms.task import NEEDS, REQUEST_CAP
 from . import prompt
@@ -211,9 +212,11 @@ class Intake:
     def send(self, text: str) -> tuple[dict[str, str | None], Callable[[], Any]]:
         if self.bare:
             sent = {"system": prompt.INSTRUCTION, "prompt": text}
-            return sent, lambda: self.runner.run_turn(text, None, system=prompt.INSTRUCTION)
+            return sent, lambda: L.run_turn(self.runner, text, None, system=prompt.INSTRUCTION, purpose="intake",
+                                            item_id="intake")
         whole = prompt.whole(text)
-        return {"system": None, "prompt": whole}, lambda: self.runner.run_turn(whole, None)
+        return {"system": None, "prompt": whole}, lambda: L.run_turn(self.runner, whole, None, purpose="intake",
+                                                                      item_id="intake")
 
     def _record(self, tid: str, turn: Turn) -> None:
         res = SimpleNamespace(raw={}, model=self.model, seconds=turn.seconds, cost=None,

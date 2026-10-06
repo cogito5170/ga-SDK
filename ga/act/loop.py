@@ -348,9 +348,10 @@ class Act:
             tries[0] += 1
             if tries[0] > 1 and llm is not None:
                 llm.retry("REQUEST", attempt=tries[0], why="transient server error")
-            if getattr(self.runner, "bare", False):
-                return self.runner.run_turn(body, None, system=system)
-            return self.runner.run_turn(whole, None)
+            from .. import llm as L
+            bare = getattr(self.runner, "bare", False)
+            return L.run_turn(self.runner, body if bare else whole, None, system=system if bare else None,
+                              purpose="build", item_id=self.item.id, model=self.model)
         try:
             out = retry_transient(turn, backoff_s=self.transient_backoff_s, sleep=self.sleep)
             usage = usage_counts(out.usage, getattr(out, "usage_format", None))
@@ -620,10 +621,11 @@ def _triage_runner(backend: str, options: dict, root: Path, state: Path) -> Call
     """A tool-less triage runner: agent ga-plan where the backend takes an agent (agv), the same options otherwise."""
     def make(m: str) -> Any:
         from .. import backends
+        from ..llm import create_runner
         opts = dict(options)
         if "agent" in getattr(backends.get(backend), "options", ()):
             opts["agent"] = RT.TRIAGE_AGENT
-        return backends.create(backend, m, opts, {"cwd": str(root), "timeout_s": 600, "state_dir": str(state)})
+        return create_runner(backend, m, opts, {"cwd": str(root), "timeout_s": 600, "state_dir": str(state)})
     return make
 
 
@@ -670,8 +672,8 @@ def _run_one(root: Path, raw_item: dict[str, Any], *, backend: str, model: str, 
     cfg = K.load(Path(root), config)
     item = make_item(raw_item, cfg)
     if runner is None:
-        from .. import backends
-        runner = backends.create(backend, model, dict(options or {}),
+        from ..llm import create_runner
+        runner = create_runner(backend, model, dict(options or {}),
                                  {"cwd": str(root), "timeout_s": kw.pop("turn_timeout_s", 600), "state_dir": str(state_dir or Path(root) / ".ga" / "act")})
     if hasattr(runner, "cache_prefix"):
         runner.cache_prefix = True  # anthropic_http: the system text (the stable prefix) carries cache_control

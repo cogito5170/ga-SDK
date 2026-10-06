@@ -28,7 +28,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, TextIO
 
+from . import llm as L
 from .adapters.gemini_cli import DEFAULT_MODEL, GeminiError
+from .llm import create_runner
 from .forms import FormError, Problem
 
 CONFIG_SCHEMA = "ga-gemini/1"          # `ga gemini`'s config (kept: an alias form, CMD-GA28 S4)
@@ -242,8 +244,9 @@ def supervise_problems(raw: Any, backend: str | None = None) -> list[Problem]:
     if p:
         return p
     from . import backends
+    from .llm import create_runner
     try:
-        backends.create(name, raw["model"], opts, {"cwd": None})
+        create_runner(name, raw["model"], opts, {"cwd": None})
     except KeyError as e:
         p.append(Problem("$.backend", str(e).strip("'\"")[:200]))
     except backends.ConfigError as e:
@@ -722,7 +725,7 @@ class Supervisor:
             else:
                 opts = {"cli": cfg.cli}
             try:
-                cli = backends.create(self.backend, self.model, opts, {"cwd": str(cfg.root), "timeout_s": cfg.turn_timeout_s,
+                cli = create_runner(self.backend, self.model, opts, {"cwd": str(cfg.root), "timeout_s": cfg.turn_timeout_s,
                                                                     "state_dir": self.dir})
             except (KeyError, backends.ConfigError) as e:
                 raise FormError([Problem("$.backend" if isinstance(e, KeyError) else "$.model",
@@ -916,7 +919,8 @@ class Supervisor:
             self.say(f"[ga gemini] {sid}: the server failed the turn ({e.reason}); one retry in {b:g} s")
             self.log("transient", step=sid, reason=e.reason, backoff_s=b, kind=kind)
         try:
-            turn = retry_transient(lambda: self.cli.run_turn(prompt, self.st.get("session_id"),
+            turn = retry_transient(lambda: L.run_turn(self.cli, prompt, self.st.get("session_id"),
+                                                      purpose="probe", item_id=str(sid), model=self.model,
                                                              on_wait=self._turn_wait(sid),
                                                              wait_every_s=self.cfg.turn_status_s, **extra),
                                    backoff_s=self.cfg.transient_backoff_s, sleep=self._sleep, on_retry=retry_line)

@@ -222,6 +222,53 @@ class Gateway:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
         return Result(REFUSED, reason=reason)
 
+    # -- a gated turn on a runner (session-bound: no rule cache; refusals raise BackendError so callers' labels hold)
+    def turn(self, runner: Any, prompt: str, session: str | None = None, *, purpose: str, item_id: str = "-",
+             model: str = "", system: str | None = None, **kw: Any) -> Any:
+        from ..backends.base import BackendError, ModelMismatch, RateLimited, Transient
+        size = len(((system or "") + prompt).encode("utf-8"))
+        policy = pol.load(self.cfg.policy_path)
+        base = {"purpose": purpose, "item_id": item_id, "requested_model": model, "served_model": None,
+                "input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0, "usd": 0.0,
+                "card_bytes": size, "policy_sha256": policy.sha256,
+                "fingerprint": fingerprint(purpose, system or "", prompt, self.cfg.sdk_sha, model, policy.sha256)}
+        c = Card(system or "", prompt)
+        if size > self.cfg.card_max_bytes and session is None:
+            self._refuse(base, c, "card_size", {"card_bytes": size, "max": self.cfg.card_max_bytes}, policy)
+            raise BackendError("card_size")
+        est = estimate_usd(size, model, self.cfg.est_output_tokens)
+        verdict = self._check_caps(policy, purpose, item_id, est)
+        if verdict is not None:
+            status, reason = verdict
+            if status == NEEDS_JUDGMENT:
+                self.ledger.append({**base, "outcome": REFUSED, "label": NEEDS_JUDGMENT, "reason": reason})
+                raise BackendError(NEEDS_JUDGMENT)
+            self._refuse(base, c, "budget", reason, policy)
+            raise BackendError("budget_refused:" + str(reason.get("cap")))
+        try:
+            out = runner.run_turn(prompt, session, **({"system": system} if system is not None else {}), **kw)
+        except (RateLimited, Transient) as e:  # not served, not billed
+            self.ledger.append({**base, "outcome": ERROR, "label": str(getattr(e, "reason", "") or "backend")[:80]})
+            raise
+        except ModelMismatch:
+            self.ledger.append({**base, "usd": round(est, 8), "outcome": ERROR, "label": "served-model mismatch"})
+            raise
+        except BackendError as e:
+            reason = str(getattr(e, "reason", "") or "")
+            label = "timeout" if "timeout" in reason.lower() else "refusal" if "refus" in reason.lower() else "backend"
+            self.ledger.append({**base, "usd": round(est, 8), "estimate_usd": round(est, 8), "outcome": ERROR,
+                                "label": label})
+            raise
+        served = list(getattr(out, "served", []) or [])
+        toks, usd = actual_usd(getattr(out, "usage", None), getattr(out, "usage_format", None), model)
+        usd = est if usd is None else usd
+        self.ledger.append({**base, "served_model": served[0] if served else None,
+                            "input_tokens": toks.get("input", 0), "output_tokens": toks.get("output", 0),
+                            "cache_read_tokens": toks.get("cache_read", 0),
+                            "cache_write_tokens": toks.get("cache_write", 0), "usd": round(usd, 8),
+                            "estimate_usd": round(est, 8), "outcome": OK})
+        return out
+
     # -- the backend call
     def _invoke(self, base, c: Card, model: str, est: float, fp: str, policy) -> Result:
         from ..backends.base import BackendError, ModelMismatch
@@ -281,3 +328,17 @@ def default_gateway(config: GatewayConfig | None = None, runner_factory: Callabl
 
 def call(card: Any, purpose: str, item_id: str, model_hint: str, *, gateway: Gateway | None = None) -> Result:
     return (gateway or default_gateway()).call(card, purpose, item_id, model_hint)
+
+
+def run_turn(runner: Any, prompt: str, session: str | None = None, *, purpose: str, item_id: str = "-",
+             model: str = "", system: str | None = None, gateway: Gateway | None = None, **kw: Any) -> Any:
+    """The only place a model turn is taken on a runner: budget caps, ledger, shadow refusal (see Gateway.turn)."""
+    return (gateway or default_gateway()).turn(runner, prompt, session, purpose=purpose, item_id=item_id, model=model,
+                                               system=system, **kw)
+
+
+def create_runner(backend: str, model: str, options: dict[str, Any] | None = None,
+                  ctx: dict[str, Any] | None = None) -> Any:
+    """The only place a backend runner is made (ga.backends.create); its turns go through ``run_turn`` here."""
+    from .. import backends
+    return backends.create(backend, model, dict(options or {}), dict(ctx or {}))
