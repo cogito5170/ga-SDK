@@ -108,6 +108,12 @@ class Asker:
         else:
             eng = self.engine_factory(lambda s: None)
             m = I.route(q)
+            if m.intent is not None and m.intent.name == "setup":  # a code answer: 0 tokens, nothing to confirm
+                lines: list[str] = []
+                eng = self.engine_factory(lines.append)
+                eng.execute("setup", confirmed=True)
+                return 200, {"answer": redact("\n".join(lines)), "code": True,
+                             "cost_estimate": {"cost": "free", "input_tokens": 0, "turns": 0}}
             if m.intent is not None:
                 p = eng.prepare(m.intent.name)
                 if p["refuse"]:

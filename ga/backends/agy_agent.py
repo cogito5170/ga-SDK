@@ -24,12 +24,21 @@ INSTRUCTION = ("You answer with exactly one JSON block, in the form the prompt g
                "You use no tools: you read no files and run no commands; everything you need is in the prompt.")
 
 
+ASK_INSTRUCTION = ("You answer the user's question in plain, short sentences, in the language of the question, from the "
+                   "context given in the prompt only. If the context does not say, you say you do not know; you never "
+                   "invent facts. You use no tools: you read no files and run no commands.")
+
+
 def files(name: str) -> dict[str, str]:
     """The plugin's files, relative path -> text."""
     manifest = {"name": name, "version": "1.0.0",
                 "description": "GA Engine plan agent: no tools, one JSON block in the given form"}
-    agent = (f"---\nname: {name}\ndescription: GA Engine plan turns. Answers with one JSON block in the given form; "
-             f"uses no tools.\ntools: []\n---\n\n{INSTRUCTION}\n")
+    ask = name == "ga-ask"
+    manifest["description"] = ("GA Engine ask agent: no tools, short answers from the given context only" if ask
+                               else manifest["description"])
+    desc = ("GA Engine ask turns. Short answers from the given context only; uses no tools." if ask else
+            "GA Engine plan turns. Answers with one JSON block in the given form; uses no tools.")
+    agent = f"---\nname: {name}\ndescription: {desc}\ntools: []\n---\n\n{ASK_INSTRUCTION if ask else INSTRUCTION}\n"
     return {".claude-plugin/plugin.json": json.dumps(manifest, indent=2) + "\n", f"agents/{name}.md": agent}
 
 
@@ -83,4 +92,4 @@ def main(argv: list[str] | None = None, *, run=subprocess.run, out=None) -> int:
     return 0
 
 
-__all__ = ["DEFAULT_NAME", "DEFAULT_DIR", "INSTRUCTION", "files", "write", "install_argv", "main"]
+__all__ = ["DEFAULT_NAME", "DEFAULT_DIR", "INSTRUCTION", "ASK_INSTRUCTION", "files", "write", "install_argv", "main"]

@@ -23,7 +23,7 @@ from typing import Any, Callable
 
 from ..runlog import RunLog, redact
 from . import intents as I
-from .store import DayTurns, Ledger, home as default_home, settings as load_settings
+from .store import SOLVE_DEFAULT, DayTurns, Ledger, home as default_home, settings as load_settings
 
 EXIT = {"ok": 0, "unmatched": 1, "declined": 1, "error": 2, "cap": 3}
 
@@ -149,6 +149,29 @@ class Engine:
             return e.code
 
     # -- free actions ------------------------------------------------------------------------------------------------
+    def do_setup(self) -> int:
+        """Setup facts by code from the config and ``agy models``; no model turn, no secret (names only)."""
+        from . import model as M
+        st = self.settings
+        agent = (st.get("ask_agent") or M.ASK_AGENT) if not st.get("agy_cli") else "(settings agy_cli)"
+        self.show(f"묻기 모델: {st.get('ask_model') or SOLVE_DEFAULT['model']} · 묻기 에이전트: {agent}")
+        try:
+            cfg = self.bridge_cfg()
+            raw = json.loads((Path(cfg["workdir"]) / cfg["supervise_config"]).read_text(encoding="utf-8"))
+            opts = raw.get("options") if isinstance(raw.get("options"), dict) else {}
+            self.show(f"실행 모델: {raw.get('model') or '?'} · 실행 옵션: "
+                      f"{', '.join(f'{k}={v}' for k, v in opts.items() if isinstance(v, (str, int, float))) or '(없음)'}")
+        except (Refused, OSError, ValueError, KeyError, TypeError):
+            self.show("실행 모델: 브리지 설정을 읽지 못했습니다")
+        self.show(f"오늘 agy 턴: {self.day.used()} / 한도 {self.day.cap}")
+        base = list(st.get("agy_cli") or ["agy"])
+        if "--agent" in base:
+            i = base.index("--agent")
+            base = base[:i] + base[i + 2:]
+        slugs = M.list_models(base)
+        self.show("agy models: " + (", ".join(slugs) if slugs else "목록을 가져오지 못했습니다"))
+        return 0
+
     def do_help(self) -> int:
         self.show("ga ask — 이렇게 물어보세요 (모델 없이 규칙으로 고릅니다):")
         for it in I.TABLE:
@@ -329,10 +352,20 @@ class Engine:
         if self.day.left() < 1:
             self.show(f"오늘 agy 턴 한도({self.day.cap})를 다 썼습니다")
             return EXIT["cap"]
+        from . import model as M
+        if not self.settings.get("agy_cli"):
+            name = self.settings.get("ask_agent") or M.ASK_AGENT
+            if M.agent_installed(name) is False:
+                self.show(M.install_hint(name))
+                return EXIT["error"]
         self.day.add(1)  # counted before the call: a failed turn is spent too
         try:
-            r = one_turn(p["text"], cli=self.settings.get("agy_cli"), model=self.settings.get("ask_model"))
+            r = one_turn(p["text"], cli=M.ask_cli(self.settings), model=self.settings.get("ask_model"))
         except ModelTurnError as e:
+            if e.reason == "agent_missing":
+                self.day.refund(1)
+                self.show(M.install_hint(self.settings.get("ask_agent") or M.ASK_AGENT))
+                return EXIT["error"]
             self.show(f"agy 1턴 실패: {e.reason}")
             return EXIT["error"]
         u = r["usage"]
@@ -343,6 +376,9 @@ class Engine:
         if r["denied"]:
             self.show(f"agy가 도구를 쓰려다 거부됨: {', '.join(r['denied'][:8])}")
         self.show(f"입력 {inp:,} · 출력 {outp:,} 토큰 · {r['seconds']:g}초")
+        warn = M.input_warning(inp, self.settings.get("ask_agent") or M.ASK_AGENT)
+        if warn:
+            self.show("⚠ " + warn)
         return 0
 
     # -- solve -------------------------------------------------------------------------------------------------------

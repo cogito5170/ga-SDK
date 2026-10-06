@@ -722,7 +722,15 @@ async function askPlan() {
   S.ask.plan = null;
   changed("askbox"); changed("ask");
   try {
-    S.ask.plan = { ...(await api("/api/ask", { q, mode: S.ask.mode })), q, mode: S.ask.mode };
+    const got = { ...(await api("/api/ask", { q, mode: S.ask.mode })), q, mode: S.ask.mode };
+    if (got.answer !== undefined) {  // a code answer: 0 tokens, no confirm step
+      S.ask.plan = null;
+      S.ask.said = { text: got.answer, code: true };
+      S.past.unshift({ q, mode: got.mode, cost: got.cost_estimate, status: "답함", say: got.answer, at: new Date().toISOString() });
+      S.past.length = Math.min(S.past.length, 20);
+      savePast();
+      changed("past");
+    } else S.ask.plan = got;
   } catch (e) {
     const why = e.body && (e.body.refuse || e.body.error);
     S.ask.said = { fail: true, text: why ? `돌릴 수 없어요: ${why}` : `비용을 보지 못했어요 (${e.message}).` };
@@ -780,7 +788,8 @@ const ASK = {
   },
   cost() {
     const p = S.ask.plan;
-    const said = S.ask.said ? h("p", { class: "said" + (S.ask.said.fail ? " fail" : ""), role: "status" }, S.ask.said.text)
+    const said = S.ask.said ? h("p", { class: "said" + (S.ask.said.fail ? " fail" : ""), role: "status" },
+      S.ask.said.code ? [h("b", { class: "code-answer" }, "코드 답 · 0 토큰"), h("br"), S.ask.said.text] : S.ask.said.text)
       : h("p", { class: "said", role: "status" });
     if (!p) return section("cost", "비용 먼저", null, said, h("p", { class: "note" }, "물음을 쓰고 비용 보기를 누르면, 돌리기 전에 여기에 먼저 보여 드려요."));
     const c = p.cost_estimate || {};
@@ -803,7 +812,8 @@ const ASK = {
     const r = S.run;
     if (!r) return null;
     return section("run", "돌리는 중", null, h("div", { class: "row" }, r.done ? state("ok", "끝남") : state("live", "도는 중"), h("h3", null, r.q)),
-      h("pre", { class: "out", role: "log", "aria-label": "돌린 결과" }, r.lines.length ? r.lines.join("\n") : "…"));
+      h("pre", { class: "out", role: "log", "aria-label": "돌린 결과" }, r.lines.length ? r.lines.filter((x) => !x.startsWith("⚠ ")).join("\n") : "…"),
+      r.lines.filter((x) => x.startsWith("⚠ ")).map((x) => h("p", { class: "note warn" }, x.slice(2))));
   },
   past() {
     const l = S.past;

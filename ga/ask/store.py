@@ -70,6 +70,13 @@ class DayTurns:
                              encoding="utf-8")
 
 
+    def refund(self, n: int) -> None:
+        """Give back turns counted before a call that never reached a model."""
+        if n > 0 and self.used() > 0:
+            self.path.write_text(json.dumps({"date": today(self.clock), "agy_turns": max(self.used() - int(n), 0)}) + "\n",
+                                 encoding="utf-8")
+
+
 class Ledger:
     """``ledger.jsonl``: one row per run that spent model tokens."""
 
