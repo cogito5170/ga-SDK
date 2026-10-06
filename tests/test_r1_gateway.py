@@ -208,3 +208,24 @@ def test_report(tmp_path, capsys):
     from ga.__main__ import main
     assert main(["llm", "report", "--hour", "--policy", cfg.policy_path, "--home", cfg.home]) == 0
     assert json.loads(capsys.readouterr().out)["caps"][pol.TOTAL_H]["limit"] == 5.0
+
+
+def test_estimate_counts_against_the_cap_exactly(tmp_path):
+    from ga.llm.gateway import estimate_usd
+    est = estimate_usd(CARD.size(), MODEL, 2000)
+    gw, log, cfg = make(tmp_path, caps={pol.TOTAL_H: 1.0 + est - 0.0005, pol.TOTAL_DAY: 99})
+    seed(cfg, "probe", 1.0)
+    assert gw.call(CARD, "probe", "i", MODEL).status == "refused"
+    write_policy(tmp_path, {pol.TOTAL_H: 1.0 + est + 0.0005, pol.TOTAL_DAY: 99})
+    assert gw.call(CARD, "probe", "i", MODEL).status == "ok"
+
+
+def test_gated_turn_refuses_without_calling_and_raises(tmp_path):
+    from ga.backends.base import BackendError
+    gw, log, cfg = make(tmp_path)
+    seed(cfg, "probe", 50.0)
+    with pytest.raises(BackendError) as e:
+        gw.turn(Runner(log), "p", None, purpose="probe", item_id="i", model=MODEL)
+    assert e.value.reason.startswith("budget_refused:") and not log and shadow_rows(cfg)
+    seed(cfg, "intake", 0.0)
+    gw2, log2, cfg2 = make(tmp_path / "ok")  if False else (gw, log, cfg)
