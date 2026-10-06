@@ -214,6 +214,22 @@ class Ladder(unittest.TestCase):
         self.assertEqual(d["rungs"], res.rungs)
         self.assertEqual(set(d["rungs"][0]), {"model", "status", "reason", "turns", "tokens"})
 
+    def test_a_tree_that_starts_with_a_removed_file_restarts_each_rung_from_that_state(self):
+        # the agy bridge removes an item's `rewrite` files before ga act (BD-450); a ladder must keep that start
+        root, state = self.repo()
+        (root / "calc.py").unlink()
+        seen = {}
+
+        def rung2(prompt, system):
+            seen["calc_exists"] = (root / "calc.py").exists()
+            seen["junk"] = (root / "junk.py").exists()
+            return "NEW calc.py\n" + CALC
+        rung1 = "NEW calc.py\nbroken(\nNEW junk.py\nprint('rung 1')\n"
+        res, made = self.ladder(root, state, {"cheap": Fake([rung1]), "mid": Fake([rung2])}, ladder="cheap,mid",
+                                max_turns=1)
+        self.assertEqual(made, ["cheap", "mid"], res.rungs)
+        self.assertEqual(seen, {"calc_exists": False, "junk": False})  # rung 2 starts with calc.py removed again
+
     def test_rung1_done_never_runs_rung2(self):
         root, state = self.repo()
         res, made = self.ladder(root, state, {"cheap": Fake([FIX]), "mid": Fake(["BLOCKED x\n"])})

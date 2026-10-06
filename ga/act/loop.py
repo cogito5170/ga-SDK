@@ -392,9 +392,10 @@ class Tree:
         import subprocess
         self.root, self.keep = Path(root), [Path(k).resolve() for k in keep]
         self._sp = subprocess
-        if self._git("diff", "HEAD", "--quiet").returncode != 0:
-            raise K.ActConfigError("a ladder needs a clean worktree (no changes to tracked files) to restart rungs from")
         self.head = self._git("rev-parse", "HEAD").stdout.strip()
+        # the tree may start with changes to tracked files (the agy bridge removes an item's `rewrite` files before
+        # ga act, BD-450): keep them as a binary patch and put them back on every restore
+        self.start = self._git("diff", "HEAD", "--binary").stdout
         self.untracked = set(self._others())
 
     def _git(self, *a: str) -> Any:
@@ -406,6 +407,9 @@ class Tree:
     def restore(self) -> None:
         if self._git("reset", "-q", "--hard", self.head).returncode != 0:
             raise K.ActConfigError("the ladder could not reset the worktree")
+        if self.start and self._sp.run(["git", "apply", "--binary", "-"], cwd=self.root, input=self.start,
+                                       capture_output=True, text=True, timeout=120).returncode != 0:
+            raise K.ActConfigError("the ladder could not put back the worktree's starting changes")
         for rel in self._others():
             f = (self.root / rel).resolve()
             if rel in self.untracked or any(f == k or k in f.parents for k in self.keep):
