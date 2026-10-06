@@ -24,12 +24,23 @@ Decisions page (`/api/ops`) show the newest decisions.
   later tick checks it. A definite failure, or no result by the deadline, re-enters one rung higher (the spec's
   `escalate`: retry -> the next ladder rung; send-back -> alert). The same `(rule, subject, action)` failing twice
   sends one `blocked` alert, and ops leaves that subject alone. Nothing retries without bound.
-- **Model** (S4): only for an anomaly that no rule matches. The evidence card has a fixed size (at most 1,500 tokens
-  by `ga.ctxpack.tokens`, no history). It gets one turn per tick, on the cheapest `ga.act.route.LADDER` rung that a
-  ledger or shadow row shows answering. The answer must be one action name from the table; anything else becomes an
-  `unclassified` alert. Every turn is one row in `ops/ledger/<UTC day>.jsonl`, with tokens.
+- **Model** (S4, S6): only for anomalies that no rule (table or learned) matches. When a rule matches, ops makes
+  zero model calls. All such items in one tick go into ONE call: a fixed prompt prefix (the instruction and the
+  table's actions, byte-identical on every call so it caches), then one capped evidence line per item (`ITEM n: ...`,
+  no history). The batch is at most `tune.batch` items; the rest wait for the next tick. A one-item card is at most
+  1,500 tokens. The call goes to the cheapest `ga.act.route.LADDER` rung that a ledger or shadow row shows
+  answering (or the tuned rung). The answer is one line `<n> <action>` per item. An item with no valid action gets
+  an `unclassified` alert.
+- **Ledger** (S6): one row per call in `ops/ledger/<UTC day>.jsonl`: input, output, cache_read, cache_write, n_items,
+  tokens_per_item, rung, item_bytes, card_bytes.
+- **Token loop** (S6, `ops/optimize.jsonl` records every step). After each call, code (no model) compares
+  tokens_per_item to `tune.threshold` (800). Over it, ops tries the next change in this order: a smaller card
+  (`item_bytes` halved, floor 150), a cheaper rung (one LADDER step down), a larger batch (doubled, at most 32). The
+  next call measures the change: lower tokens per item keeps it, anything else reverts it. When the model gives the
+  same action `promote_n` (3) times in a row for one observation shape (src, decision, judge_class, error kind, no
+  tokens, descends, survivors), that becomes a learned rule/1 in `ops/state.json`, and that shape needs no model.
 
-Files: `<ga dir>/ops/state.json`, `decisions.jsonl`, `ledger/`.
+Files: `<ga dir>/ops/state.json`, `decisions.jsonl`, `optimize.jsonl`, `ledger/`.
 
 ## O2: why a shadow decision can end ASK_HUMAN with no tokens, no served model and no error
 

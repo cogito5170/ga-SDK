@@ -25,7 +25,11 @@ TABLE = Path(__file__).with_name("table.json")
 OPS_TO = "baseline-ops"
 OPS_FROM = "ga-ops"
 CARD_TOKENS = 1500           # S4: the evidence card's cap (ga.ctxpack.tokens: ceil(bytes / 4))
-MODEL_TURNS_PER_TICK = 1
+# S6: the token loop's knobs (st["tune"]) and their bounds; a call over THRESHOLD tokens per item tries one change
+TUNE = {"item_bytes": 600, "batch": 8, "rung": None, "threshold": 800, "promote_n": 3}
+ITEM_BYTES_MIN, BATCH_MAX = 150, 32
+STEPS = ("smaller_card", "cheaper_rung", "larger_batch")
+ANSWER = re.compile(r"^\s*(\d+)\s*[:.)-]?\s*([A-Za-z_]+)")
 SURVIVED = re.compile(r"^mutation (?P<label>.+?) survived: tests (?P<tests>.*?) do not cover it")
 RISKS = ("low", "medium", "high")
 
@@ -143,6 +147,9 @@ def observe(ga_dir: Path, conf: dict[str, Any], cache: dict[str, Any] | None = N
                     "served": r.get("served"), "model": r.get("served") or r.get("model_resolved"),
                     "needs": list(r.get("needs") or []), "survivors": survivors(r.get("needs") or []),
                     "descends": d, "base_ref": ref})
+        o = out[-1]  # the shape fields learned rules match on (S6)
+        o.update(error_kind=str(o["error"]).split(":", 1)[0] if o["error"] else None, no_tokens=o["tokens_in"] is None,
+                 has_survivors=bool(o["survivors"]))
     return out
 
 
@@ -238,8 +245,10 @@ class Ops:
     def load_state(self) -> dict[str, Any]:
         f = self.dir / "state.json"
         st = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
-        for k in ("pending", "failures", "alerts", "blocked", "done", "descends"):
+        for k in ("pending", "failures", "alerts", "blocked", "done", "descends", "learned"):
             st.setdefault(k, {})
+        st.setdefault("rules", [])
+        st["tune"] = {**TUNE, **(st.get("tune") or {})}
         return st
 
     def save_state(self, st: dict[str, Any]) -> None:
@@ -260,6 +269,7 @@ class Ops:
     def tick(self, dry_run: bool = False) -> list[dict[str, Any]]:
         """VERIFY the pending actions, then decide each new anomaly. Returns this tick's decision rows."""
         self.out, self.dry, self.model_turns = [], dry_run, 0
+        ask: list[dict[str, Any]] = []
         st = self.load_state()
         obs = observe(self.ga, self.conf, st["descends"])
         by = {o["subject"]: o for o in obs}
@@ -271,15 +281,18 @@ class Ops:
                 continue
             if not anomalous(o):
                 continue
-            rule = match(self.table, o)
-            handled = True
-            if rule is not None:
-                self._act(st, o, rule["action"], rule=rule["id"], kind=rule["kind"],
-                          evidence={k: o.get(k) for k in rule.get("evidence", [])})
-            else:
-                handled = self._model_decides(st, o)
-            if handled and not dry_run and s not in st["pending"]:
+            rule = match(self.table, o) or match({"rules": st["rules"]}, o)
+            if rule is None:
+                ask.append(o)  # S6: every item that needs a model goes into this tick's one call
+                continue
+            self._act(st, o, rule["action"], rule=rule["id"], kind=rule["kind"],
+                      evidence={k: o.get(k) for k in rule.get("evidence", [])})
+            if not dry_run and s not in st["pending"]:
                 st["done"][s] = self._fingerprint(o)
+        if ask:
+            for o in self._model_batch(st, ask):
+                if not dry_run and o["subject"] not in st["pending"]:
+                    st["done"][o["subject"]] = self._fingerprint(o)
         if not dry_run:
             self.save_state(st)
         return self.out
@@ -461,23 +474,33 @@ class Ops:
         self._act(st, o, nxt, rule=rule, kind=kind, evidence={"after": why[:200]},
                   rung=rung + 1 if nxt == action else 0)
 
-    # ------------------------------------------------------------ model (S4)
-    def evidence_card(self, o: dict[str, Any]) -> str:
-        """Fixed size, no history: the table's action names, then this one observation; cut to CARD_TOKENS."""
-        from ..ctxpack import tokens
-        acts = "\n".join(f"- {n} ({a['risk']}): {a['description']}" for n, a in self.table["actions"].items())
+    # ------------------------------------------------------------ model (S4, S6)
+    PREFIX = ("You are ga ops. Each ITEM below is an operational anomaly that matched no rule. For every item answer one "
+              "line '<item number> <action name>' with an action name from the list, nothing else.\n\n## actions\n")
+
+    def _item(self, n: int, o: dict[str, Any], cap: int) -> str:
         fields = {k: o.get(k) for k in ("id", "rev", "sha", "judge_class", "decision", "error", "tokens_in", "served",
                                          "model", "descends", "base_ref")}
-        body = ("You are ga ops. An operational anomaly matched no rule. Answer with exactly one action name from the "
-                "list, nothing else.\n\n## actions\n" + acts + "\n\n## observation\n"
-                + json.dumps(fields, ensure_ascii=False, sort_keys=True)[:1200]
-                + "\nasks: " + "; ".join(str(x)[:200] for x in o.get("asks", [])[:3])
-                + "\nneeds: " + "; ".join(str(x)[:160] for x in o.get("needs", [])[:6]) + "\n")
-        cap = CARD_TOKENS * 4
-        raw = body.encode("utf-8")
-        card = body if len(raw) <= cap else raw[:cap - 4].decode("utf-8", "ignore") + "\n..."
-        assert tokens(card) <= CARD_TOKENS
-        return card
+        text = (f"ITEM {n}: " + json.dumps(fields, ensure_ascii=False, sort_keys=True)
+                + " asks: " + "; ".join(str(x)[:200] for x in o.get("asks", [])[:3])
+                + " needs: " + "; ".join(str(x)[:160] for x in o.get("needs", [])[:6]))
+        raw = text.encode("utf-8")
+        return text if len(raw) <= cap else raw[:cap - 3].decode("utf-8", "ignore") + "..."
+
+    def batch_card(self, items: list[dict[str, Any]], item_bytes: int) -> str:
+        """S6: one fixed prompt prefix (the table's actions; byte-identical every call, so it caches) + one capped
+        evidence line per item, no history. The prefix itself is cut to CARD_TOKENS."""
+        acts = "\n".join(f"- {n} ({a['risk']}): {a['description']}" for n, a in self.table["actions"].items())
+        head = self.PREFIX + acts + "\n\n## items\n"
+        cap = CARD_TOKENS * 4 - TUNE["item_bytes"] - 16  # room for one item: a one-item card stays <= CARD_TOKENS
+        raw = head.encode("utf-8")
+        if len(raw) > cap:
+            head = raw[:cap - 5].decode("utf-8", "ignore") + "\n...\n"
+        return head + "\n".join(self._item(n, o, item_bytes) for n, o in enumerate(items, 1)) + "\n"
+
+    def evidence_card(self, o: dict[str, Any]) -> str:
+        """The one-item card (S4: at most CARD_TOKENS)."""
+        return self.batch_card([o], TUNE["item_bytes"])
 
     def cheapest_working(self) -> str:
         """The cheapest LADDER rung that some ledger row shows answering (no error, tokens counted); else hub.json's."""
@@ -496,39 +519,115 @@ class Ops:
         best = [m for m in LADDER if m in worked]
         return best[0] if best else resolve_model(self.conf)["resolved"]
 
-    def _model_decides(self, st: dict[str, Any], o: dict[str, Any]) -> bool:
-        """False when this tick's model turns are spent (the next tick asks)."""
-        if self.model_turns >= MODEL_TURNS_PER_TICK:
-            return False
-        card = self.evidence_card(o)
-        model = self.cheapest_working()
+    def _model_batch(self, st: dict[str, Any], items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """S6: at most ONE model call per tick for every item no rule matched (up to the tuned batch size; the rest
+        wait for the next tick). Returns the items handled."""
+        tune = st["tune"]
+        items = items[:max(1, int(tune["batch"]))]
+        model = tune.get("rung") or self.cheapest_working()
+        card = self.batch_card(items, int(tune["item_bytes"]))
         if self.dry:
-            self._log({"subject": o["subject"], "id": o.get("id"), "rule": None, "action": None, "model_turn": True,
-                       "result": f"dry run: would ask {model}"})
-            self.model_turns += 1
-            return True
+            for o in items:
+                self._log({"subject": o["subject"], "id": o.get("id"), "rule": None, "action": None, "model_turn": True,
+                           "result": f"dry run: would ask {model} ({len(items)} items, one call)"})
+            return items
         self.model_turns += 1
         t0, err, out = time.time(), None, {"answer": "", "usage": None, "served": None}
         try:
             out = self.fx.model_turn(card, model)
-        except Exception as e:  # noqa: BLE001 -- a label, and the anomaly is alerted
+        except Exception as e:  # noqa: BLE001 -- a label, and each item is alerted
             err = f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200]
         names = set(self.table["actions"])
-        words = re.findall(r"[A-Za-z_]+", out["answer"] or "")
-        pick = next((w for w in words if w in names), None)
+        picks: dict[int, str] = {}
+        for line in str(out.get("answer") or "").splitlines():
+            m = ANSWER.match(line)
+            if m and m[2] in names and 1 <= int(m[1]) <= len(items):
+                picks.setdefault(int(m[1]), m[2])
         u = out.get("usage") or {}
+        tin, tout = u.get("input"), u.get("output")
+        tpi = round(((tin or 0) + (tout or 0)) / len(items), 1) if isinstance(tin, int) else None
         from .. import l0
         l0.append(self.dir / "ledger" / f"{self.day()}.jsonl",
-                  {"at": iso(self.clock()), "kind": "ops", "subject": o["subject"], "id": o.get("id"), "model": model,
-                   "served": out.get("served"), "input": u.get("input"), "output": u.get("output"),
-                   "card_tokens": len(card.encode("utf-8")) // 4 + 1, "seconds": round(time.time() - t0, 3),
-                   "error": err, "answer": pick})
-        if pick is None:
-            self._act(st, {**o, "asks": [f"no rule and the model gave no action ({err or 'no action name'})"]},
-                      "alert_ops", rule="model", kind="unclassified", evidence={"model": model}, model_turn=True)
-            return True
-        self._act(st, o, pick, rule="model", kind="model", evidence={"model": model}, model_turn=True)
-        return True
+                  {"at": iso(self.clock()), "kind": "ops", "subjects": [o["subject"] for o in items], "rung": model,
+                   "model": model, "served": out.get("served"), "input": tin, "output": tout,
+                   "cache_read": u.get("cache_read"), "cache_write": u.get("cache_write"), "n_items": len(items),
+                   "tokens_per_item": tpi, "item_bytes": int(tune["item_bytes"]), "card_bytes": len(card.encode("utf-8")),
+                   "seconds": round(time.time() - t0, 3), "error": err, "answers": len(picks)})
+        for n, o in enumerate(items, 1):
+            pick = picks.get(n)
+            if pick is None:
+                self._act(st, {**o, "asks": [f"no rule and the model gave no action ({err or 'no action name'})"]},
+                          "alert_ops", rule="model", kind="unclassified", evidence={"model": model}, model_turn=True)
+                continue
+            self._act(st, o, pick, rule="model", kind="model", evidence={"model": model}, model_turn=True)
+            self._learn(st, o, pick)
+        if tpi is not None:
+            self._optimize(st, tpi, model)
+        return items
+
+    # ------------------------------------------------------------ the token loop (S6)
+    @staticmethod
+    def signature(o: dict[str, Any]) -> dict[str, Any]:
+        """The shape of an observation a learned rule matches on (no ids, no shas)."""
+        return {k: o.get(k) for k in ("src", "decision", "judge_class", "error_kind", "no_tokens", "descends",
+                                      "has_survivors")}
+
+    def _learn(self, st: dict[str, Any], o: dict[str, Any], action: str) -> None:
+        """A decision the model made promote_n times in a row for the same signature becomes a rule (no model)."""
+        sig = self.signature(o)
+        key = json.dumps(sig, sort_keys=True)
+        rec = st["learned"].get(key)
+        rec = rec if rec and rec.get("action") == action else {"action": action, "n": 0}
+        rec["n"] += 1
+        st["learned"][key] = rec
+        if rec["n"] < int(st["tune"]["promote_n"]) or any(r.get("sig") == key for r in st["rules"]):
+            return
+        when = {"all": [{"field": k, "null": True} if v is None else {"field": k, "eq": v} for k, v in sig.items()]}
+        rid = f"learned_{len(st['rules']) + 1}"
+        st["rules"].append({"schema": "rule/1", "id": rid, "kind": "learned", "action": action, "when": when,
+                            "evidence": ["id", "mail"], "sig": key})
+        self._step({"step": "promote", "rule": rid, "action": action, "after": rec["n"], "sig": sig})
+
+    def _step(self, row: dict[str, Any]) -> None:
+        row = {"at": iso(self.clock()), **row}
+        self.out.append({"subject": "optimize", **row})
+        self.dir.mkdir(parents=True, exist_ok=True)
+        with open(self.dir / "optimize.jsonl", "a", encoding="utf-8") as h:
+            h.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+
+    def _optimize(self, st: dict[str, Any], tpi: float, model: str) -> None:
+        """After a call: a running trial is kept only if tokens per item fell, else reverted. With no trial and
+        tokens per item over the threshold, try the next step: smaller card, cheaper rung, larger batch."""
+        tune = st["tune"]
+        trial = tune.pop("trial", None)
+        if trial is not None:
+            kept = tpi < trial["before"]
+            if not kept:
+                tune[trial["knob"]] = trial["old"]
+            self._step({"step": trial["step"], "result": "kept" if kept else "reverted", "knob": trial["knob"],
+                        "old": trial["old"], "new": trial["new"], "before": trial["before"], "after": tpi})
+            return
+        if tpi <= float(tune["threshold"]):
+            return
+        from ..act.route import LADDER
+        for k in range(len(STEPS)):
+            step = STEPS[(int(tune.get("next", 0)) + k) % len(STEPS)]
+            knob, old = {"smaller_card": "item_bytes", "cheaper_rung": "rung", "larger_batch": "batch"}[step], None
+            old = tune[knob]
+            if step == "smaller_card":
+                new = max(ITEM_BYTES_MIN, int(old) // 2)
+            elif step == "cheaper_rung":
+                i = LADDER.index(model) if model in LADDER else 0
+                new = LADDER[i - 1] if i > 0 else None
+            else:
+                new = min(BATCH_MAX, int(old) * 2)
+            if new is None or new == old or (step == "cheaper_rung" and new == model):
+                continue
+            tune[knob] = new
+            tune["trial"] = {"step": step, "knob": knob, "old": old, "new": new, "before": tpi}
+            tune["next"] = (STEPS.index(step) + 1) % len(STEPS)
+            self._step({"step": step, "result": "trying", "knob": knob, "old": old, "new": new, "before": tpi})
+            return
 
 
 def last_decisions(ga_dir: str | Path, n: int = 20) -> list[dict[str, Any]]:

@@ -1,6 +1,7 @@
 """CMD-GA57: ga ops tick — observe -> rule/1 -> guarded action-spec/1 -> VERIFY -> escalate; a model only when no rule matches."""
 import io
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -48,7 +49,12 @@ class FakeFx:
         if self.model_raises:
             raise AssertionError("no model turn may run here")
         self.model_calls.append((card, model))
-        return {"answer": self.answer, "usage": self.usage or {"input": 321, "output": 4}, "served": model}
+        n = len(re.findall(r"^ITEM \d+:", card, re.M))
+        ans = self.answer if not isinstance(self.answer, str) or "\n" in self.answer or self.answer[:1].isdigit() \
+            else "\n".join(f"{i} {self.answer}" for i in range(1, n + 1))
+        ans = ans(card, model) if callable(ans) else ans
+        usage = self.usage(card, model, n) if callable(self.usage) else self.usage
+        return {"answer": ans, "usage": usage or {"input": 321, "output": 4}, "served": model}
 
 
 def row(mail="to/baseline/r1.md", **kw):
@@ -346,10 +352,6 @@ class Model(Base):
         self.assertEqual(len(d), 1)
         self.assertTrue(d[0]["model_turn"])
         self.assertEqual(d[0]["action"], "alert_ops")
-        led = O.read_jsonl(self.ga / "ops" / "ledger" / "2026-09-21.jsonl")
-        self.assertEqual(len(led), 1)
-        self.assertEqual((led[0]["input"], led[0]["output"], led[0]["answer"]), (321, 4, "alert_ops"))
-        self.assertEqual(len(self.alerts("unclassified")), 0)
         self.assertEqual(len(self.alerts("model")), 1)
 
     def test_card_capped_whatever_the_table(self):
@@ -358,22 +360,125 @@ class Model(Base):
         from ga.ctxpack import tokens
         card = self.ops(table=t).evidence_card({"subject": "m", "asks": [], "needs": []})
         self.assertLessEqual(tokens(card), 1500)
-        self.assertTrue(card.endswith("\n..."))
+        self.assertIn("\n...\n", card)
 
-    def test_model_answer_outside_table_alerts_unclassified(self):
-        self.fx.answer = "I think you should reboot"
+    def test_three_items_one_call_fixed_prefix(self):
+        self.add(*[row(mail=f"to/baseline/r{k}.md", judge_class="insufficient") for k in range(3)])
+        self.fx.answer = "1 wait\n2 alert_ops\n3: wait"
+        out = self.ops().tick()
+        self.assertEqual(len(self.fx.model_calls), 1)
+        card = self.fx.model_calls[0][0]
+        self.assertEqual(len(re.findall(r"^ITEM \d+:", card, re.M)), 3)
+        self.assertTrue(card.startswith(O.Ops.PREFIX))
+        acts = {r["subject"]: r["action"] for r in out if r.get("rule") == "model"}
+        self.assertEqual(acts, {"to/baseline/r0.md": "wait", "to/baseline/r1.md": "alert_ops", "to/baseline/r2.md": "wait"})
+        # the next call's prefix is byte-identical (it caches)
+        self.add(row(mail="to/baseline/r9.md", judge_class="failure"))
+        self.ops().tick()
+        c2 = self.fx.model_calls[1][0]
+        p = c2.index("## items\n")
+        self.assertEqual(c2[:p], card[:p])
+
+    def test_ledger_fields(self):
+        self.fx.usage = {"input": 900, "output": 30, "cache_read": 700, "cache_write": 0}
+        self.add(row(judge_class="insufficient"), row(mail="to/baseline/r2.md", judge_class="insufficient"))
+        self.ops().tick()
+        led = O.read_jsonl(self.ga / "ops" / "ledger" / "2026-09-21.jsonl")
+        self.assertEqual(len(led), 1)
+        r = led[0]
+        self.assertEqual((r["input"], r["output"], r["cache_read"], r["cache_write"]), (900, 30, 700, 0))
+        self.assertEqual((r["n_items"], r["tokens_per_item"], r["rung"]), (2, 465.0, "gpt-oss-120b-medium"))
+
+    def test_batch_size_bounds_one_call_rest_next_tick(self):
+        self.add(*[row(mail=f"to/baseline/r{k}.md", judge_class="insufficient") for k in range(10)])
+        self.fx.answer = lambda card, model: "\n".join(f"{i} {'wait' if i % 2 else 'alert_ops'}" for i in range(1, 9))
+        self.ops().tick()
+        self.assertEqual(len(self.fx.model_calls), 1)
+        self.assertEqual(len(re.findall(r"^ITEM", self.fx.model_calls[0][0], re.M)), 8)
+        self.ops().tick()
+        self.assertEqual(len(re.findall(r"^ITEM", self.fx.model_calls[1][0], re.M)), 2)
+        self.ops().tick()
+        self.assertEqual(len(self.fx.model_calls), 2)
+
+    def test_answer_outside_table_alerts_unclassified(self):
+        self.fx.answer = "1 reboot"
         self.add(row(judge_class="insufficient"))
         self.ops().tick()
         self.assertEqual(len(self.alerts("unclassified")), 1)
 
-    def test_one_model_turn_per_tick(self):
-        self.add(row(judge_class="insufficient"), row(mail="to/baseline/r2.md", judge_class="insufficient"))
+    def _steps(self):
+        return O.read_jsonl(self.ga / "ops" / "optimize.jsonl")
+
+    def test_over_threshold_tries_smaller_card_and_regression_reverts(self):
+        self.fx.usage = {"input": 2000, "output": 10}  # 2010 per item > 800
+        self.add(row(mail="to/baseline/a.md", judge_class="insufficient"))
         self.ops().tick()
-        self.assertEqual(len(self.fx.model_calls), 1)
+        self.assertEqual(self.state()["tune"]["item_bytes"], 300)
+        self.assertEqual(self._steps()[-1]["result"], "trying")
+        self.fx.usage = {"input": 2500, "output": 10}  # worse: revert
+        self.add(row(mail="to/baseline/b.md", judge_class="insufficient"))
         self.ops().tick()
-        self.assertEqual(len(self.fx.model_calls), 2)
+        st = self.state()
+        self.assertEqual(st["tune"]["item_bytes"], 600)
+        self.assertNotIn("trial", st["tune"])
+        self.assertEqual(self._steps()[-1]["result"], "reverted")
+        # the next step in order: a cheaper rung (none below gpt-oss) is skipped -> larger batch
+        self.fx.usage = {"input": 2500, "output": 10}
+        self.add(row(mail="to/baseline/c.md", judge_class="insufficient"))
         self.ops().tick()
-        self.assertEqual(len(self.fx.model_calls), 2)
+        self.assertEqual(self._steps()[-1]["step"], "larger_batch")
+        self.assertEqual(self.state()["tune"]["batch"], 16)
+
+    def test_improvement_is_kept(self):
+        self.fx.usage = {"input": 2000, "output": 10}
+        self.add(row(mail="to/baseline/a.md", judge_class="insufficient"))
+        self.ops().tick()
+        self.fx.usage = {"input": 900, "output": 10}
+        self.add(row(mail="to/baseline/b.md", judge_class="insufficient"))
+        self.ops().tick()
+        self.assertEqual(self.state()["tune"]["item_bytes"], 300)
+        self.assertEqual(self._steps()[-1]["result"], "kept")
+
+    def test_cheaper_rung_step(self):
+        self.conf["model"] = "gemini-3.6-flash-medium"
+        self.fx.usage = {"input": 2000, "output": 10}
+        self.ops().tick()
+        st = self.ops().load_state()
+        st["tune"]["next"] = 1
+        self.ops().save_state(st)
+        self.add(row(judge_class="insufficient"))
+        self.ops().tick()
+        self.assertEqual(self.state()["tune"]["rung"], "gemini-3.6-flash-low")
+        self.add(row(mail="to/baseline/r2.md", judge_class="insufficient"))
+        self.ops().tick()
+        self.assertEqual(self.fx.model_calls[-1][1], "gemini-3.6-flash-low")
+
+    def test_repeated_decision_becomes_a_rule(self):
+        self.fx.answer = "wait"
+        for k in range(3):
+            self.add(row(mail=f"to/baseline/r{k}.md", judge_class="insufficient"))
+            self.ops().tick()
+        self.assertEqual(len(self.fx.model_calls), 3)
+        st = self.state()
+        self.assertEqual(len(st["rules"]), 1)
+        self.assertEqual(st["rules"][0]["action"], "wait")
+        self.assertEqual(self._steps()[-1]["step"], "promote")
+        self.fx.model_raises = True  # the same shape again: the learned rule, zero model calls
+        self.add(row(mail="to/baseline/r9.md", judge_class="insufficient"))
+        out = self.ops().tick()
+        self.assertEqual(out[0]["rule"], "learned_1")
+        # another shape still goes to the model
+        self.fx.model_raises = False
+        self.add(row(mail="to/baseline/rx.md", judge_class="failure"))
+        self.ops().tick()
+        self.assertEqual(len(self.fx.model_calls), 4)
+
+    def test_mixed_answers_do_not_promote(self):
+        for k, a in enumerate(["wait", "alert_ops", "wait"]):
+            self.fx.answer = a
+            self.add(row(mail=f"to/baseline/r{k}.md", judge_class="insufficient"))
+            self.ops().tick()
+        self.assertEqual(self.state()["rules"], [])
 
     def test_no_working_rung_uses_hub_model(self):
         self.assertEqual(self.ops().cheapest_working(), "gpt-oss-120b-medium")
