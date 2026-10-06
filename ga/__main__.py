@@ -558,7 +558,8 @@ OWN_PARSER = {"ask": "ga.ask:main", "bridge": "ga.bridge:main", "ui": "ga.ui:mai
               "agy-agent": "ga.backends.agy_agent:main",  # CMD-GA41 S4
               "console": "ga.console.server:main",  # CMD-CON2
               "plan": "ga.plan.cli:main",  # CMD-GA40
-              "vm": "ga.vm.cli:main"}  # CMD-OPS1
+              "vm": "ga.vm.cli:main",  # CMD-OPS1
+              "project": "ga.project.cli:main"}  # CMD-GA54
 
 
 def _own_argv(argv: list[str]) -> tuple[str, list[str]] | None:
@@ -708,6 +709,8 @@ def main(argv: list[str] | None = None) -> int:
                    "the planning lessons; written, never sent; `ga plan compare` (CMD-GA40)")
     sub.add_parser("vm", add_help=False, help="GA VM: check / install / status / enable-hub / uninstall — the engine as user-level "
                    "systemd services on a VM (CMD-OPS1; docs/VM.md)")
+    sub.add_parser("project", add_help=False, help="GA project: one file for repos, environment, instructions, routines "
+                   "and threads; init proposes, a person approves (CMD-GA54; docs/PROJECT.md)")
     from .intake.cli import add_parser as _add_do  # CMD-GA37: ga do
     _add_do(sub)
     p = sub.add_parser("hub", help="the mail-driven hub tick: inbox -> ga judge -> verdict card -> one small-model "

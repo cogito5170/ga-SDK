@@ -1,9 +1,10 @@
-"""``ga actions list|show|approve|revoke`` (CMD-GA42 S3). ``approve`` is a human act: it asks y/N on a TTY and refuses
+"""``ga actions list|show|run|approve|revoke`` (CMD-GA42 S3). ``approve`` is a human act: it asks y/N on a TTY and refuses
 without one (GA Console approves through ``ga.actions.approve(name, approver="console")`` after its token check)."""
 from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 
 from . import registry as R
 
@@ -15,6 +16,9 @@ def add_parser(sub) -> None:
     for name, h in (("show", "one proposal with its check and trial"), ("revoke", "remove an approved action")):
         q = s.add_parser(name, help=h)
         q.add_argument("name")
+    q = s.add_parser("run", help="run an approved action by name in this folder (what a ga project routine runs)")
+    q.add_argument("name")
+    q.add_argument("--root", default=".", help="the project folder (default: here)")
     q = s.add_parser("approve", help="approve a proposal (a person at a TTY, y/N)")
     q.add_argument("name")
     q.add_argument("--allow-network", action="store_true", help="the action may use the network")
@@ -49,6 +53,10 @@ def cmd_actions(args, stdin=None, out=None) -> int:
             ok = R.revoke(args.name, h)
             print(f"revoked {args.name}" if ok else f"{args.name} was not approved", file=out)
             return 0 if ok else 1
+        if args.actions_cmd == "run":
+            code, text = R.run(args.name, {}, Path(args.root), h=h)
+            print(text, end="" if text.endswith("\n") or not text else "\n", file=out)
+            return code
         if args.actions_cmd == "approve":
             if not (hasattr(stdin, "isatty") and stdin.isatty()):
                 print("ga actions approve: a person approves at a terminal (TTY); refused", file=sys.stderr)

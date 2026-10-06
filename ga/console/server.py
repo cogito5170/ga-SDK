@@ -10,6 +10,8 @@ the strict CSP and no-store on every answer, nothing remote. The static console 
     POST /api/ask {q, mode: ask|do} -> {plan, cost_estimate, confirm_id};  POST /api/ask/confirm {confirm_id} -> {run_id}
     GET  /api/events  (SSE; Last-Event-ID resumes)  types: state work mail service log act_turn bridge ev
     GET  /api/events/recent?limit=&type=&task=   ga.events/1 history, newest first (CMD-GA50)
+    GET  /api/project?name=   the saved project, its status and the init proposal (CMD-GA54)
+    POST /api/project/approve {sha256} -> writes the proposal shown under that sha256 (the console's human act)
 
 Changes reach /api/events by code (file mtimes, git heads, the mailbox tip, service events), never by a model.
 """
@@ -281,6 +283,26 @@ class Console(ThreadingHTTPServer):
     def work(self) -> list[dict[str, Any]]:
         return C.work(self.cfg, self.reader, self.services.running_ids())
 
+    def project(self, name: str = "") -> dict[str, Any]:
+        """CMD-GA54 S5: the project card and the init proposal (read-only; no fetch)."""
+        from ..project import core as K, schema as S
+        names = S.names()
+        name = name if name in names else (names[0] if names else "")
+        saved = S.load(name) if name else None
+        prop = K.proposal(name=name or None, console=self.cfg)
+        return {"names": names, "project": saved, "problems": S.validate(saved) if saved else [],
+                "status": K.status(saved) if saved else None, "proposal": prop}
+
+    def project_approve(self, sha: str, name: str = "") -> tuple[int, dict[str, Any]]:
+        """Writes the proposal only when it is still the one shown (same sha256) and valid."""
+        from ..project import core as K, schema as S
+        prop = K.proposal(name=name if S.NAME.match(name or "") else None, console=self.cfg)
+        if not sha or sha != prop["sha256"]:
+            return 409, {"error": "the proposal changed; look again before approving", "sha256": prop["sha256"]}
+        if prop["problems"]:
+            return 400, {"error": "invalid", "problems": prop["problems"]}
+        return 200, {"wrote": str(K.approve(prop)), "name": prop["project"]["name"]}
+
     # -- the watcher (S4): code finds what changed ---------------------------------------------------------------------
     def watch_once(self) -> list[str]:
         fp = C.fingerprint(self.cfg, self.reader)
@@ -400,6 +422,8 @@ class ConsoleHandler(UiHandler):
             return self.events(q)
         if path == "/api/events/recent":
             return self.json(200, srv.events_recent(q))
+        if path == "/api/project":
+            return self.json(200, srv.project((q.get("name") or [""])[0]))
         m = re.match(r"^/api/services/([A-Za-z0-9_.-]+)/logs$", path)
         if m:
             if m.group(1) not in srv.services:
@@ -432,6 +456,9 @@ class ConsoleHandler(UiHandler):
             return self.json(200, {"confirm_model_turns": srv.asker.confirm_model_turns()})
         if path == "/api/ask/confirm":
             code, obj = srv.asker.confirm(str(body.get("confirm_id") or ""))
+            return self.json(code, obj)
+        if path == "/api/project/approve":
+            code, obj = srv.project_approve(str(body.get("sha256") or ""), str(body.get("name") or ""))
             return self.json(code, obj)
         return self.not_found()
 

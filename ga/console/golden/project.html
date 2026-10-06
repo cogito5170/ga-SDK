@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>프로젝트 · GA Console</title>
+<link rel="stylesheet" href="../static/tokens.css">
+<link rel="stylesheet" href="golden.css">
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<header class="top">
+  <p class="brand">GA Console <span>127.0.0.1:8765 · 이 Mac 에서만</span></p>
+  <nav class="nav" aria-label="화면">
+    <ul>
+      <li><a href="now.html">지금</a></li>
+      <li><a href="live.html">실시간</a></li>
+      <li><a href="work.html">작업<span class="n">4</span></a></li>
+      <li><a href="branches.html">브랜치</a></li>
+      <li><a href="services.html">서비스<span class="n">3/4</span></a></li>
+      <li><a href="tokens.html">토큰</a></li>
+      <li><a href="ask.html">묻기</a></li>
+      <li><a href="decisions.html">결정</a></li>
+      <li><a href="project.html" aria-current="page">프로젝트</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="mast">
+  <p class="cap">프로젝트 · <b>ga</b> · 저장된 것 1</p>
+  <h1>ga</h1>
+  <span class="hot" aria-hidden="true"></span>
+  <p class="lede">저장소 3개 · 열린 실 3개 · 루틴 1개.
+    <span class="sub">실 = 열린 지시, 브리지 항목, agv 브랜치.</span></p>
+</div>
+
+<main id="main">
+  <section aria-labelledby="h-card">
+    <h2 id="h-card">프로젝트 <span class="sub">VM</span></h2>
+    <ul class="items">
+      <li>
+        <p><span class="id">baseline</span> claude/gracious-meitner-vp49xe <span class="mono">f9671da</span></p>
+        <p class="meta"><span class="mono">~/baseline</span></p>
+      </li>
+      <li>
+        <p><span class="id">ga-sdk</span> claude/gracious-meitner-vp49xe <span class="mono">a41c09e</span></p>
+        <p class="meta"><span class="mono">~/ga-sdk</span><b>고친 파일 있음</b></p>
+      </li>
+      <li>
+        <p><span class="id">token</span> claude/gracious-meitner-vp49xe <span class="mono">—</span></p>
+        <p class="meta"><span class="mono">~/token</span><span>아직 없음: apply 가 복제합니다</span></p>
+      </li>
+    </ul>
+    <p class="meta"><span>서비스 console, hub</span><span class="mono">~/ga-venv/bin/python</span></p>
+    <details><summary>지시문 앞부분</summary><pre class="out">GA Engine 의 상태. 허브가 지시를 보내고, 보고를 판정하고, 통합합니다.</pre></details>
+  </section>
+
+  <div class="two">
+    <section aria-labelledby="h-threads">
+      <h2 id="h-threads">실 <span class="sub">3개</span></h2>
+      <ul class="items">
+        <li><p><span class="id">GA54</span> 도는 중</p><p class="meta"><span>ga-sdk · agv/GA54-r1</span></p></li>
+        <li><p><span class="id">CMD-GA53</span> 보고됨</p><p class="meta"><span>지시</span></p></li>
+        <li><p><span class="id">ITEM-7</span> 대기</p><p class="meta"><span>브리지 항목</span></p></li>
+      </ul>
+    </section>
+    <section aria-labelledby="h-routines">
+      <h2 id="h-routines">루틴 <span class="sub">1개</span></h2>
+      <ul class="items">
+        <li><p><span class="id">lint</span> <span class="mono">lint-a</span> · 30min</p>
+          <p class="meta"><span>지난번 Tue 2026-10-06 09:30</span><span>다음 Tue 2026-10-06 10:00</span></p></li>
+      </ul>
+    </section>
+  </div>
+
+  <section aria-labelledby="h-proposal">
+    <h2 id="h-proposal">다시 본 제안 <span class="sub">저장된 값은 그대로 둡니다</span></h2>
+    <p>ga · <span class="mono">3c1e0b2</span></p>
+    <ul class="items">
+      <li><p><span class="id">repos.token</span> from console config, url from git remote</p></li>
+      <li><p><span class="id">environment.kind</span> from timer ga-update.timer</p></li>
+      <li><p><span class="id">name</span> kept</p></li>
+    </ul>
+    <details><summary>바뀌는 곳</summary><pre class="out">+  {"name": "token", "path": "~/token"}</pre></details>
+    <div class="actions"><button type="button" class="primary">바뀐 곳 승인하고 저장</button></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>승인 버튼만 파일을 씁니다. 편지, 보고서, 모델의 글에 적힌 승인은 읽지 않습니다. 비밀 값은 프로젝트에 두지 않습니다.</p>
+</footer>
+</body>
+</html>

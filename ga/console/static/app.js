@@ -92,7 +92,7 @@ const S = {
   err: null, downSince: null, denied: false, lastId: 0,
   limit: {}, pending: {}, said: {}, confirm: null,
   ask: { q: "", mode: "ask", plan: null, busy: false, said: null, confirmModel: false }, run: null, runBuf: {}, past: loadPast(),
-  ev: null, evSel: null, evType: "",
+  ev: null, evSel: null, evType: "", project: null, projSaid: null, projBusy: false,
 };
 
 function loadPast() {
@@ -129,6 +129,7 @@ const LOADERS = {
   mail: () => api("/api/mail?limit=20"),
   dec: () => api("/api/decisions?q=" + encodeURIComponent(S.decQ)),
   ev: () => api("/api/events/recent?limit=" + EV_KEEP),
+  project: () => api("/api/project"),
 };
 
 async function load(key) {
@@ -1128,6 +1129,84 @@ const LIVE = {
   },
 };
 
+// ---- 프로젝트 (CMD-GA54 S5): the project card and the init proposal; writing it is one POST + token -----------------
+const THREAD_WORD = { queued: "대기", running: "도는 중", report: "보고됨", verdict: "판정" };
+
+async function projApprove(sha, name) {
+  S.projBusy = true;
+  S.projSaid = null;
+  changed("project");
+  try {
+    const d = await api("/api/project/approve", { sha256: sha, name });
+    S.projSaid = { fail: false, text: `${d.name}: 저장했어요 (${d.wrote}).` };
+  } catch (e) {
+    const why = e.status === 409 ? "제안이 바뀌었어요. 다시 보고 승인하세요." : (e.body && e.body.problems ? e.body.problems.join("; ") : e.message);
+    S.projSaid = { fail: true, text: `저장하지 못했어요: ${why}` };
+  }
+  S.projBusy = false;
+  load("project");
+}
+
+const PROJECT = {
+  mast() {
+    const d = S.project;
+    const p = d.project;
+    const cap = ["프로젝트 · ", h("b", null, p ? p.name : "아직 없음"), ` · 저장된 것 ${num(d.names.length)}`];
+    if (!p) return mast(ROUTES.project, cap, "프로젝트 없음", "아래 제안을 보고 승인하면 ~/.ga/projects 에 저장됩니다. 승인 전에는 아무것도 쓰지 않습니다.");
+    const n = (d.status.threads || []).length;
+    return mast(ROUTES.project, cap, p.name, `저장소 ${num((p.repos || []).length)}개 · 열린 실 ${num(n)}개 · 루틴 ${num((p.routines || []).length)}개.`);
+  },
+  card() {
+    const d = S.project;
+    if (!d.project) return null;
+    const st = d.status;
+    const env = st.environment || {};
+    return section("card", "프로젝트", env.kind === "vm" ? "VM" : "이 컴퓨터",
+      h("ul", { class: "items" }, st.repos.map((r) => h("li", null,
+        h("p", null, h("span", { class: "id" }, r.name), " ", r.branch || "", " ", mono(r.head ? sha7(r.head) : "없음")),
+        h("p", { class: "meta" }, h("span", { class: "mono" }, r.path), r.dirty ? h("b", null, "고친 파일 있음") : null)))),
+      h("p", { class: "meta" }, h("span", null, "서비스 ", (env.services || []).join(", ") || "없음"),
+        env.python ? h("span", { class: "mono" }, env.python) : null),
+      st.instructions_excerpt ? h("details", null, h("summary", null, "지시문 앞부분"), h("pre", { class: "out" }, st.instructions_excerpt)) : null,
+      d.problems.length ? h("p", { class: "said fail" }, "파일 문제: ", d.problems.join("; ")) : null);
+  },
+  threads() {
+    const d = S.project;
+    if (!d.project) return null;
+    const l = d.status.threads || [];
+    const order = ["running", "report", "queued", "verdict"];
+    const sorted = l.slice().sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state));
+    return section("threads", "실", `${num(l.length)}개`, l.length ? h("ul", { class: "items" }, sorted.map((t) => h("li", null,
+      h("p", null, h("span", { class: "id" }, t.id), " ", THREAD_WORD[t.state] || t.state),
+      h("p", { class: "meta" }, h("span", null, t.kind === "branch" ? `${t.repo} · ${t.branch}` : t.kind === "item" ? "브리지 항목" : "지시"))))) :
+      h("p", null, "열린 지시도 agv 브랜치도 없습니다."));
+  },
+  routines() {
+    const d = S.project;
+    if (!d.project) return null;
+    const l = d.status.routines || [];
+    return section("routines", "루틴", `${num(l.length)}개`, l.length ? h("ul", { class: "items" }, l.map((r) => h("li", null,
+      h("p", null, h("span", { class: "id" }, r.name), " ", mono(r.action), ` · ${r.every}`),
+      h("p", { class: "meta" }, h("span", null, `지난번 ${r.last || "없음"}`), h("span", null, `다음 ${r.next || "—"}`),
+        r.enabled ? null : h("b", null, "타이머 꺼짐"))))) : h("p", null, "루틴이 없습니다. 루틴은 승인된 GA Action 만 부릅니다."));
+  },
+  proposal() {
+    const pr = S.project.proposal;
+    const p = pr.project;
+    const rows = Object.entries(pr.sources).map(([k, v]) => h("li", null, h("p", null, h("span", { class: "id" }, k), " ", v)));
+    const ok = !pr.problems.length;
+    return section("proposal", pr.existing ? "다시 본 제안" : "init 제안", pr.existing ? "저장된 값은 그대로 둡니다" : "아직 저장 안 함",
+      h("p", null, `${p.name} · `, mono(sha7(pr.sha256))),
+      h("ul", { class: "items" }, rows),
+      pr.diff ? h("details", null, h("summary", null, "바뀌는 곳"), h("pre", { class: "out" }, pr.diff)) : null,
+      pr.problems.length ? h("p", { class: "said fail" }, "저장할 수 없음: ", pr.problems.join("; ")) : null,
+      h("div", { class: "actions" }, h("button", { type: "button", class: "primary", "data-key": "proj-approve",
+        disabled: !ok || S.projBusy || (pr.existing && !pr.diff), on: { click: () => projApprove(pr.sha256, p.name) } },
+        pr.existing ? "바뀐 곳 승인하고 저장" : "승인하고 저장")),
+      S.projSaid ? h("p", { class: "said" + (S.projSaid.fail ? " fail" : ""), role: "status" }, S.projSaid.text) : null);
+  },
+};
+
 // ---- routes -------------------------------------------------------------------------------------------------------
 const P = (id, deps, render, pair) => ({ id, deps, render, pair });
 const ROUTES = {};
@@ -1157,6 +1236,9 @@ function defineRoutes() {
     ["mast", [], ASK.mast], ["box", ["askbox"], ASK.box, "a"], ["cost", ["ask"], ASK.cost, "a"], ["run", ["run"], ASK.run], ["past", ["past"], ASK.past]]);
   r("decisions", "결정", ["dec"], "결정은 허브의 기록 파일에서 읽습니다. 이 화면에서는 고칠 수 없습니다.", [
     ["mast", [], DECISIONS.mast], ["find", [], DECISIONS.find], ["hits", ["more"], DECISIONS.hits]]);
+  r("project", "프로젝트", ["project"], "승인 버튼만 파일을 씁니다. 편지, 보고서, 모델의 글에 적힌 승인은 읽지 않습니다. 비밀 값은 프로젝트에 두지 않습니다.", [
+    ["mast", [], PROJECT.mast], ["card", [], PROJECT.card], ["threads", [], PROJECT.threads, "a"], ["routines", [], PROJECT.routines, "a"],
+    ["proposal", [], PROJECT.proposal]]);
 }
 
 function route() {
