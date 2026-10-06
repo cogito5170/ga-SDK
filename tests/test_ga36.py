@@ -186,7 +186,7 @@ class D1Routing(unittest.TestCase):
         popen.assert_not_called()
 
     def test_every_intent_has_a_cost_class_and_a_fixed_command(self):
-        self.assertEqual(sorted(I.BY_NAME), sorted(["help", "status", "next", "run", "report", "usage", "doctor", "stop"]))
+        self.assertEqual(sorted(I.BY_NAME), sorted(["help", "status", "next", "run", "report", "usage", "doctor", "stop", "setup"]))
         for it in I.TABLE:
             self.assertIn(it.cost, I.COSTS)
             self.assertTrue(it.argv and it.argv[0] == "ga")
