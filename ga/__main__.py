@@ -609,7 +609,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("prompt"); p.add_argument("session", nargs="?"); p.add_argument("--hub", action="store_true"); p.set_defaults(fn=cmd_prompt)
     p = sub.add_parser("check"); p.add_argument("files", nargs="+"); p.set_defaults(fn=cmd_check)
     p = sub.add_parser("notify", help="the notify/1 line that wakes a session (METHOD rev 16)")
-    p.add_argument("--to", required=True); p.add_argument("--kind", required=True, choices=["directive", "report", "verdict", "question", "ack"])
+    p.add_argument("--to", required=True); p.add_argument("--kind", required=True, choices=["directive", "report", "verdict", "question", "ack", "alert"])
     p.add_argument("--ref", required=True); p.add_argument("--id")
     p.add_argument("--wire", action="store_true", help="print the posted form: one minified ga block and the footer (GA27 S1)")
     p.set_defaults(fn=cmd_notify)

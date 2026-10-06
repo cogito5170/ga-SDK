@@ -77,6 +77,7 @@ class FormsTest(unittest.TestCase):
     def test_notify1(self):
         ok = {"schema": "notify/1", "to": "GA", "kind": "directive", "ref": "https://github.com/o/r/issues/12", "id": "CMD-GA18"}
         self.assertEqual(hard_paths(ok), [])
+        self.assertEqual(hard_paths(dict(ok, kind="alert")), [])  # VI-06a: the watcher's alert
         for doc, path in [(dict(ok, kind="hello"), "$.kind"), (dict(ok, ref="issue 12"), "$.ref"),
                           ({k: v for k, v in ok.items() if k != "to"}, "$.to")]:
             with self.subTest(path=path):
