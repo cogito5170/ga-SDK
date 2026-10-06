@@ -195,6 +195,8 @@ def migrate_hub_model(home: Path, *, dry_run: bool = False, say: Callable[[str],
     conf["model"] = "auto"
     f.write_text(json.dumps(conf, indent=2) + "\n", encoding="utf-8")
     say(f"ga vm: {f} model {old} -> auto (follow the bridge's served model)")
+    from .. import events as EV
+    EV.emit("SYSTEM", "vm-update", "hub model auto", "DONE", old=old)
     return True
 
 
@@ -731,11 +733,28 @@ def update(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_G
            now: Callable[[], str] | None = None) -> int:
     """Fast-forward ~/ga-sdk, ~/baseline and ~/token to origin/<branch>; pip only when ga-sdk's HEAD or pins changed;
     restart only the enabled services whose code changed; one ack mail per new ga version. Never resets or forces."""
+    from .. import events as EV
+    sp = EV.span("SYSTEM", "vm-update", "update", dry_run=dry_run or None, branch=branch).start()
+    try:
+        rc = _update(home, sp, dry_run=dry_run, min_free_gb=min_free_gb, runner=runner, free=free, branch=branch,
+                     say=say, now=now)
+    except BaseException as e:
+        sp.error(f"{type(e).__name__}: {e}")
+        sp.fail()
+        raise
+    (sp.done if rc == 0 else sp.fail)(exit=rc)
+    return rc
+
+
+def _update(home: Path, sp: Any, *, dry_run: bool, min_free_gb: float, runner: Runner | None,
+            free: Callable[[Any], int], branch: str, say: Callable[[str], None], now: Callable[[], str] | None) -> int:
     import time
+    from .. import events as EV
     r = runner or Runner()
     d = check_disk(home, min_free_gb, free)
     if not d["ok"]:
         say(f"ga vm update: disk guard: {d['free_gb']} GB free < {d['min_gb']} GB — stopped before any fetch")
+        sp.error("disk guard", free_gb=d["free_gb"], min_gb=d["min_gb"])
         return 1
     repos = {"ga-sdk": home / "ga-sdk", "baseline": home / "baseline", "token": home / "token"}
     before, after, skipped = {}, {}, []
@@ -748,8 +767,11 @@ def update(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_G
             if dry_run:
                 say(f"would: fetch + fast-forward {repo} to origin/{branch}")
                 continue
-            sync_repo(r, repo, "", branch, "update", lambda m: None)
-            after[name] = _head(r, repo)
+            with EV.span("NET", "vm-update", "git fetch + ff", repo=name) as net:
+                sync_repo(r, repo, "", branch, "update", lambda m: None)
+                after[name] = _head(r, repo)
+                net.done(before=(before[name] or "")[:12], after=(after[name] or "")[:12],
+                         changed=before[name] != after[name])
         except VmError as e:
             skipped.append(f"{name}: {str(e)[:160]}")
             say(f"ga vm update: {e}")
@@ -762,9 +784,13 @@ def update(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_G
         migrate_hub_model(home, dry_run=True, say=say)
         return 0
     migrate_hub_model(home, say=say)
+    EV.emit("SYSTEM", "vm-update", "heads", "RUNNING", before={k: (v or "")[:12] for k, v in before.items()},
+            after={k: (v or "")[:12] for k, v in after.items()})
     try:
         if "ga-sdk" in before:
-            pip = _pip(r, home, venv, sdk, lambda m: None, by_head=True)
+            with EV.span("SYSTEM", "vm-update", "pip install") as ps:
+                pip = _pip(r, home, venv, sdk, lambda m: None, by_head=True)
+                ps.done(ran=pip)
     except VmError as e:
         skipped.append(f"pip: {e}")
         say(f"ga vm update: {e}")
@@ -774,6 +800,7 @@ def update(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_G
             if r.run(["systemctl", "--user", "is-enabled", unit], timeout=30)[0] == 0:  # never a disabled unit
                 r.run(["systemctl", "--user", "restart", unit], timeout=60)
                 restarted.append(unit)
+                EV.emit("SYSTEM", "vm-update", "restart", "DONE", unit=unit)
     if rc == 0 and (home / "baseline").exists():
         mail = _notice(r, home, after)
     line = {"at": (now or (lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))(),

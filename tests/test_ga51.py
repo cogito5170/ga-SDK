@@ -116,6 +116,16 @@ class Migration(unittest.TestCase):
             self.assertEqual(self.model(d), mine)
             self.assertEqual(lines, [])
 
+    def test_one_system_event_only_when_rewritten(self):
+        ev = Path(tempfile.mkdtemp()) / "events.jsonl"
+        with mock.patch.dict("os.environ", {"GA_EVENTS": str(ev)}):
+            core.migrate_hub_model(self.home("gemini-3.8-flash-high"), say=lambda m: None)
+            self.assertFalse(ev.exists() and ev.read_text().strip())
+            core.migrate_hub_model(self.home("gpt-oss-120b-medium"), say=lambda m: None)
+        (line,) = [json.loads(x) for x in ev.read_text().splitlines()]
+        self.assertEqual((line["type"], line["status"]), ("SYSTEM", "DONE"))
+        self.assertEqual(line["metadata"]["old"], "gpt-oss-120b-medium")
+
     def test_dry_run_changes_nothing(self):
         d, lines = self.home("gemini-3.1-pro-high"), []
         self.assertTrue(core.migrate_hub_model(d, dry_run=True, say=lines.append))

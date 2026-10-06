@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+from .. import events as EV
 from ..forms import FormError, hard, parse_text, validate
 from ..mailbox import Mailbox, MailError, secrets_in
 from ..runlog import Tail, TurnMeter, follow
@@ -78,7 +79,7 @@ def run_supervise(cfg: dict[str, Any], conf: Path, task: str, progress: Callable
     tail, meter = Tail(log), TurnMeter()
     start = tail.offset
     src = str(Path(__file__).resolve().parents[2])  # this ga, also when it runs from a checkout
-    env = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [src, os.environ.get("PYTHONPATH", "")])),
+    env = dict(EV.child_env(), PYTHONPATH=os.pathsep.join(filter(None, [src, os.environ.get("PYTHONPATH", "")])),
                AGY_BRIDGE_COMMANDS=json.dumps(cfg.get("commands") or {}))
     t0 = time.monotonic()
     with subprocess.Popen([sys.executable, "-m", "ga", "supervise", "--config", conf.name, task], cwd=cfg["workdir"],
@@ -211,39 +212,73 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
         if limit is not None and handled >= limit:
             break
         log(f"bridge: message from {m.sender}: {m.schema or '?'} {m.form}")
+        EV.emit("QUEUE", "bridge", "mail received", "DONE", parent_id=None, form=m.form, sender=m.sender,
+                schema=m.schema or "?")
+        # CMD-GA50: one TASK per message; its known steps advance as RUNNING step events
+        task_ev = EV.span("TASK", m.form, "directive", parent_id=None, sender=m.sender, goal=None,
+                          steps=["read", "run", "report", "ack"]).start()
+        failed = ""
         try:
+            task_ev.update("step", step="read")
             if m.sender != cfg["hub"]:
                 reply = declined(cfg, m.form, f"only {cfg['hub']} may send directives to {cfg['name']}")
+                failed = "declined: not the hub"
             elif m.schema != "directive/2" or not m.valid:
                 reply = declined(cfg, m.form, "not a valid directive/2: " + "; ".join(m.problems)[:150])
+                failed = "declined: not a valid directive/2"
             else:
                 head, _ = parse_text(m.text)
+                task_ev.update("step", step="run", goal=EV.short(head.get("goal", "")))
                 conf = effective_config(cfg, head["id"], max_steps)
                 task = task_text(head)
-                run = runner(cfg, conf, task)
+                run = _run_ev(runner, cfg, conf, task)
                 capacity = is_capacity(run)
                 retried = any(e.get("event") == "transient" for e in run.get("events") or [])
                 if capacity and not retried:  # once, after a short backoff; a second capacity stop is reported, not retried
                     # again (GA41: ga supervise retries a transient turn itself; then the bridge does not retry the run)
                     log(f"bridge: agy capacity exhausted (503); one retry in {cfg['capacity_backoff_s']} s")
+                    task_ev.retry("step", step="run", why="capacity (503)", backoff_s=cfg["capacity_backoff_s"])
                     sleep(float(cfg["capacity_backoff_s"]))
-                    run = runner(cfg, conf, task)
+                    run = _run_ev(runner, cfg, conf, task)
                     capacity = is_capacity(run)
+                if run.get("code") != 0 or capacity:
+                    failed = "capacity" if capacity else f"ga supervise exit {run.get('code')}"
                 reply = build_report(cfg, head, run, capacity)
                 try:
                     record_served(cfg, run)
                 except OSError as e:  # the report still goes; the hub falls back to its code default
                     log(f"bridge: served model not recorded: {e}")
+            task_ev.update("step", step="report")
             problems = hard(validate(parse_text(reply)[0]))
             if problems:
                 raise FormError(problems)
             box.send(cfg["hub"], reply, cfg["name"])
+            EV.emit("QUEUE", "bridge", "report mailed", "DONE", to=cfg["hub"], form=m.form)
             log(f"bridge: report sent to {cfg['hub']} for {m.form}")
         except (MailError, FormError, OSError, ValueError) as e:
             log(f"bridge: {m.form} not answered: {type(e).__name__}: {str(e)[:200]}")
+            task_ev.error(f"{type(e).__name__}: {str(e)[:100]}")
+            failed = failed or type(e).__name__
+        task_ev.update("step", step="ack")
         box.mark_read(cfg["name"], m.path)  # once: a failing directive is not retried in a loop
+        EV.emit("QUEUE", "bridge", "mail acked", "DONE", form=m.form)
+        (task_ev.fail if failed else task_ev.done)(result=EV.short(failed or "report sent"))
         handled += 1
     return handled
+
+
+def _run_ev(runner: Callable[[dict, Path, str], dict], cfg: dict[str, Any], conf: Path, task: str) -> dict[str, Any]:
+    """One run inside an AGENT span (CMD-GA50): the child's own events hang under it through GA_EVENT_PARENT."""
+    with EV.span("AGENT", "bridge", "ga supervise") as sp:
+        run = runner(cfg, conf, task)
+        turns = [e for e in run.get("events") or [] if e.get("event") == "turn"]
+        meta = {"exit": run.get("code"), "turns": len(turns), "tail": EV.tail(run.get("out") or "", 8)}
+        if run.get("code") == 0:
+            sp.done(**meta)
+        else:
+            sp.error(f"ga supervise exit {run.get('code')}")
+            sp.fail(**meta)
+    return run
 
 
 def pid_file() -> Path:

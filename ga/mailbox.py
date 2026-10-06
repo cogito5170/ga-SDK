@@ -92,8 +92,10 @@ def parse_path(path: str) -> tuple[str, str, str, str] | None:
 
 class Mailbox:
     def __init__(self, repo: str | Path, *, remote: str = "origin", retries: int = RETRIES,
-                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.time):
+                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.time,
+                 quiet: bool = False):
         self.repo, self.remote, self.retries, self.sleep, self.clock = Path(repo), remote, retries, sleep, clock
+        self.quiet = quiet  # CMD-GA50: no NET events (GA Console's own read-only polling is not the VM's work)
         self.pushes = 0  # attempts made by the last send (for the bounded-retry test)
 
     # -- git --
@@ -104,6 +106,17 @@ class Mailbox:
             raise MailError(f"git {args[0]} failed: {p.stderr.strip()[:200]}")
         return p.stdout
 
+    def host(self) -> str:
+        """The remote's host only (no user, no token, no path), ``local`` for a path remote; for NET events."""
+        if getattr(self, "_host", None) is None:
+            try:
+                url = self._git("remote", "get-url", self.remote, check=False).strip()
+            except Exception:
+                url = ""
+            m = re.match(r"^[a-z][a-z0-9+.-]*://(?:[^@/]*@)?([^/:]+)", url) or re.match(r"^(?:[^@/]+@)?([^/:]+):(?!/)", url)
+            self._host = m.group(1) if m else ("local" if url else "?")
+        return self._host
+
     def git_dir(self) -> Path:
         d = Path(self._git("rev-parse", "--git-common-dir").strip())
         return d if d.is_absolute() else (self.repo / d).resolve()
@@ -112,14 +125,20 @@ class Mailbox:
         """Fetch the mailbox branch into a ref of this call's own (concurrent sends in one clone do not share one), return
         its commit, or None when the remote has no mailbox yet."""
         ref = f"refs/ga-mailbox/fetch-{uuid.uuid4().hex}"
+        from . import events as EV
+        sp = EV.Quiet() if self.quiet else EV.span("NET", "mailbox", "git fetch", host=self.host()).start()
         # --refmap= : no opportunistic update of refs/remotes/<remote>/ga-mailbox, which concurrent sends would race on
         p = subprocess.run(["git", "fetch", "-q", "--no-write-fetch-head", "--refmap=", self.remote,
                             f"+refs/heads/{BRANCH}:{ref}"],
                            cwd=self.repo, env=dict(os.environ, GIT_TERMINAL_PROMPT="0"), capture_output=True, text=True)
         if p.returncode != 0:
             if "couldn't find remote ref" in p.stderr or "could not find remote ref" in p.stderr:
+                sp.done(result="no mailbox yet")
                 return None
+            sp.error(f"git fetch failed: {p.stderr.strip()[:100]}")
+            sp.fail(exit=p.returncode)
             raise MailError(f"git fetch failed: {p.stderr.strip()[:200]}")
+        sp.done(exit=0)
         sha = self._git("rev-parse", ref).strip()
         self._git("update-ref", "-d", ref, check=False)
         return sha
@@ -172,10 +191,19 @@ class Mailbox:
             commit = self._git("commit-tree", tree, *(["-p", parent] if parent else []), "-m",
                                f"ga mail: {sender} -> {to} {fid}", env=who).strip()
             self.pushes += 1
+            from . import events as EV
+            sp = EV.span("NET", "mailbox", "git push", host=self.host(), to=to, bytes=len(text.encode("utf-8")),
+                         attempt=attempt + 1).start()
             p = subprocess.run(["git", "push", "-q", self.remote, f"{commit}:refs/heads/{BRANCH}"], cwd=self.repo,
                                env=dict(os.environ, GIT_TERMINAL_PROMPT="0"), capture_output=True, text=True)
             if p.returncode == 0:
+                sp.done(exit=0)
                 return path
+            if attempt < self.retries:
+                sp.retry(why="push rejected: someone added first")
+            else:
+                sp.error("push rejected", attempts=self.pushes)
+            sp.fail(exit=p.returncode)
             if attempt < self.retries:  # someone else added first: redo on the new tip, after a bounded backoff
                 self.sleep(random.uniform(0.2, 1.0) * backoff(attempt))
         raise MailError(f"not delivered: the push was rejected {self.pushes} time(s)")
