@@ -149,7 +149,8 @@ class Edits(unittest.TestCase):
         root = py_repo(self)
         out = apply(root, F.parse("NEW calc.py\n<<<<<<< CONTENT\nx\n>>>>>>> END\n"
                                   "NEW lib/x.py\n<<<<<<< CONTENT\nX = 1\n>>>>>>> END\n").actions, ["calc.py", "lib/**"])
-        self.assertIn("exists", out.rejected[0])
+        self.assertEqual(out.replaced, ["calc.py"])  # CMD-GA46 S2: NEW replaces an owned existing file
+        self.assertEqual((root / "calc.py").read_text(), "x\n")
         self.assertEqual((root / "lib" / "x.py").read_text(), "X = 1\n")
 
 
@@ -316,7 +317,7 @@ class Loop(unittest.TestCase):
         root = py_repo(self)
         res, fake, act, _ = run(self, root, ["DONE\n", "DONE\n", "DONE\n"], max_turns=3)
         self.assertEqual(res.status, "blocked")
-        self.assertIn("turn cap", res.reason)
+        self.assertIn("no progress", res.reason)  # CMD-GA46 S1: a refused DONE changes nothing, so it stalls
         self.assertIn("DONE not accepted", bodies(fake)[1])
         # after a fix the same DONE is accepted (the fix alone already turns it green)
         root2 = py_repo(self)
