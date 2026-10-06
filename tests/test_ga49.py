@@ -70,6 +70,26 @@ class Gate(unittest.TestCase):
         self.assertEqual(o["false_accepts"], [])
         self.assertTrue(shadow_compare(*rows(20, err={9}))["gate_ok"])
 
+    def test_disagreement_in_the_middle_leaves_only_the_run_after_it(self):
+        o = shadow_compare(*rows(14, bad={10}))  # 10 agree, 1 disagree, 3 agree (by mail time)
+        self.assertEqual(o["gate"], "gate 3/10")
+        self.assertFalse(o["gate_ok"])
+        self.assertEqual(o["agree"], 13)
+
+    def test_ask_human_with_a_backend_error_is_not_an_agreement_even_when_baseline_asked_too(self):
+        b, s = rows(14, err={5})
+        b[5]["decision"] = "ASK_HUMAN"  # baseline ASK_HUMAN, shadow ASK_HUMAN because the backend failed
+        o = shadow_compare(b, s)
+        self.assertEqual(o["shadow_errors"], ["C5 rev 1"])
+        self.assertEqual(o["agree"], 13)
+        self.assertFalse(next(r for r in o["rows"] if r["id"] == "C5")["agree"])
+        self.assertEqual(o["gate"], "gate 8/10")  # C6..C13 only: the error broke the run
+        self.assertFalse(o["gate_ok"])
+        b2, s2 = rows(14)  # control: the same ASK_HUMAN pair without an error does agree
+        b2[5]["decision"], s2[5]["decision"] = "ASK_HUMAN", "ASK_HUMAN"
+        o2 = shadow_compare(b2, s2)
+        self.assertEqual((o2["shadow_errors"], o2["agree"], o2["gate_ok"]), ([], 14, True))
+
     def test_a_false_accept_blocks_even_after_ten(self):
         b, s = rows(12)
         b[0]["decision"] = "SEND_BACK"
