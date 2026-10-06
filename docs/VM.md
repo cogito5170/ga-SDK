@@ -150,3 +150,7 @@ systemctl --user disable --now ga-bridge.service
 ```
 
 그다음 Mac 에서 `~/ga-venv/bin/python -m ga vm bridge-adopt` 를 한 번 돌리고(그동안 VM 이 답한 지시를 Mac 의 읽음 기록에도 표시) Mac 의 브리지를 다시 켭니다. 전부 지우려면 `ga vm uninstall`(서비스와 설정만 지우고 `~/token` 과 체크아웃은 남김).
+
+## 스스로 최신 유지 (`ga vm update`)
+
+`ga vm install --full` 은 `ga-update.timer` 도 켭니다(부팅 2분 뒤, 이후 30분마다). `ga vm update [--dry-run]` 은 디스크 가드 후 `~/ga-sdk`, `~/baseline`, `~/token` 을 `origin/<통합 브랜치>` 로 fast-forward 만 합니다(로컬 변경이 있거나 ff 가 안 되면 그 한 줄만 남기고 건너뜀 — reset/force 없음). ga-sdk 의 HEAD 나 pyproject 가 바뀐 때만 `pip install -e`, ga-sdk 가 바뀐 때만 켜져 있는 ga-console·ga-bridge 를 재시작합니다(꺼진 유닛은 건드리지 않음). 한 번 실행에 한 줄이 `~/.ga/update.jsonl` 에 쌓이고 `ga vm status` 가 마지막 줄을 보여줍니다. ga 버전이 새로워지면 `baseline-ops` 로 notify/1(ack) 한 통을 보냅니다(실패하면 다음 실행에서 다시).

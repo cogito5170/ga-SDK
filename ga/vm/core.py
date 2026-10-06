@@ -26,6 +26,8 @@ PORT = 8765
 CONSOLE_UNIT, HUB_UNIT, HUB_TIMER = "ga-console.service", "ga-hub.service", "ga-hub.timer"
 UNITS = (CONSOLE_UNIT, HUB_UNIT, HUB_TIMER)
 BRIDGE_UNIT = "ga-bridge.service"  # --full only
+UPDATE_UNIT, UPDATE_TIMER = "ga-update.service", "ga-update.timer"  # --full only (CMD-GA48)
+NOTICE_TO, NOTICE_FROM = "baseline-ops", "vm"
 AGENTS = ("minimal", "ga-plan", "ga-act", "ga-ask")  # the Mac's three + ga-ask, the ask default since GA44
 BRIDGE_NAME = "AGY"
 ADOPTED = "bridge-adopted"  # ~/.ga/bridge-adopted: written by `ga vm bridge-adopt`, required by the bridge unit
@@ -150,6 +152,16 @@ def unit_files(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> dict[str, str
     timer = ("[Unit]\nDescription=GA hub tick every 60 s\n\n[Timer]\nOnBootSec=60\nOnUnitActiveSec=60\n"
              f"Unit={HUB_UNIT}\n\n[Install]\nWantedBy=timers.target\n")
     return {CONSOLE_UNIT: console, HUB_UNIT: hub, HUB_TIMER: timer}
+
+
+def update_units(home: Path) -> dict[str, str]:
+    """CMD-GA48 S2: the self-update oneshot and its timer (2 min after boot, then every 30 min)."""
+    py = f"{home}/ga-venv/bin/python"
+    svc = (f"[Unit]\nDescription=GA VM self-update (fast-forward the checkouts, reinstall only on change)\n\n[Service]\n"
+           f"Type=oneshot\nWorkingDirectory={home}\nExecStart={py} -m ga vm update --home {home}\nNoNewPrivileges=yes\n")
+    timer = ("[Unit]\nDescription=GA VM self-update every 30 min\n\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec=30min\n"
+             f"Unit={UPDATE_UNIT}\n\n[Install]\nWantedBy=timers.target\n")
+    return {UPDATE_UNIT: svc, UPDATE_TIMER: timer}
 
 
 def hub_conf(home: Path, *, branch: str = BRANCH) -> dict[str, Any]:
@@ -282,6 +294,7 @@ def install(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_
         units = unit_files(home, min_free_gb=min_free_gb)
         if full:
             units[BRIDGE_UNIT] = bridge_unit(home, min_free_gb=min_free_gb)
+            units.update(update_units(home))
         for name, text in units.items():
             changed.append(w(udir / name, text, act))
         if full:
@@ -313,6 +326,9 @@ def install(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_
                 sc("enable", "--now", HUB_TIMER)
         else:
             say("ga-hub: installed but left disabled — this ga has no `ga hub tick --shadow` yet; after an update run `ga vm enable-hub`")
+    if full and not dry_run and sc("is-enabled", UPDATE_TIMER)[0] != 0:
+        act(f"systemctl --user enable --now {UPDATE_TIMER}")
+        sc("enable", "--now", UPDATE_TIMER)
     if full:
         _say_missing(home, missing, say)
         say(f"{BRIDGE_UNIT}: installed, not enabled — see `ga vm bridge-adopt` and `ga vm enable-bridge` (docs/VM.md)")
@@ -478,18 +494,21 @@ def _would(path: Path, text: str, act: Callable[[str], None]) -> bool:
     return True
 
 
-def _pip(r: Runner, home: Path, venv: Path, sdk: Path, act: Callable[[str], None]) -> None:
+def _pip(r: Runner, home: Path, venv: Path, sdk: Path, act: Callable[[str], None], by_head: bool = False) -> bool:
+    """True when pip ran. ``by_head`` (the self-update): a new ga-sdk HEAD reinstalls too, not only new pins."""
     py = venv / "bin" / "python"
     marker = home / ".ga" / "vm-install.json"
     want = sdk_pins_hash(sdk)
-    have = ""
+    head = _git(r, sdk, "rev-parse", "HEAD")[1].strip()
+    have, have_head = "", ""
     if marker.is_file():
         try:
-            have = json.loads(marker.read_text(encoding="utf-8")).get("pyproject_sha256", "")
+            m = json.loads(marker.read_text(encoding="utf-8"))
+            have, have_head = m.get("pyproject_sha256", ""), m.get("head", "")
         except ValueError:
             pass
-    if py.exists() and have == want:
-        return
+    if py.exists() and have == want and (not by_head or have_head == head):
+        return False
     (home / ".ga").mkdir(parents=True, exist_ok=True)
     tmpdir = tempfile.mkdtemp(prefix="vm-pip-", dir=home / ".ga")
     try:
@@ -505,7 +524,8 @@ def _pip(r: Runner, home: Path, venv: Path, sdk: Path, act: Callable[[str], None
             raise VmError(f"pip install failed: {out.strip()[-300:]}")
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
-    _write(marker, json.dumps({"pyproject_sha256": want}) + "\n", act)
+    _write(marker, json.dumps({"pyproject_sha256": want, "head": head}) + "\n", act)
+    return True
 
 
 # --- status, enable-hub, uninstall ---------------------------------------------------------------------------------
@@ -520,6 +540,7 @@ def status(home: Path, *, runner: Runner | None = None, free: Callable[[Any], in
         for line in out.strip().splitlines()[-5:]:
             say(f"    {line}")
     say(f"free disk: {free(home) / GB:.1f} GB on {home}")
+    say("last update: " + (last_update(home) or "none yet (ga-update.timer is installed by `ga vm install --full`)"))
     say(f"Mac: ssh -N -L {PORT}:127.0.0.1:{PORT} <vm>   then open the URL from `journalctl --user -u ga-console`")
     return 0
 
@@ -627,3 +648,112 @@ def url(home: Path, *, runner: Runner | None = None, user: str | None = None, ho
     say(f"  ssh -N -L {PORT}:127.0.0.1:{PORT} {user or getpass.getuser()}@{host or '<vm-ip>'}")
     say("  then open the URL above there (the same port, so the console's Host check passes)")
     return 0 if found else 1
+
+
+# --- self-update (CMD-GA48) ----------------------------------------------------------------------------------------
+
+UPDATE_LOG, NOTICED = "update.jsonl", "vm-noticed.json"
+
+
+def last_update(home: Path) -> str:
+    f = home / ".ga" / UPDATE_LOG
+    try:
+        lines = [x for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
+    except OSError:
+        return ""
+    return lines[-1] if lines else ""
+
+
+def _head(r: Runner, repo: Path) -> str:
+    rc, out = _git(r, repo, "rev-parse", "HEAD")
+    return out.strip() if rc == 0 else ""
+
+
+def _installed_version(r: Runner, home: Path) -> str:
+    py = home / "ga-venv" / "bin" / "python"
+    if py.exists():
+        rc, out = r.run([str(py), "-c", "import ga; print(ga.__version__)"], timeout=60)
+        if rc == 0 and out.strip():
+            return out.strip().splitlines()[-1]
+    from .. import __version__
+    return __version__
+
+
+def _notice(r: Runner, home: Path, heads: dict[str, str]) -> str:
+    """One notify/1 (ack) per new ga version; 'sent', 'same', or 'failed: ...' (the next run retries)."""
+    from ..forms import dump_text
+    from ..mailbox import MailError, Mailbox
+    ver = _installed_version(r, home)
+    f = home / ".ga" / NOTICED
+    try:
+        last = json.loads(f.read_text(encoding="utf-8")).get("version") if f.is_file() else None
+    except ValueError:
+        last = None
+    if last == ver:
+        return "same"
+    note = f"VM runs ga {ver}; heads " + ", ".join(f"{k} {v[:12] or '-'}" for k, v in heads.items())
+    head = {"schema": "notify/1", "to": NOTICE_TO, "kind": "ack", "ref": f"https://github.com/cogito5170/ga-sdk/commit/{heads.get('ga-sdk') or 'HEAD'}", "note": note}
+    try:
+        Mailbox(home / "baseline").send(NOTICE_TO, dump_text(head), sender=NOTICE_FROM)
+    except MailError as e:
+        return f"failed: {str(e)[:120]}"
+    _write(f, json.dumps({"version": ver}) + "\n", lambda m: None)
+    return "sent"
+
+
+def update(home: Path, *, dry_run: bool = False, min_free_gb: float = MIN_FREE_GB, runner: Runner | None = None,
+           free: Callable[[Any], int] = disk_free, branch: str = BRANCH, say: Callable[[str], None] = print,
+           now: Callable[[], str] | None = None) -> int:
+    """Fast-forward ~/ga-sdk, ~/baseline and ~/token to origin/<branch>; pip only when ga-sdk's HEAD or pins changed;
+    restart only the enabled services whose code changed; one ack mail per new ga version. Never resets or forces."""
+    import time
+    r = runner or Runner()
+    d = check_disk(home, min_free_gb, free)
+    if not d["ok"]:
+        say(f"ga vm update: disk guard: {d['free_gb']} GB free < {d['min_gb']} GB — stopped before any fetch")
+        return 1
+    repos = {"ga-sdk": home / "ga-sdk", "baseline": home / "baseline", "token": home / "token"}
+    before, after, skipped = {}, {}, []
+    for name, repo in repos.items():
+        if not repo.exists():
+            continue
+        before[name] = after[name] = _head(r, repo)
+        try:
+            plan_repo(r, repo)
+            if dry_run:
+                say(f"would: fetch + fast-forward {repo} to origin/{branch}")
+                continue
+            sync_repo(r, repo, "", branch, "update", lambda m: None)
+            after[name] = _head(r, repo)
+        except VmError as e:
+            skipped.append(f"{name}: {str(e)[:160]}")
+            say(f"ga vm update: {e}")
+    sdk_changed = before.get("ga-sdk") != after.get("ga-sdk")
+    pip, restarted, mail = False, [], "skipped"
+    venv, sdk = home / "ga-venv", home / "ga-sdk"
+    rc = 0
+    if dry_run:
+        say("would: pip install only when ga-sdk HEAD or pins changed; restart the enabled services whose code changed")
+        return 0
+    try:
+        if "ga-sdk" in before:
+            pip = _pip(r, home, venv, sdk, lambda m: None, by_head=True)
+    except VmError as e:
+        skipped.append(f"pip: {e}")
+        say(f"ga vm update: {e}")
+        rc = 1
+    if rc == 0 and sdk_changed:
+        for unit in (CONSOLE_UNIT, BRIDGE_UNIT):
+            if r.run(["systemctl", "--user", "is-enabled", unit], timeout=30)[0] == 0:  # never a disabled unit
+                r.run(["systemctl", "--user", "restart", unit], timeout=60)
+                restarted.append(unit)
+    if rc == 0 and (home / "baseline").exists():
+        mail = _notice(r, home, after)
+    line = {"at": (now or (lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))(),
+            "heads": {"before": before, "after": after}, "pip": pip, "restarted": restarted, "skipped": skipped, "mail": mail}
+    log = home / ".ga" / UPDATE_LOG
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(line, sort_keys=True) + "\n")
+    say("ga vm update: " + json.dumps(line, sort_keys=True))
+    return rc

@@ -30,6 +30,10 @@ def main(argv: list[str] | None = None, *, runner: core.Runner | None = None, fr
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--full", action="store_true", help="also the Token stack, the agy agents and the bridge unit (docs/VM.md)")
     p.add_argument("--min-free-gb", type=float, default=core.MIN_FREE_GB)
+    p = common(sub.add_parser("update", help="fast-forward the checkouts, reinstall/restart only on change (the ga-update timer)"))
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--branch", default=core.BRANCH)
+    p.add_argument("--min-free-gb", type=float, default=core.MIN_FREE_GB)
     common(sub.add_parser("status"))
     common(sub.add_parser("enable-hub", help="enable the shadow hub timer when this ga has `ga hub tick --shadow`"))
     p = common(sub.add_parser("bridge-adopt", help="mark every message now in to/<name> read in the VM clone"))
@@ -58,6 +62,8 @@ def main(argv: list[str] | None = None, *, runner: core.Runner | None = None, fr
         return core.install(home, dry_run=a.dry_run, min_free_gb=a.min_free_gb, runner=runner, free=free, tmp=tmp,
                             baseline_url=a.baseline_url, sdk_url=a.sdk_url, branch=a.branch, full=a.full,
                             token_url=a.token_url)
+    if a.cmd == "update":
+        return core.update(home, dry_run=a.dry_run, min_free_gb=a.min_free_gb, runner=runner, free=free, branch=a.branch)
     if a.cmd == "status":
         return core.status(home, runner=runner, free=free)
     if a.cmd == "enable-hub":
