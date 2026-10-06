@@ -7,7 +7,7 @@ every turn (it opens the card's stable prefix); adding a command or a retriever 
     =======
     (new lines)
     >>>>>>> REPLACE
-    NEW <path>                  a file that does not exist yet:
+    NEW <path>                  a new file, or one of your files rewritten whole:
     <<<<<<< CONTENT
     (the whole file)
     >>>>>>> END
@@ -34,7 +34,7 @@ EDIT <path>
   (several SEARCH/REPLACE blocks may follow one EDIT; keep each SEARCH short but unique)
 NEW <path>
 <<<<<<< CONTENT
-<whole content of a file that does not exist yet>
+<whole content of a new file, or of one of your files you rewrite whole>
 >>>>>>> END
 RUN <name>                 run a command listed under "commands" (names only, never a command line)
 RUN <action> path=<p>      run an approved action by name; values only for its placeholders (path=, name=)
@@ -83,6 +83,13 @@ class Parsed:
 
 def _text(lines: list[str]) -> str:
     return "".join(ln + "\n" for ln in lines)
+
+
+def _content(lines: list[str]) -> str:
+    """NEW content: trailing empty lines collapse to one final newline; empty content stays empty."""
+    while lines and not lines[-1].strip():
+        lines = lines[:-1]
+    return _text(lines)
 
 
 def parse(answer: str) -> Parsed:
@@ -164,7 +171,7 @@ def parse(answer: str) -> Parsed:
                     i = len(lines)
                     continue
                 if arg:
-                    acts.append(Action("NEW", arg, content=_text(lines[i + 1:end])))
+                    acts.append(Action("NEW", arg, content=_content(lines[i + 1:end])))
                 else:
                     probs.append("NEW without a path")
                 i = end + 1

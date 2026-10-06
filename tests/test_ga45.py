@@ -294,8 +294,8 @@ class Ladder(unittest.TestCase):
 class Version(unittest.TestCase):
     def test_version_0_14_0(self):
         import ga
-        self.assertEqual(ga.__version__, "0.14.0")
-        self.assertIn('version = "0.14.0"', (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
+        self.assertEqual(ga.__version__, "0.15.0")
+        self.assertIn('version = "0.15.0"', (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
 
 
 if __name__ == "__main__":

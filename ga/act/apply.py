@@ -21,6 +21,7 @@ class Outcome:
     rejected: list[str] = field(default_factory=list)   # "EDIT a.py block 2: no exact match"
     nearest: list[str] = field(default_factory=list)    # numbered file lines for each no-match block
     changed: list[str] = field(default_factory=list)    # paths written
+    replaced: list[str] = field(default_factory=list)   # existing owned files rewritten whole by NEW
 
 
 def safe_rel(root: Path, rel: str) -> Path | None:
@@ -95,12 +96,15 @@ def apply(root: Path, actions: list[Action], globs: list[str]) -> Outcome:
             out.rejected.append(f"{a.kind} {a.arg}: not in the item's files (you may edit only those)")
             continue
         if a.kind == "NEW":
-            if p.exists():
-                out.rejected.append(f"NEW {a.arg}: the file exists (use EDIT)")
+            if p.exists() and not p.is_file():
+                out.rejected.append(f"NEW {a.arg}: not a file")
                 continue
+            replaced = p.is_file()
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(a.content, encoding="utf-8")
-            out.applied.append(f"NEW {a.arg} ({len(a.content.splitlines())} lines)")
+            out.applied.append(f"NEW {a.arg} ({len(a.content.splitlines())} lines" + (", replaced)" if replaced else ")"))
+            if replaced:
+                out.replaced.append(a.arg)
             out.changed.append(a.arg)
             continue
         if not p.is_file():

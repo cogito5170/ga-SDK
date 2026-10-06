@@ -223,10 +223,14 @@ class Act:
                 return self._result("blocked", err, turn, rows)
             status, reason = self._act(answer, row)
             now = self.failing_set()
-            if row["applied"] and status is None:
-                stall = stall + 1 if now == prev else 0
+            if status is None:
+                if now != prev:
+                    stall = 0
+                elif row["applied"] or row.pop("idle"):  # applied, or rejected / no action: nothing moved
+                    stall += 1
                 if stall >= NO_PROGRESS_TURNS:
-                    status, reason = "blocked", f"no progress: the same failing set after {stall} edit turns"
+                    status, reason = "blocked", f"no progress: the same failing set after {stall} turns"
+            row.pop("idle", None)
             prev = now
             row["failing"] = sorted(now)[:50]
             self._log(row, rows, usage, served, secs)
@@ -302,7 +306,8 @@ class Act:
         self.last = self._last_text(out, p, notes)
         row.update({"applied": len(out.applied), "rejected": len(out.rejected), "commands": ran,
                     "needs": sum(1 for a in p.actions if a.kind == "NEED"), "format_problems": len(p.problems),
-                    "noise_lines": p.noise, "changed": list(out.changed)})
+                    "noise_lines": p.noise, "changed": list(out.changed), "replaced": list(out.replaced),
+                    "idle": not out.applied and not ran and not any(a.kind in ("NEED", "RUN", "PROPOSE") for a in p.actions)})
         return status, reason
 
     def _propose(self, a: Any) -> str:
