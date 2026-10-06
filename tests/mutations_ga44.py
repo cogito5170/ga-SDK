@@ -14,6 +14,10 @@ M = [  # (name, file, [(old, new), ...])
   [('Intent("setup", "free",', 'Intent("setup_off", "free",')]),
  ("warning threshold ignored", "ga/ask/model.py", [("    if inp > WARN_INPUT:", "    if False:")]),
  ("missing-agent check skipped", "ga/ask/__init__.py", [("if M.agent_installed(name) is False:", "if False:")]),
+ ("IME composition check removed", "ga/console/static/app.js",
+  [('!e.shiftKey && !e.isComposing && e.keyCode !== 229', '!e.shiftKey')]),
+ ("confirm skipped for ga do", "ga/console/server.py",
+  [('if mode == "ask" and "model" in job and not self.confirm_model_turns():', 'if not self.confirm_model_turns():')]),
  ("unknown-agent answer not recognised", "ga/ask/model.py", [('if p.returncode != 0 and UNKNOWN_AGENT.search', 'if False and UNKNOWN_AGENT.search')]),
 ]
 
@@ -25,7 +29,7 @@ def run(mutate):
             shutil.copytree(ROOT / d, tmp / d)
         shutil.copy(ROOT / "pyproject.toml", tmp / "pyproject.toml")
         mutate(tmp)
-        r = subprocess.run([PY, "-m", "unittest", "tests.test_ga44"], cwd=tmp,
+        r = subprocess.run([PY, "-m", "unittest", "tests.test_ga44", "tests.test_ga44_console"], cwd=tmp,
                            capture_output=True, text=True)
         return r.returncode, (r.stderr.strip().splitlines() or ["?"])[-1]
     finally:

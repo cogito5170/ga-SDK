@@ -91,7 +91,7 @@ const S = {
   logs: {}, sel: null, turns: [], newMail: new Set(),
   err: null, downSince: null, denied: false, lastId: 0,
   limit: {}, pending: {}, said: {}, confirm: null,
-  ask: { q: "", mode: "ask", plan: null, busy: false, said: null }, run: null, runBuf: {}, past: loadPast(),
+  ask: { q: "", mode: "ask", plan: null, busy: false, said: null, confirmModel: false }, run: null, runBuf: {}, past: loadPast(),
 };
 
 function loadPast() {
@@ -730,6 +730,8 @@ async function askPlan() {
       S.past.length = Math.min(S.past.length, 20);
       savePast();
       changed("past");
+    } else if (got.started) {  // a model turn ran at once (no confirm step)
+      startRun(got);
     } else S.ask.plan = got;
   } catch (e) {
     const why = e.body && (e.body.refuse || e.body.error);
@@ -739,20 +741,30 @@ async function askPlan() {
   changed("askbox"); changed("ask");
 }
 
+function startRun(p) {
+  S.run = { id: p.run_id, q: p.q, lines: [], done: false };
+  S.past.unshift({ run: p.run_id, q: p.q, mode: p.mode, cost: p.cost_estimate, status: "도는 중", at: new Date().toISOString() });
+  S.past.length = Math.min(S.past.length, 20);
+  for (const d of S.runBuf[p.run_id] || []) runLine(S.run, d);
+  delete S.runBuf[p.run_id];
+  S.ask.plan = null;
+  S.ask.said = { text: "돌리기 시작했어요. 아래에 줄이 쌓입니다." };
+  savePast();
+  changed("run"); changed("past");
+}
+
+async function setConfirmModel(on) {
+  S.ask.confirmModel = on;
+  try { await api("/api/ask/setting", { confirm_model_turns: on }); } catch (e) { /* the box keeps working */ }
+}
+
 async function askConfirm() {
   const p = S.ask.plan;
   S.ask.busy = "run";
   changed("ask");
   try {
     const r = await api("/api/ask/confirm", { confirm_id: p.confirm_id });
-    S.run = { id: r.run_id, q: p.q, lines: [], done: false };
-    S.past.unshift({ run: r.run_id, q: p.q, mode: p.mode, cost: p.cost_estimate, status: "도는 중", at: new Date().toISOString() });
-    S.past.length = Math.min(S.past.length, 20);
-    for (const d of S.runBuf[r.run_id] || []) runLine(S.run, d);
-    delete S.runBuf[r.run_id];
-    S.ask.plan = null;
-    S.ask.said = { text: "돌리기 시작했어요. 아래에 줄이 쌓입니다." };
-    savePast();
+    startRun({ ...p, run_id: r.run_id });
   } catch (e) {
     S.ask.said = { fail: true, text: e.status === 404 ? "확인 번호가 지났어요. 비용 보기를 다시 눌러 주세요." : `돌리지 못했어요 (${e.message}).` };
   }
@@ -782,7 +794,11 @@ const ASK = {
     return section("box", "새 물음", null, h("form", { class: "ask-q", on: { submit: (e) => { e.preventDefault(); askPlan(); } } },
       h("fieldset", { class: "choice" }, h("legend", null, "종류"), radio("ask", "묻기 — 읽기만"), radio("do", "하기 — 고칠 수 있음")),
       h("div", { class: "field" }, h("label", { for: "q" }, "물음"),
-        h("textarea", { id: "q", name: "q", "data-key": "q", prop: { value: S.ask.q }, on: { input: (e) => { S.ask.q = e.target.value; } } })),
+        h("textarea", { id: "q", name: "q", "data-key": "q", prop: { value: S.ask.q },
+          on: { input: (e) => { S.ask.q = e.target.value; },
+                keydown: (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); if (!S.ask.busy) askPlan(); } } } })),
+      h("div", { class: "choice" }, h("label", null, h("input", { type: "checkbox", "data-key": "confirm-model", prop: { checked: S.ask.confirmModel },
+        on: { change: (e) => setConfirmModel(e.target.checked) } }), " 토큰 확인 후 보내기")),
       h("div", { class: "actions" }, h("button", { type: "submit", "data-key": "plan", disabled: Boolean(S.ask.busy) },
         S.ask.busy === "plan" ? "비용 보는 중 …" : "비용 보기"))));
   },
@@ -918,6 +934,7 @@ function go() {
   S.confirm = null;
   render();
   for (const k of r.need) load(k);
+  api("/api/ask/setting").then((v) => { S.ask.confirmModel = Boolean(v.confirm_model_turns); changed("askbox"); }).catch(() => {});
   if (!r.need.includes("state")) load("state");  // the nav counts
   window.scrollTo(0, 0);
 }

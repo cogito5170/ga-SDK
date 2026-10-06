@@ -88,6 +88,28 @@ class Asker:
         self.pending: dict[str, dict[str, Any]] = {}
         self.lock = threading.Lock()
 
+    def _ask_json(self) -> Path:
+        from ..ask.store import home
+        h = self.cfg.get("ask_home")
+        return (Path(h) if h else home()) / "ask.json"
+
+    def confirm_model_turns(self) -> bool:
+        try:
+            return bool(json.loads(self._ask_json().read_text(encoding="utf-8")).get("confirm_model_turns", False))
+        except (OSError, ValueError, AttributeError):
+            return False
+
+    def set_confirm_model_turns(self, on: bool) -> None:
+        f = self._ask_json()
+        try:
+            raw = json.loads(f.read_text(encoding="utf-8"))
+            raw = raw if isinstance(raw, dict) else {}
+        except (OSError, ValueError):
+            raw = {}
+        raw["confirm_model_turns"] = bool(on)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
     def plan(self, q: str, mode: str) -> tuple[int, dict[str, Any]]:
         from ..ask import intents as I
         q = q.strip()
@@ -134,7 +156,13 @@ class Asker:
             now = self.clock()
             self.pending = {k: v for k, v in self.pending.items() if now - v["at"] < CONFIRM_TTL_S}
             self.pending[cid] = {**job, "at": now}
-        return 200, {"plan": [redact(x) for x in plan], "cost_estimate": cost, "confirm_id": cid}
+        out = {"plan": [redact(x) for x in plan], "cost_estimate": cost, "confirm_id": cid}
+        if mode == "ask" and "model" in job and not self.confirm_model_turns():
+            # a model turn runs at once (the daily cap was checked in prepare_model); ga do always confirms
+            code, r = self.confirm(cid)
+            if code == 200:
+                return 200, {**out, "confirm_id": None, "run_id": r["run_id"], "started": True}
+        return 200, out
 
     def confirm(self, cid: str) -> tuple[int, dict[str, Any]]:
         with self.lock:
@@ -316,6 +344,8 @@ class ConsoleHandler(UiHandler):
             return self.json(200, srv.work())
         if path == "/api/branches":
             return self.json(200, C.branches(srv.cfg))
+        if path == "/api/ask/setting":
+            return self.json(200, {"confirm_model_turns": srv.asker.confirm_model_turns()})
         if path == "/api/tokens":
             return self.json(200, C.tokens(srv.cfg, srv.reader, clock=srv.clock))
         if path == "/api/decisions":
@@ -352,6 +382,9 @@ class ConsoleHandler(UiHandler):
         if path == "/api/ask":
             code, obj = srv.asker.plan(str(body.get("q") or ""), str(body.get("mode") or "ask"))
             return self.json(code, obj)
+        if path == "/api/ask/setting":
+            srv.asker.set_confirm_model_turns(bool(body.get("confirm_model_turns")))
+            return self.json(200, {"confirm_model_turns": srv.asker.confirm_model_turns()})
         if path == "/api/ask/confirm":
             code, obj = srv.asker.confirm(str(body.get("confirm_id") or ""))
             return self.json(code, obj)

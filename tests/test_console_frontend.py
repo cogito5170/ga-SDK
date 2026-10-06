@@ -222,6 +222,7 @@ class Browser(unittest.TestCase):
     def test_d1_ask_shows_cost_first_then_runs_on_confirm(self):
         self.FakeEngine.ran = []
         pg = self.page("ask")
+        pg.check("[data-key=confirm-model]")  # GA44: a model turn only asks first when this is ticked
         pg.fill("#q", "hello there")
         pg.click("button:text-is('비용 보기')")
         pg.wait_for_selector(".cost", timeout=10000)
