@@ -412,7 +412,7 @@ class Act:
             if a.kind == "RUN" and a.arg not in self.commands and a.arg in self.actions:
                 ran.append(a.arg)
                 self._agent("WAITING_TOOL", tool=a.arg)
-                sp = self._tool("RUN", a.arg, action=True)
+                sp = self._tool("RUN", a.arg, approved_action=True)
                 notes.append(self._action(a))
                 (sp.done if ": exit 0" in notes[-1].splitlines()[0] else sp.fail)(result=EV.short(notes[-1].splitlines()[0]))
                 continue
