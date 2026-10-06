@@ -88,6 +88,14 @@ class Auto(unittest.TestCase):
             self.assertIsNone(record_served({"served_file": str(Path(d) / "x.json")}, {"events": [{"event": "turn"}]}))
             self.assertFalse((Path(d) / "x.json").exists())
 
+    def test_a_fallback_chain_records_the_last_rung(self):
+        with tempfile.TemporaryDirectory() as d:
+            sf = Path(d) / "served.json"
+            run = {"events": [{"event": "turn", "served": ["rung-a", "rung-b"]}]}
+            self.assertEqual(record_served({"served_file": str(sf)}, run, now=lambda: "T"), "rung-b")
+            self.assertEqual(json.loads(sf.read_text())["model"], "rung-b")
+            self.assertEqual(resolve_model({"model": "auto", "served_file": str(sf)})["resolved"], "rung-b")
+
 
 class Migration(unittest.TestCase):
     def home(self, model):
