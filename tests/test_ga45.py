@@ -35,8 +35,9 @@ class HubUnit(unittest.TestCase):
     def test_hub_unit_has_config_and_ga_dir(self):
         home = Path("/home/u")
         unit = core.unit_files(home)[core.HUB_UNIT]
-        (line,) = [ln for ln in unit.splitlines() if ln.startswith("ExecStart=")]
+        line, ops = [ln for ln in unit.splitlines() if ln.startswith("ExecStart=")]  # CMD-GA57 S5: ops tick after hub tick
         self.assertTrue(line.endswith("-m ga hub tick --shadow --config /home/u/.ga/hub.json --ga-dir /home/u/.ga"), line)
+        self.assertTrue(ops.endswith("-m ga ops tick --config /home/u/.ga/hub.json --ga-dir /home/u/.ga"), ops)
 
     def test_hub_conf_paths_are_absolute(self):
         c = core.hub_conf(Path("/home/u"))
