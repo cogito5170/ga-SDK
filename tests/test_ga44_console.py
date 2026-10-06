@@ -124,6 +124,7 @@ class Keys(unittest.TestCase):
         self.FakeEngine.ran = []
         pg = self.page("ask")
         pg.wait_for_selector("[data-key=confirm-model]")
+        pg.wait_for_selector("html[data-live=open]", state="attached", timeout=20000)
         return pg
 
     def test_enter_sends_at_once_and_token_line_is_not_asked_first(self):
@@ -146,10 +147,13 @@ class Keys(unittest.TestCase):
     def test_enter_during_ime_composition_does_not_send(self):
         pg = self.ask_page()
         pg.fill("#q", "한글")
+        sent = []
+        pg.on("request", lambda r: sent.append(r.url) if r.method == "POST" and "/api/ask" in r.url else None)
         pg.evaluate("""() => { const t = document.getElementById('q');
           t.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', isComposing: true, bubbles: true, cancelable: true}));
           t.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', keyCode: 229, bubbles: true, cancelable: true})); }""")
         time.sleep(0.5)
+        self.assertEqual(sent, [])  # the request itself, not the slower engine run (a sleep-then-ran check let the IME mutant live)
         self.assertEqual(self.FakeEngine.ran, [])
 
     def test_ticked_box_shows_the_confirm_card_for_a_model_turn(self):
