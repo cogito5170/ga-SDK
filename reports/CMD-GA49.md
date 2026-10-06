@@ -1,0 +1,7 @@
+# CMD-GA49 — shadow gate observable and honest (0.17.1), rebased on e364817
+
+- S1: shadow.jsonl rows carry `asks` (<=3, <=300 chars), `error` (the `_decide` backend label or null) and `served`. The notify/1 kind shadow form (`shadow_form`) and its validator carry the same three fields (additive); `shadow_rows_from_mailbox` returns them, so `shadow-compare --mailbox/--name` sees them.
+- S2: `shadow_compare` gate_ok = last 10 compared rows (by shadow `at`) all agree and no false accepts; adds `shadow_errors` (ASK_HUMAN with a backend error: not an agreement, not a false accept, breaks the run) and `gate` ("gate n/10"). CLI prints both.
+- S3: bridge report/2 `results.model` is the served model of the first turn that reports one; when unknown the entry is omitted (report/2 values cannot be null).
+- S4: not changed. `check_served` (ga/backends/base.py) requires served == configured model; the hub default gpt-oss-120b-medium against a gemini-serving rung gives `served_model_mismatch` (judge success, tokens null, ASK_HUMAN, as in BD-467). The routed model is not known from code, and loosening check_served would weaken a deliberate rule; set the VM hub config `model` to the bridge's rung. S1's `error` confirms it on the next item.
+- Tests: tests/test_ga49.py (9). test_ga42_shadow gate expectation updated. Full suite compared with e364817 (rlo-sdk could not be installed: its repo holds only a README), see the verdict.

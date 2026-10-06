@@ -122,6 +122,18 @@ def is_capacity(run: dict[str, Any]) -> bool:
             or any(e.get("event") == "turn" and e.get("reason") in ("capacity", "transient:503") for e in run.get("events") or []))
 
 
+def _served_model(turns: list[dict[str, Any]]) -> str | None:
+    """The model of the rung that actually answered (a turn's ``served``), never the configured default: None when no
+    turn says (then results has no model entry) (CMD-GA49 S3)."""
+    for t in turns:
+        sv = t.get("served")
+        sv = [sv] if isinstance(sv, str) else sv
+        names = [str(x) for x in sv or [] if x]
+        if names:
+            return ",".join(names)
+    return None
+
+
 def build_report(cfg: dict[str, Any], head: dict[str, Any], run: dict[str, Any], capacity: bool = False) -> str:
     turns = [e for e in run["events"] if e.get("event") == "turn"]
     end = next((e for e in reversed(run["events"]) if e.get("event") == "end"), {})
@@ -153,8 +165,10 @@ def build_report(cfg: dict[str, Any], head: dict[str, Any], run: dict[str, Any],
               "items": items or [{"id": "D1", "state": "met" if ok else "unmet", "evidence": evidence}],
               "results": [{"name": "input_tokens", "value": sum(int(t.get("input_tokens") or 0) for t in turns)},
                           {"name": "tokens", "value": sum(int(t.get("tokens") or 0) for t in turns)},
-                          {"name": "seconds", "value": round(sum(float(t.get("seconds") or 0) for t in turns), 3)},
-                          {"name": "model", "value": next((t.get("model") for t in turns if t.get("model")), "?")}]}
+                          {"name": "seconds", "value": round(sum(float(t.get("seconds") or 0) for t in turns), 3)}]}
+    served = _served_model(turns)
+    if served:  # report/2 results hold numbers and strings only: an unknown model is left out, never guessed
+        report["results"].append({"name": "model", "value": served})
     if blockers:
         report["blockers"] = blockers[:10]
     answer = out.strip()[-cfg["max_answer_chars"]:]

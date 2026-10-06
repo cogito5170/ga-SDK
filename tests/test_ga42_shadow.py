@@ -139,7 +139,7 @@ class ShadowCompare(unittest.TestCase):
         self.assertFalse(out["gate_ok"])
         ok = shadow_compare([b for b in self.BL if b["id"] != "B"], self.SH)
         self.assertEqual(ok["false_accepts"], [])
-        self.assertTrue(ok["gate_ok"])
+        self.assertFalse(ok["gate_ok"])  # CMD-GA49 S2: 3 compared rows are not 10 agreements
 
     def test_cli_prints_and_exits_1_on_a_false_accept(self):
         from ga.__main__ import main

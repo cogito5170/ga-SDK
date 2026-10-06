@@ -1437,6 +1437,9 @@ _SAME = {"ACCEPT": "ACCEPT", "ACCEPTED": "ACCEPT", "CONTINUE": "ACCEPT", "SEND_B
          "REFINE": "SEND_BACK", "ASK_HUMAN": "ASK_HUMAN", "ASK_USER": "ASK_HUMAN"}
 
 
+GATE_N = 10  # CMD-GA49 S2: the last N compared rows must all agree
+
+
 def shadow_compare(baseline: list[dict[str, Any]], shadow: list[dict[str, Any]]) -> dict[str, Any]:
     """Line a baseline verdict list {id, rev, decision} up against shadow.jsonl by (id, rev) — the last shadow line
     of a pair counts — and count agreement, false accepts (hub ACCEPT where baseline sent back) and extra send-backs
@@ -1447,23 +1450,37 @@ def shadow_compare(baseline: list[dict[str, Any]], shadow: list[dict[str, Any]])
     def norm(d: Any) -> str:
         return _SAME.get(str(d or "").strip().upper().replace("-", "_").replace(" ", "_"), str(d or "?"))
 
-    hub = {key(r): norm(r.get("decision")) for r in shadow}
-    rows, false_accepts, extra, missing = [], [], [], []
+    last = {key(r): r for r in shadow}
+    hub = {k: norm(r.get("decision")) for k, r in last.items()}
+    rows, false_accepts, extra, missing, errors = [], [], [], [], []
+    order = {id(b): i for i, b in enumerate(baseline)}
     for b in baseline:
         k = key(b)
         if k not in hub:
             missing.append(f"{k[0]} rev {k[1]}")
             continue
         bd, hd = norm(b.get("decision")), hub[k]
-        rows.append({"id": k[0], "rev": k[1], "baseline": bd, "hub": hd, "agree": bd == hd})
+        err = bool(last[k].get("error")) and hd == "ASK_HUMAN"  # a backend error, not a judgement
+        rows.append({"id": k[0], "rev": k[1], "baseline": bd, "hub": hd, "agree": bd == hd and not err, "error": err,
+                     "at": str(last[k].get("at") or "")})
+        if err:
+            errors.append(f"{k[0]} rev {k[1]}")
+            continue
         if hd == "ACCEPT" and bd == "SEND_BACK":
             false_accepts.append(f"{k[0]} rev {k[1]}")
         if hd == "SEND_BACK" and bd == "ACCEPT":
             extra.append(f"{k[0]} rev {k[1]}")
     agree = sum(r["agree"] for r in rows)
+    ordered = sorted(rows, key=lambda r: r["at"])  # by mail time (shadow.jsonl's own clock); stable for ties
+    run = 0
+    for r in reversed(ordered):
+        if not r["agree"]:
+            break
+        run += 1
+    ok = run >= GATE_N and not false_accepts and all(r["agree"] for r in ordered[-GATE_N:])
     return {"compared": len(rows), "agree": agree, "agreement": round(agree / len(rows), 3) if rows else None,
             "false_accepts": false_accepts, "extra_send_backs": extra, "missing_in_shadow": missing,
-            "rows": rows, "gate_ok": bool(rows) and not false_accepts}
+            "shadow_errors": errors, "gate": f"gate {min(run, GATE_N)}/{GATE_N}", "rows": rows, "gate_ok": ok}
 
 
 def shadow_rows_from_mailbox(mailbox: Any, name: str = SHADOW_TO) -> list[dict[str, Any]]:
@@ -1512,6 +1529,8 @@ class MailHub(Hub):
         self.shadow = bool(conf.get("shadow")) if shadow is None else bool(shadow)
         self.shadow_path = self.ga / "hub" / "shadow.jsonl"
         self._usage: dict[str, Any] | None = None
+        self._error: str = ""  # the backend error label of the last _decide (CMD-GA49 S1)
+        self._served: str | None = None
 
     # ---------------------------------------------------------------- state
     def load_state(self) -> dict[str, Any]:
@@ -1540,7 +1559,8 @@ class MailHub(Hub):
         u = self._usage or {}
         row = {"at": f"{self.today()}T{datetime.now(timezone.utc).strftime('%H:%M:%S')}Z", "id": did, "rev": rev, "sha": getattr(j, "sha", None),
                "judge_class": getattr(j, "cls", None), "needs": list(getattr(j, "needs", None) or []),
-               "decision": decision, "asks": list(lines), "tokens": {"input": u.get("input"), "output": u.get("output")},
+               "decision": decision, "asks": [str(x)[:300] for x in lines][:3], "error": self._error or None,
+               "served": self._served, "tokens": {"input": u.get("input"), "output": u.get("output")},
                "mail": m.path}
         self.shadow_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.shadow_path, "a", encoding="utf-8") as h:
@@ -1563,7 +1583,8 @@ class MailHub(Hub):
         txt = lambda v: str(v)[:200] if v is not None else None  # noqa: E731
         sh = {"id": txt(row.get("id")), "rev": rev, "sha": txt(row.get("sha")), "decision": str(row.get("decision") or "?")[:40],
               "judge_class": txt(row.get("judge_class")), "input": num(tok.get("input")), "output": num(tok.get("output")),
-              "mail": txt(row.get("mail"))}
+              "mail": txt(row.get("mail")), "error": txt(row.get("error")), "served": txt(row.get("served")),
+              "asks": [str(x)[:300] for x in row.get("asks") or []][:3]}
         head = {"schema": "notify/1", "to": self._shadow_to(), "kind": "shadow",
                 "ref": f"{self.conf.get('mailbox_url', MAILBOX_URL)}/blob/ga-mailbox/{row.get('mail') or ''}",
                 "shadow": sh}
@@ -1644,7 +1665,7 @@ class MailHub(Hub):
         if not did or commit is None or directive is None:
             why = "no configured repo in the report's commits" if commit is None else f"no directive {did} on file"
             if self.shadow:
-                self._usage = None
+                self._usage, self._error, self._served = None, "", None
                 self._shadow(m, did, head, directive, None, "ASK_HUMAN", [why])
                 res.plan.append(f"shadow ASK_HUMAN {did}")
                 return
@@ -1666,7 +1687,7 @@ class MailHub(Hub):
                               remote=rc.get("remote", "origin"))
         except Exception as e:  # the judge itself failed: a person looks
             if self.shadow:
-                self._usage = None
+                self._usage, self._error, self._served = None, "", None
                 self._shadow(m, did, head, directive, None, "ASK_HUMAN", [f"ga judge failed: {type(e).__name__}"])
                 res.plan.append(f"shadow ASK_HUMAN {did}")
                 return
@@ -1773,7 +1794,7 @@ class MailHub(Hub):
             err = f"backend:{getattr(e, 'reason', None) or type(e).__name__}"[:200]
         decision, lines = parse_decision(answer) if not err else ("ASK_HUMAN", ["the model turn failed"])
         secs = round(_t.time() - t0, 3)
-        self._usage = usage
+        self._usage, self._error, self._served = usage, err, served
         if self.shadow:  # the tokens go to shadow.jsonl; no ledger, no L0
             return decision, lines, err
         row = {"id": did, "kind": "hub", "backend": self.conf.get("backend", "agv"), "model": self.conf.get("model"),

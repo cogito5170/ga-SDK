@@ -143,7 +143,8 @@ def cmd_hub_shadow_compare(args) -> int:
     out = shadow_compare([b for b in base if isinstance(b, dict)], rows)
     print(f"agreement {out['agree']}/{out['compared']}" + (f" ({out['agreement']})" if out["compared"] else "")
           + f"; false accepts {len(out['false_accepts'])}; extra send-backs {len(out['extra_send_backs'])}"
-          + f"; missing in shadow {len(out['missing_in_shadow'])}")
+          + f"; missing in shadow {len(out['missing_in_shadow'])}; shadow_errors {len(out['shadow_errors'])}"
+          + ("" if out["gate_ok"] else "; " + out["gate"]))
     print(json.dumps({k: v for k, v in out.items() if k != "rows"}, ensure_ascii=False))
     return 0 if out["gate_ok"] else 1
 
