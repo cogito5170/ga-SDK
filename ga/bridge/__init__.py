@@ -20,6 +20,7 @@ import re
 import subprocess
 import sys
 import time
+from subprocess import SubprocessError
 from pathlib import Path
 from typing import Any, Callable
 
@@ -302,7 +303,7 @@ def one_pass(cfg: dict[str, Any], box: Mailbox | None = None,
             box.send(cfg["hub"], reply, cfg["name"])
             EV.emit("QUEUE", "bridge", "report mailed", "DONE", to=cfg["hub"], form=m.form)
             log(f"bridge: report sent to {cfg['hub']} for {m.form}")
-        except (MailError, FormError, OSError, ValueError, subprocess.SubprocessError) as e:
+        except (MailError, FormError, OSError, ValueError, SubprocessError) as e:  # a name, not subprocess.X: robust to a local import
             why = f"{type(e).__name__}: {str(e)[:200]}"
             log(f"bridge: {m.form} not answered: {why}")
             task_ev.error(why[:120])
