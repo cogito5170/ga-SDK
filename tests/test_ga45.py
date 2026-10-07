@@ -99,7 +99,7 @@ class ShadowMail(unittest.TestCase):
         sh_ = head["shadow"]
         self.assertEqual((sh_["id"], sh_["rev"], sh_["sha"], sh_["decision"], sh_["judge_class"]),
                          ("CMD-T1", 1, w.sha, "ACCEPT", "success"))
-        self.assertIsInstance(sh_["input"], int)
+        self.assertIsNone(sh_["input"])  # VI-04b: no model turn in shadow
         self.assertEqual(w.mail.box.get("baseline-shadow", [])[0].path, w.mail.box["baseline-shadow"][0].path)
         st = json.loads((w.tmp / ".ga/hub/state.json").read_text())
         (row,) = read_jsonl(w.tmp / ".ga/hub/shadow.jsonl")

@@ -1434,7 +1434,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 _SAME = {"ACCEPT": "ACCEPT", "ACCEPTED": "ACCEPT", "CONTINUE": "ACCEPT", "SEND_BACK": "SEND_BACK", "SENT_BACK": "SEND_BACK",
-         "REFINE": "SEND_BACK", "ASK_HUMAN": "ASK_HUMAN", "ASK_USER": "ASK_HUMAN"}
+         "REFINE": "SEND_BACK", "ASK_HUMAN": "ASK_HUMAN", "ASK_USER": "ASK_HUMAN", "SHADOW": "ASK_HUMAN"}
 
 
 HUB_MODEL_DEFAULT = "gpt-oss-120b-medium"  # the code default when hub.json names no model (or auto has nothing served)
@@ -1539,8 +1539,10 @@ class MailHub(Hub):
 
     def __init__(self, conf: dict[str, Any], *, ga_dir: str | Path, mailbox: Any = None, runner: Any = None,
                  judge_fn: Callable[..., Any] | None = None, apply_fn: Callable[..., Any] | None = None,
-                 today: Callable[[], str] = lambda: date.today().isoformat(), shadow: bool | None = None):
+                 today: Callable[[], str] = lambda: date.today().isoformat(), shadow: bool | None = None,
+                 verdict_fn: Callable[..., Any] | None = None):
         from . import judge as J
+        from . import verdict as V
         from .mailbox import Mailbox
         self.conf = conf
         self.ga = real_path(ga_dir)
@@ -1554,6 +1556,7 @@ class MailHub(Hub):
         self._own_runner = False
         self.judge_fn = judge_fn or J.judge
         self.apply_fn = apply_fn or J.apply
+        self.verdict_fn = verdict_fn or V.dry_run
         self.shadow = bool(conf.get("shadow")) if shadow is None else bool(shadow)
         self.shadow_path = self.ga / "hub" / "shadow.jsonl"
         self._usage: dict[str, Any] | None = None
@@ -1763,6 +1766,13 @@ class MailHub(Hub):
         owned = self.conf.get("owned", {}).get(did, [])
         from fnmatch import fnmatch
         outside = [f for f in changed if owned and not any(fnmatch(f, g) for g in owned)]
+        if self.shadow:  # VI-04b: the shadow decision is ga verdict (0 model calls)
+            decision, lines, err = self._verdict_decision(rp, rc, did, j.sha or commit.get("sha", ""), owned,
+                                                          list(getattr(j, "needs", None) or []))
+            self._usage, self._error, self._served = None, err, None
+            self._shadow(m, did, head, directive, j, decision, lines)
+            res.plan.append(f"shadow {decision} {did}")
+            return
         card = verdict_card(directive, head, j, diffstat, outside, st["verdicts"].get(did, []))
         EV.emit("TASK", "hub-shadow" if self.shadow else "hub", "step", "RUNNING", step="decide", directive=did,
                 judge=j.cls)
@@ -1840,6 +1850,26 @@ class MailHub(Hub):
             return [], []
         rows = [ln.split("\t") for ln in p.stdout.splitlines() if ln.count("\t") >= 2]
         return [f"{f} +{a} -{d}" for a, d, f in rows], [f for _, _, f in rows]
+
+    def _verdict_decision(self, rp: Path, rc: dict[str, Any], did: str, sha: str, owned: list[str],
+                          needs: list[str]) -> tuple[str, list[str], str]:
+        """VI-04b: (decision, lines, err) from ga verdict; no model, no gateway."""
+        from . import verdict as V
+        spec = (self.conf.get("specs") or {}).get(did)
+        if not spec and sha:
+            base = V._rev(rp, rc["base"])
+            added = [p for st, p in V._changed(rp, base, sha)
+                     if st == "A" and V._is_test(p) and Path(p).name.startswith("test_")] if base else []
+            spec = added[0] if added else None
+        if not spec:
+            return "SHADOW", [f"no acceptance test for {did}"], ""
+        try:
+            v = self.verdict_fn(rp, branch=sha, sha=sha, base=rc["base"], spec=spec, allowed=owned or None,
+                                nonexec=needs or None, scope=str(self.conf.get("verdict_scope", "full")),
+                                config=rc.get("config"))
+        except Exception as e:
+            return "SHADOW", [f"ga verdict failed: {type(e).__name__}"], f"verdict:{type(e).__name__}"
+        return str(v["decision"]), [str(v["reason"])[:300]], ""
 
     def _decide(self, card: str, did: str) -> tuple[str, list[str], str]:
         """One model turn; it goes to the ledger and L0 whatever happens."""

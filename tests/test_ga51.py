@@ -1,5 +1,7 @@
 """CMD-GA51 D1: hub.json "model": "auto" follows the model the bridge saw served; check_served still holds against the
-resolved model; ga vm migrates only the models ga itself wrote. Offline (fake backend), 0 model runs."""
+resolved model; ga vm migrates only the models ga itself wrote. Offline (fake backend), 0 model runs.
+VI-04b (baseline amendment): the shadow hub makes no model turn any more, so the model plumbing is pinned on the
+non-shadow hub, whose ledger row carries the same model fields."""
 import json
 import tempfile
 import unittest
@@ -32,7 +34,7 @@ def shadow_tick(t, served_record, serves):
     if served_record is not None:
         sf.write_text(json.dumps({"model": served_record, "at": "2026-10-06T00:00:00Z"}), encoding="utf-8")
     w.conf.update(model="auto", served_file=str(sf))
-    h = hub(w, ["ACCEPT"], shadow=True)
+    h = hub(w, ["ACCEPT"], shadow=False)
     h.runner = None  # the backend is made from hub.json, as on the VM
     made = []
 
@@ -41,7 +43,7 @@ def shadow_tick(t, served_record, serves):
         return Host(model, serves)
     with mock.patch("ga.backends.create", create):
         h.tick()
-    (row,) = read_jsonl(w.tmp / ".ga/hub/shadow.jsonl")
+    (row,) = read_jsonl(w.tmp / ".ga/hub/ledger/2026-10-05.jsonl")
     return row, made, h
 
 
@@ -49,7 +51,7 @@ class Auto(unittest.TestCase):
     def test_auto_resolves_to_the_served_model(self):
         row, made, _ = shadow_tick(self, "gemini-3.8-flash-high", "gemini-3.8-flash-high")
         self.assertEqual(made, ["gemini-3.8-flash-high"])
-        self.assertIsNone(row["error"])
+        self.assertFalse(row["error"])  # the ledger row writes "" for no error
         self.assertEqual(row["decision"], "ACCEPT")
         self.assertEqual((row["model_configured"], row["model_resolved"]), ("auto", "gemini-3.8-flash-high"))
         self.assertNotIn("model_note", row)

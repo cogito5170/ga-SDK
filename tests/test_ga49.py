@@ -19,16 +19,21 @@ class Boom:
         raise e
 
 
+def boom_verdict(repo, **k):  # VI-04b: the shadow decision is ga verdict; its failure is the row's error
+    raise RuntimeError("down")
+
+
 class ShadowRow(unittest.TestCase):
-    def test_runner_error_is_in_the_row(self):
+    def test_verdict_error_is_in_the_row(self):
         w = World(self)
         w.report()
         h = hub(w, ["ACCEPT"], shadow=True)
         h.runner = Boom()
+        h.verdict_fn = boom_verdict
         h.tick()
         (row,) = read_jsonl(w.tmp / ".ga/hub/shadow.jsonl")
-        self.assertEqual(row["decision"], "ASK_HUMAN")
-        self.assertEqual(row["error"], "backend:http_503")
+        self.assertEqual(row["decision"], "SHADOW")
+        self.assertEqual(row["error"], "verdict:RuntimeError")
         self.assertIsNone(row["served"])
         self.assertEqual(len(row["asks"]), 1)
 
@@ -38,7 +43,7 @@ class ShadowRow(unittest.TestCase):
         hub(w, ["ACCEPT"], shadow=True).tick()
         (row,) = read_jsonl(w.tmp / ".ga/hub/shadow.jsonl")
         self.assertIsNone(row["error"])
-        self.assertEqual(row["served"], "fake-small")
+        self.assertIsNone(row["served"])  # VI-04b: no model served anything in shadow
 
 
 def rows(n, bad=(), err=()):
@@ -124,15 +129,15 @@ class ShadowNotify(unittest.TestCase):
         w = World(self)
         w.report()
         h = hub(w, ["ACCEPT"], shadow=True)
-        h.runner = Boom()
+        h.verdict_fn = boom_verdict
         h.tick()
         (row,) = read_jsonl(w.tmp / ".ga/hub/shadow.jsonl")
         text = h.shadow_form(row)
         head, _ = parse_text(text)
         self.assertEqual(hard(validate(head)), [])
-        self.assertEqual(head["shadow"]["error"], "backend:http_503")
-        self.assertEqual(head["shadow"]["asks"], ["the model turn failed"])
+        self.assertEqual(head["shadow"]["error"], "verdict:RuntimeError")
+        self.assertEqual(head["shadow"]["asks"], ["ga verdict failed: RuntimeError"])
         r = {**head["shadow"], "tokens": {"input": None, "output": None}}  # what shadow_rows_from_mailbox returns
-        self.assertEqual(r["error"], "backend:http_503")
+        self.assertEqual(r["error"], "verdict:RuntimeError")
         out = shadow_compare([{"id": row["id"], "rev": row["rev"], "decision": "ACCEPT"}], [r])
         self.assertEqual(out["shadow_errors"], [f"{row['id']} rev {row['rev']}"])

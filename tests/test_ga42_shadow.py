@@ -1,5 +1,7 @@
 """CMD-GA42 rev 2 D1: accept-with-needs, a hand-written registry entry without network approval, shadow mode and
-``ga hub shadow-compare``. Offline, fake judge / backend / mailbox from tests/test_ga42.py. 0 model runs."""
+``ga hub shadow-compare``. Offline, fake judge / backend / mailbox from tests/test_ga42.py. 0 model runs.
+VI-04b (baseline amendment): the shadow decision is ``ga verdict`` (0 model calls); the fake ``verdict_fn`` below is
+ga.verdict.decide on given checks, so the shadow tests pin the hub's plumbing, not the checks."""
 import io
 import json
 import subprocess
@@ -16,15 +18,24 @@ from tests.test_ga42 import DLOG, BASE, REPO, World, git, to
 from tests.test_ga42_actions import Base
 
 
-def hub(w, answers, cls="success", shadow=None, **kw):
+def hub(w, answers, cls="success", shadow=None, checks=None, **kw):
+    """``checks``: the ga verdict checks the fake verdict_fn decides on (default: all pass)."""
     from tests.test_ga42 import Fake
-    w.runner, w.applied = Fake(answers), []
+    from ga import verdict as V
+    w.runner, w.applied, w.verdicts = Fake(answers), [], []
 
     def apply(j, repo, remote):
         w.applied.append(j.sha)
         return "fake-pushed"
+
+    def verdict_fn(repo, **k):
+        w.verdicts.append(k)
+        c = {n: (True, "ok") for n in V.ORDER}
+        c.update(checks or {})
+        return V.decide(c, k.get("nonexec"), "light")
+    w.conf.setdefault("specs", {"CMD-T1": "tests/test_calc.py"})
     return MailHub(w.conf, ga_dir=w.tmp / ".ga", mailbox=w.mail, runner=w.runner, judge_fn=w.judgement(cls, **kw),
-                   apply_fn=apply, today=lambda: "2026-10-05", shadow=shadow)
+                   apply_fn=apply, today=lambda: "2026-10-05", shadow=shadow, verdict_fn=verdict_fn)
 
 
 class AcceptWithNeeds(unittest.TestCase):
@@ -69,12 +80,12 @@ class Shadow(unittest.TestCase):
         # CMD-GA45 S2: the shadow hub also mails its row to baseline-shadow and keeps the mailed path in state.json
         return {k: v for k, v in w.snapshot().items() if not k.endswith(("/hub/shadow.jsonl", "/hub/state.json"))}
 
-    def check_shadow(self, answers, cls, decision, shadow=True, conf_shadow=False, **kw):
+    def check_shadow(self, answers, cls, decision, shadow=True, conf_shadow=False, checks=None, **kw):
         w = World(self)
         w.report()
         if conf_shadow:
             w.conf["shadow"] = True
-        h = hub(w, answers, cls, shadow=shadow, **kw)
+        h = hub(w, answers, cls, shadow=shadow, checks=checks, **kw)
         before, tmp0 = self.files(w), set(Path(tempfile.gettempdir()).glob("ga-hub-shadow-*"))
         res = h.tick()
         self.assertEqual(self.files(w), before)  # no file outside shadow.jsonl changed
@@ -85,32 +96,35 @@ class Shadow(unittest.TestCase):
         self.assertEqual((w.remote_main(), w.remote_main("base.git")),
                          (w.main0, git(w.base, "rev-parse", "HEAD")))
         self.assertEqual(res.integrated, {})
-        self.assertEqual(len(w.runner.calls), 1)  # the model decision ran exactly as now
+        self.assertEqual(len(w.runner.calls), 0)  # VI-04b: no model turn in shadow
+        self.assertEqual(len(w.verdicts), 1)  # ga verdict decided
         self.assertEqual(len(w.judged), 1)
         (row,) = read_jsonl(w.tmp / ".ga/hub/shadow.jsonl")
         for k in ("at", "id", "rev", "sha", "judge_class", "needs", "decision", "asks", "tokens"):
             self.assertIn(k, row)
         self.assertEqual((row["id"], row["rev"], row["sha"], row["judge_class"], row["decision"]),
                          ("CMD-T1", 1, w.sha, cls, decision))
-        self.assertIsInstance(row["tokens"]["input"], int)
+        self.assertEqual(row["tokens"], {"input": None, "output": None})
         # the same mail again: quiet, no write, no model call
         before = w.snapshot()
         res = h.tick()
         self.assertTrue(res.quiet)
         self.assertEqual(w.snapshot(), before)
-        self.assertEqual(len(w.runner.calls), 1)
+        self.assertEqual((len(w.runner.calls), len(w.verdicts)), (0, 1))
         return w, row
 
     def test_shadow_accept_changes_nothing_but_shadow_jsonl(self):
         self.check_shadow(["ACCEPT"], "success", "ACCEPT")
 
     def test_shadow_send_back_changes_nothing_but_shadow_jsonl(self):
-        _, row = self.check_shadow(["SEND_BACK\n- fix add\n- add a test"], "partial", "SEND_BACK")
-        self.assertEqual(row["asks"], ["fix add", "add a test"])
+        _, row = self.check_shadow(["SEND_BACK\n- fix add\n- add a test"], "partial", "SEND_BACK",
+                                   checks={"files": (False, "outside allowed: other.py")})
+        self.assertEqual(row["asks"], ["files: outside allowed: other.py"])
 
-    def test_shadow_accept_with_needs_is_recorded_as_ask_human(self):
-        _, row = self.check_shadow(["ACCEPT"], "success", "ASK_HUMAN", needs=["D1 claim"])
+    def test_shadow_accept_with_needs_is_recorded_as_shadow(self):  # VI-04b: needs are non-executable criteria
+        _, row = self.check_shadow(["ACCEPT"], "success", "SHADOW", needs=["D1 claim"])
         self.assertEqual(row["needs"], ["D1 claim"])
+        self.assertEqual(row["asks"], ["non-executable criterion: D1 claim"])
 
     def test_shadow_from_the_config(self):
         self.check_shadow(["ACCEPT"], "success", "ACCEPT", shadow=None, conf_shadow=True)

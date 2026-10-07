@@ -376,7 +376,7 @@ class MailNet(EvCase):
 
 
 class HubEvents(EvCase):
-    def test_shadow_decision_is_task_and_llm(self):
+    def test_shadow_decision_is_task_and_no_llm(self):  # VI-04b: the shadow decision is ga verdict, 0 model calls
         from test_ga42 import World
         from test_ga42_shadow import hub
         w = World(self)
@@ -386,10 +386,7 @@ class HubEvents(EvCase):
         self.assertValid(evs)
         task = [e for e in evs if e["type"] == "TASK" and e["status"] == "STARTED"][0]
         self.assertEqual(task["component"], "hub-shadow")
-        llm = [e for e in evs if e["type"] == "LLM"]
-        self.assertEqual([e["action"] for e in llm], ["REQUEST", "PROCESSING", "RECEIVING_RESULT", "RESPONSE_READY"])
-        self.assertEqual(llm[0]["parent_id"], task["event_id"])
-        self.assertEqual(llm[-1]["metadata"]["decision"], "ACCEPT")
+        self.assertEqual([e for e in evs if e["type"] == "LLM"], [])
         self.assertEqual(evs[-1]["metadata"]["decision"], "shadow ACCEPT CMD-T1")
         self.assertNotIn("ACCEPT\n", self.evf.read_text())
 
@@ -399,7 +396,7 @@ class HubEvents(EvCase):
         from ga.backends.base import BackendError
         w = World(self)
         w.report()
-        h = hub(w, ["ACCEPT"], "success", shadow=True)
+        h = hub(w, ["ACCEPT"], "success", shadow=False)  # VI-04b: only the non-shadow hub still has a model turn
 
         class Broken:
             bare = True
