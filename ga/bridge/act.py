@@ -41,7 +41,7 @@ BLOCK = re.compile(r"```ga-act[ \t]*\n(.*?)\n```", re.S)
 PATCH_CAP = 60_000
 SAFE_PATH = re.compile(r"^(?!/)(?!.*\.\.)[\w./@()\[\]-]+$")
 BRANCH = re.compile(r"^[\w./-]+$")
-SPEC_KEYS = {"item", "tests", "commands", "base", "repo", "rewrite", "ladder", "model"}
+SPEC_KEYS = {"item", "tests", "commands", "base", "repo", "rewrite", "ladder", "model", "max_turns"}
 
 
 def item_spec(body: str) -> dict[str, Any] | None:
@@ -55,6 +55,10 @@ def item_spec(body: str) -> dict[str, Any] | None:
         raise ValueError(f"ga-act block is not JSON: {e}") from None
     if not isinstance(spec, dict) or not isinstance(spec.get("item"), dict):
         raise ValueError("ga-act block must be an object with an item")
+    if "max_turns" in spec:
+        mt = spec["max_turns"]
+        if type(mt) is bool or not isinstance(mt, int) or not (1 <= mt <= 30):
+            raise ValueError("max_turns must be an int 1..30")
     extra = set(spec) - SPEC_KEYS
     if extra:
         raise ValueError(f"ga-act block: unknown key(s) {', '.join(sorted(extra))}")
@@ -133,12 +137,13 @@ def _expand(argv: list[str], subs: dict[str, str]) -> list[str]:
 def act_argv(cfg: dict[str, Any], spec: dict[str, Any], wt: Path, tmp: Path, model: str) -> list[str]:
     act = cfg.get("act") or {}
     ladder = list(spec.get("ladder") or act.get("ladder") or [])
+    max_turns = spec.get("max_turns", act.get("max_turns", 20))
     argv = [sys.executable, "-m", "ga", "act", "--item", str(tmp / "item.json"), "--repo", str(wt),
             "--backend", act.get("backend", "agv"), "--model", model,
             *(["--ladder", ",".join(ladder)] if ladder else []),
             "--options", json.dumps(act.get("options") or {}), "--config", str(tmp / "commands.json"),
             "--state", str(Path(act.get("state_dir") or "~/.ga/act-bridge").expanduser()),
-            "--max-turns", str(int(act.get("max_turns", 10)))]
+            "--max-turns", str(int(max_turns))]
     return argv
 
 
@@ -244,6 +249,18 @@ def report(cfg: dict[str, Any], head: dict[str, Any], run: dict[str, Any], patch
         tail = "(withheld: looked like it held a secret)"
     body = "```ga\n" + json.dumps(rep, ensure_ascii=False, separators=(",", ":")) + "\n```\n\n## ga act result\n\n```text\n" + \
         tail.replace("```", "'''") + "\n```\n"
+    if "trace" in res:
+        lines = []
+        for t in res["trace"]:
+            acts = "; ".join(t.get("actions", []))
+            s = f"t{t.get('turn')} card {t.get('card_tokens')} applied {t.get('applied')} rejected {t.get('rejected')}: {acts}"
+            if t.get("dropped"):
+                s += f" dropped {len(t['dropped'])}"
+            lines.append(s)
+        sec = "\n".join(lines)
+        if len(sec) > 4000:
+            sec = sec[:4000]
+        body += "\n## turns\n\n```text\n" + sec.replace("```", "'''") + "\n```\n"
     if patch:
         cut = patch if len(patch) <= PATCH_CAP else patch[:PATCH_CAP] + "\n(patch cut at the cap)\n"
         body += "\n## patch\n\n```diff\n" + cut.replace("```", "'''") + "\n```\n"
