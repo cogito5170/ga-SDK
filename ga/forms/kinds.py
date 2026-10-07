@@ -432,6 +432,92 @@ def _exchange_cross(doc: dict[str, Any]) -> list[Problem]:
     return []
 
 
+# ---- VI-10: journal/1, one row per work-item transition (research/VM_INTERIOR_DESIGN.md §2); state = fold(journal)
+JOURNAL_STATES = tuple(_REG['enums']['JOURNAL_STATES'])
+JOURNAL_EVENTS = tuple(_REG['enums']['JOURNAL_EVENTS'])
+# event -> (from_state, to_state); "NONE" is the state of an item the journal has not seen; T11's None = any state
+JOURNAL_TRANSITIONS = {
+    "T1": ("NONE", "PLANNED"), "T2": ("PLANNED", "DISPATCHED"), "T3": ("DISPATCHED", "ACTING"),
+    "T4": ("ACTING", "REPORTED"), "T5": ("REPORTED", "VERDICT"), "T6": ("VERDICT", "SEND_BACK"),
+    "T6'": ("SEND_BACK", "DISPATCHED"), "T7": ("VERDICT", "SHADOW"), "T8": ("VERDICT", "INTEGRATED"),
+    "T9": ("INTEGRATED", "DEPLOYED"), "T10": ("DEPLOYED", "OBSERVED"), "T11": (None, "CANCELLED"),
+}
+JOURNAL_ITEM_RE = re.compile(r"^(?:CMD-[A-Z]+\d+|[A-Z][A-Z0-9]*-[A-Z]+-\d+)$")  # = ga.net.pool.ITEM_ID
+
+
+def _journal_guard(v: Any) -> str | None:
+    if not isinstance(v, dict) or set(v) != {"ok", "why"} or not isinstance(v["ok"], bool) \
+            or not isinstance(v["why"], str) or not v["why"].strip():
+        return "must be {ok: true|false, why: a non-empty string}"
+    return None
+
+
+JOURNAL = [
+    Field("id", matches(re.compile(r"^J-[1-9]\d*$"), "J-<n>")),
+    Field("at", matches(re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"), "YYYY-MM-DDTHH:MM:SSZ")),
+    Field("item", matches(JOURNAL_ITEM_RE, "a work/1 item id")),
+    Field("from_state", one_of("NONE", *JOURNAL_STATES)),
+    Field("to_state", one_of("NONE", *JOURNAL_STATES)),
+    Field("event", one_of(*JOURNAL_EVENTS)),
+    Field("guard", _journal_guard),
+    Field("inputs_hash", matches(re.compile(r"^[0-9a-f]{64}$"), "a sha256 hex digest")),
+    Field("record", lambda v: None if isinstance(v, dict) else "must be an object"),
+]
+
+
+def _journal_cross(doc: dict[str, Any]) -> list[Problem]:
+    ev, f, t = doc["event"], doc["from_state"], doc["to_state"]
+    if not doc["guard"]["ok"]:
+        return [] if f == t else [Problem("$.to_state", "a refused transition keeps the state")]
+    want_f, want_t = JOURNAL_TRANSITIONS[ev]
+    if t == want_t and (f == want_f if want_f is not None else f not in ("NONE", "CANCELLED")):
+        return []
+    return [Problem("$.event", f"{ev} is {want_f or 'any state'} -> {want_t}, not {f} -> {t}")]
+
+
+# ---- VI-10: journal/1, one row per work-item transition (research/VM_INTERIOR_DESIGN.md §2); state = fold(journal)
+JOURNAL_STATES = tuple(_REG['enums']['JOURNAL_STATES'])
+JOURNAL_EVENTS = tuple(_REG['enums']['JOURNAL_EVENTS'])
+# event -> (from_state, to_state); "NONE" is the state of an item the journal has not seen; T11's None = any state
+JOURNAL_TRANSITIONS = {
+    "T1": ("NONE", "PLANNED"), "T2": ("PLANNED", "DISPATCHED"), "T3": ("DISPATCHED", "ACTING"),
+    "T4": ("ACTING", "REPORTED"), "T5": ("REPORTED", "VERDICT"), "T6": ("VERDICT", "SEND_BACK"),
+    "T6'": ("SEND_BACK", "DISPATCHED"), "T7": ("VERDICT", "SHADOW"), "T8": ("VERDICT", "INTEGRATED"),
+    "T9": ("INTEGRATED", "DEPLOYED"), "T10": ("DEPLOYED", "OBSERVED"), "T11": (None, "CANCELLED"),
+}
+JOURNAL_ITEM_RE = re.compile(r"^(?:CMD-[A-Z]+\d+|[A-Z][A-Z0-9]*-[A-Z]+-\d+)$")  # = ga.net.pool.ITEM_ID
+
+
+def _journal_guard(v: Any) -> str | None:
+    if not isinstance(v, dict) or set(v) != {"ok", "why"} or not isinstance(v["ok"], bool) \
+            or not isinstance(v["why"], str) or not v["why"].strip():
+        return "must be {ok: true|false, why: a non-empty string}"
+    return None
+
+
+JOURNAL = [
+    Field("id", matches(re.compile(r"^J-[1-9]\d*$"), "J-<n>")),
+    Field("at", matches(re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"), "YYYY-MM-DDTHH:MM:SSZ")),
+    Field("item", matches(JOURNAL_ITEM_RE, "a work/1 item id")),
+    Field("from_state", one_of("NONE", *JOURNAL_STATES)),
+    Field("to_state", one_of("NONE", *JOURNAL_STATES)),
+    Field("event", one_of(*JOURNAL_EVENTS)),
+    Field("guard", _journal_guard),
+    Field("inputs_hash", matches(re.compile(r"^[0-9a-f]{64}$"), "a sha256 hex digest")),
+    Field("record", lambda v: None if isinstance(v, dict) else "must be an object"),
+]
+
+
+def _journal_cross(doc: dict[str, Any]) -> list[Problem]:
+    ev, f, t = doc["event"], doc["from_state"], doc["to_state"]
+    if not doc["guard"]["ok"]:
+        return [] if f == t else [Problem("$.to_state", "a refused transition keeps the state")]
+    want_f, want_t = JOURNAL_TRANSITIONS[ev]
+    if t == want_t and (f == want_f if want_f is not None else f not in ("NONE", "CANCELLED")):
+        return []
+    return [Problem("$.event", f"{ev} is {want_f or 'any state'} -> {want_t}, not {f} -> {t}")]
+
+
 SCHEMAS: dict[str, tuple[list[Field], Callable[[dict[str, Any]], list[Problem]] | None]] = {
     "directive/1": (DIRECTIVE, _directive_cross),
     "report/1": (REPORT, None),
@@ -445,6 +531,8 @@ SCHEMAS: dict[str, tuple[list[Field], Callable[[dict[str, Any]], list[Problem]] 
     "directive/2": (DIRECTIVE2, _directive2_cross),
     "report/2": (REPORT2, _report2_cross),
     "notify/1": (NOTIFY, None),
+    "journal/1": (JOURNAL, _journal_cross),
+    "journal/1": (JOURNAL, _journal_cross),
 }
 
 # CMD-GA37 S1: the intake form (ga/forms/task.py)
