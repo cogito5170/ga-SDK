@@ -153,7 +153,7 @@ R3: 세션은 자기 브랜치만 내고, 통합 브랜치는 허브만 움직�
 
 - **`directive/2`:** `scope` · `done_when` 은 항목 목록이다(`[{id: "S1"|"D1", text}]`, 한 항목에 한 요구 · 따로 확인할 수 있는 기준). 선택 칸으로 `refs` 가 있다. **rev > 1 은 `changes`(`[{item, op: add|edit|drop, text?}]`)만 보낸다.** 허브는 앞 판에 그것을 얹어 전체 판을 기록하고, 턴 프롬프트에도 "지금 판" 으로 보인다(`ga.forms.apply_changes`). 없는 항목을 고치거나 있는 항목을 더하면 보내지 않는다.
 - **`report/2`:** report/1 의 칸에 더해 `items`(다룬 지시의 done_when 항목마다 met · unmet · blocked · na, evidence)를 둔다. 선택 칸으로 `results`([{name, value, unit?, ci?, evidence}]) · `blockers`([{kind: env|permission|credential|budget|dependency|design, what, gate?}]) · `deviations` · `proposals` 가 있다. 본문은 1,500 자 안팎의 요약이다(soft).
-- **`notify/1`:** 세션을 깨우는 한 줄. `ga notify --to <세션> --kind directive|report|verdict|question|ack --ref <URL> [--id]`.
+- **`notify/1`:** 세션을 깨우는 한 줄. `ga notify --to <세션> --kind directive|report|verdict|question|ack|alert --ref <URL> [--id]`.
 - **기계 규칙**
   - done 으로 보고했는데 met 이 아닌 항목이 있으면 바닥은 부분 성공이다.
   - `na` 는 `evidence` 에 까닭이 있으면 바닥에서 뺀다(round note 에 남음). 까닭이 없으면 met 이 아닌 항목으로 센다(METHOD rev 17, CMD-GA19).

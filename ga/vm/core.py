@@ -207,9 +207,9 @@ def bridge_unit(home: Path, *, min_free_gb: float = MIN_FREE_GB) -> str:
     guard = f"{py} -m ga vm check --disk-only --home {home} --min-free-gb {min_free_gb:g}"
     path = f"{home}/.local/bin:{home}/bin:/usr/local/bin:/usr/bin:/bin"
     return (f"[Unit]\nDescription=agy bridge for to/{BRIDGE_NAME} (enable with `ga vm enable-bridge --yes` after the Mac "
-            f"bridge is off)\nAfter=network-online.target\n\n[Service]\nWorkingDirectory={home}/baseline\n"
+            f"bridge is off)\nAfter=network-online.target\n\n[Service]\nWorkingDirectory={home}\n"
             f"Environment=PATH={path}\nExecStartPre={guard}\nExecStartPre={py} -m ga vm bridge-ready --home {home}\n"
-            f"ExecStart={py} {home}/baseline/ops/agy_bridge/bridge.py --config {home}/agy-bridge.json\n"
+            f"ExecStart={py} -m ga bridge --config {home}/agy-bridge.json\n"
             f"Restart=always\nRestartSec=30\nNoNewPrivileges=yes\n\n[Install]\nWantedBy=default.target\n")
 
 

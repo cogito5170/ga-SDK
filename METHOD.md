@@ -173,7 +173,7 @@ ga-SDK 는 이 고리에서 **기계적인 부분을 자동으로** 하고, **�
 - `blockers`(선택): `[{kind: env|permission|credential|budget|dependency|design, what, gate?}]`.
 - `deviations` · `proposals`(선택): 짧은 글의 목록.
 
-**`notify/1`** — 세션을 깨우는 메시지(`send_message` 등)의 꼴이다. `{to, kind: directive|report|verdict|question|ack, ref: URL, id?}`. 글을 싣지 않는다. 내용은 `ref` 가 가리키는 통로에 있다.
+**`notify/1`** — 세션을 깨우는 메시지(`send_message` 등)의 꼴이다. `{to, kind: directive|report|verdict|question|ack|alert, ref: URL, id?}`. 글을 싣지 않는다. 내용은 `ref` 가 가리키는 통로에 있다.
 
 **기계 규칙**
 - `done` 으로 보고했는데 `met` 이 아닌 항목이 있으면 바닥은 부분 성공이다. 막힘 항목이 있으면 바닥은 막힘이다.
