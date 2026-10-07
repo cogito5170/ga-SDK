@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +47,55 @@ def build(cfg: GatewayConfig, window_s: int = 3600) -> dict[str, Any]:
             "ga_sdk_sha": cfg.sdk_sha or sdk_sha(), "policy_sha256": policy.sha256, "policy_ok": policy.ok}
 
 
+def status(report: dict[str, Any]) -> dict[str, Any]:
+    at_str = str(report.get("at") or "")
+    try:
+        dt = datetime.fromisoformat(at_str.replace("Z", "+00:00"))
+        at_tag = dt.strftime("%Y%m%d%H")
+    except Exception:
+        digits = "".join(c for c in at_str if c.isdigit())
+        at_tag = digits[:10]
+
+    items: list[dict[str, Any]] = []
+    blockers: list[dict[str, str]] = []
+
+    for cap_id, data in (report.get("caps") or {}).items():
+        if not isinstance(data, dict):
+            continue
+        spend = data.get("spend")
+        limit = data.get("limit")
+        if isinstance(limit, (int, float)) and not isinstance(limit, bool) and isinstance(spend, (int, float)) and not isinstance(spend, bool):
+            if spend > limit:
+                state = "over"
+            elif spend >= 0.8 * limit:
+                state = "near"
+            else:
+                state = "ok"
+            items.append({
+                "id": cap_id,
+                "state": state,
+                "note": f"${spend} of ${limit}",
+            })
+            if state == "over":
+                blockers.append({
+                    "kind": "budget",
+                    "what": f"cap {cap_id} over limit: {spend} > {limit}",
+                })
+
+    if report.get("policy_ok") is False:
+        blockers.append({
+            "kind": "budget",
+            "what": "policy_ok is false",
+        })
+
+    return {
+        "schema": "status/1",
+        "id": f"LLM-{at_tag}",
+        "items": items,
+        "blockers": blockers,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="ga llm")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -55,7 +104,10 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--hour", action="store_true", help="the last 60 minutes (default)")
     g.add_argument("--day", action="store_true", help="the last 24 hours")
     p.add_argument("--policy"), p.add_argument("--home")
+    p.add_argument("--status", action="store_true")
     a = ap.parse_args(sys.argv[1:] if argv is None else argv)
     cfg = GatewayConfig(policy_path=a.policy or "", home=a.home or "")
-    print(json.dumps(build(cfg, 86400 if a.day else 3600), ensure_ascii=False, sort_keys=True))
+    rep = build(cfg, 86400 if a.day else 3600)
+    out = status(rep) if a.status else rep
+    print(json.dumps(out, ensure_ascii=False, sort_keys=True))
     return 0
