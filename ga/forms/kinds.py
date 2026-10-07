@@ -30,12 +30,16 @@ from .core import (
     parse_text,
 )
 
-VERDICT_CLASSES = ("success", "partial", "failure", "blocked", "insufficient")
-CAUSES = ("implementation", "requirement", "dependency", "measurement", "environment", "hub_directive")
-NEXT_CHOICES = ("continue", "refine", "verify", "handoff", "change_direction", "wait", "ask_user")
-HANDLED_STATUS = ("done", "paused", "declined")
-CHANGE_SIZES = ("implementation", "component", "interface", "architecture", "baseline")
-NEEDS = ("credential", "budget", "new_repo", "new_session")
+from .registry import load as _load_registry
+
+_REG = _load_registry()
+
+VERDICT_CLASSES = tuple(_REG['enums']['VERDICT_CLASSES'])
+CAUSES = tuple(_REG['enums']['CAUSES'])
+NEXT_CHOICES = tuple(_REG['enums']['NEXT_CHOICES'])
+HANDLED_STATUS = tuple(_REG['enums']['HANDLED_STATUS'])
+CHANGE_SIZES = tuple(_REG['enums']['CHANGE_SIZES'])
+NEEDS = tuple(_REG['enums']['NEEDS'])
 EVIDENCE_MARKS = ("verified", "partially verified", "not verified", "assumption", "blocked")
 ISSUE_GRADES = ("blocking", "current", "future", "optional")
 REPORT_SECTIONS = ("Task", "Execution", "Result", "Evidence", "Deviation", "Blocker", "Proposal", "Request")
@@ -121,9 +125,9 @@ DIRECTIVE = [
 S_ID = re.compile(r"^S\d+$")
 D_ID = re.compile(r"^D\d+$")
 ITEM_STATES = ("met", "unmet", "blocked", "na")
-BLOCKER_KINDS = ("env", "permission", "credential", "budget", "dependency", "design")
+BLOCKER_KINDS = tuple(_REG['enums']['BLOCKER_KINDS'])
 # alert: the VM watcher -> cloud, something needs a human (VI-06a); across the VM boundary only ack and alert travel
-NOTIFY_KINDS = ("directive", "report", "verdict", "question", "ack", "shadow", "alert")
+NOTIFY_KINDS = tuple(_REG['enums']['NOTIFY_KINDS'])
 
 
 def _items(prefix: re.Pattern[str], what: str) -> Check:
