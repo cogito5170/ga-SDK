@@ -183,6 +183,13 @@ def file_slice(root: Path, rel: str, lines_ab: tuple[int, int] | None = None, ma
     if p is None or not p.is_file():
         return None
     lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    if lines_ab is None and len(lines) > max_lines:
+        ds = [d for d in defs(root, rel) if d[0].count(".") <= 1]
+        if ds:
+            out = [f"{rel} outline (file too long, ask NEED file {rel} lines a-b):"]
+            for q, start, end in ds:
+                out.append(f"{start:>5}| {q}")
+            return "\n".join(out)
     a, b = lines_ab or (1, len(lines))
     if b < a:
         a, b = b, a

@@ -64,6 +64,18 @@ class Result:
     def to_dict(self) -> dict[str, Any]:
         d = {"schema": SPEC, "id": self.id, "status": self.status, "reason": self.reason, "turns": self.turns,
              "failing": self.failing, "tokens": self.tokens, "changed": self.changed}
+        trace = []
+        for r in self.rows:
+            if "actions" in r:
+                trace.append({
+                    "turn": r["turn"],
+                    "card_tokens": r["card_tokens"],
+                    "actions": r["actions"],
+                    "applied": r.get("applied", 0),
+                    "rejected": r.get("rejected", 0),
+                    "dropped": r.get("dropped", [])
+                })
+        d["trace"] = trace
         if self.rungs:
             d["rungs"] = self.rungs
         if self.route:
@@ -112,6 +124,8 @@ class Act:
                                            self.commands, self.actions))
         self.last = ""                  # the last turn's summary only: never a history
         self.needs: list[str] = []      # NEED results for the next card
+        self.kept_needs: list[Any] = []
+        self.needs_actions: list[Any] = []
         self.measure: K.Ran | None = None
         self.answered: str | None = None  # DEV-R0a: the model that answered the last turn
         self.used = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0, "estimated": 0}
@@ -154,23 +168,35 @@ class Act:
     def units(self, turn: int) -> list[C.Unit]:
         u: list[C.Unit] = []
         m = self.measure
-        u.append(C.Unit("failing", K.summarize(m, self.root) if m else "(not run yet)", 1))
+        u.append(C.Unit("failing", K.summarize(m, self.root) if m else "(not run yet)", 10))
         for t in self.needs:
-            u.append(C.Unit("code", t, 2))
+            u.append(C.Unit("code", t, 20))
+        current_sigs = set()
+        for a in self.needs_actions:
+            current_sigs.add((a.need, a.arg, tuple(a.lines) if getattr(a, "lines", None) else None))
+        for a in self.kept_needs:
+            sig = (a.need, a.arg, tuple(a.lines) if getattr(a, "lines", None) else None)
+            if sig in current_sigs:
+                continue
+            try:
+                t = self.serve_need(a)
+            except Exception as e:
+                t = f"NEED {a.need} {a.arg} failed: {_label(e)}"
+            u.append(C.Unit("code", t, 20))
         shown: set[str] = set()
         if m and not m.ok:
             for rel, line, _fn in K.frames(m.out, self.root)[-6:][::-1]:
                 s = R.enclosing(self.root, rel, line)
                 if s and s.splitlines()[0] not in shown:
                     shown.add(s.splitlines()[0])
-                    u.append(C.Unit("code", s, 3))
+                    u.append(C.Unit("code", s, 30))
         for f in self.owned_now:
             if any(x.startswith(f + ":") or x.startswith(f + " ") for x in shown):
                 continue
             s = R.file_slice(self.root, f, None, R.SMALL_FILE_LINES)
             if s and "(cut)" not in s.splitlines()[0]:
-                u.append(C.Unit("code", s, 4))
-        u.append(C.Unit("last", self.last or "(first turn)", 2))
+                u.append(C.Unit("code", s, 40))
+        u.append(C.Unit("last", self.last or "(first turn)", 20))
         left = self.max_tokens - self.total()
         u.append(C.Unit("budget", f"turn {turn} of {self.max_turns}; about {max(0, left)} tokens left", 0))
         return u
@@ -439,7 +465,14 @@ class Act:
                     notes.append(f"RUN {a.arg} failed: {_label(e)}")
                     sp.error(_label(e))
                     sp.fail(result=EV.short(notes[-1]))
-        self.needs = [self._need_ev(a) for a in p.actions if a.kind == "NEED"][:6]
+        for a in self.needs_actions:
+            sig = (a.need, a.arg, tuple(a.lines) if getattr(a, "lines", None) else None)
+            self.kept_needs = [ka for ka in self.kept_needs 
+                               if (ka.need, ka.arg, tuple(ka.lines) if getattr(ka, "lines", None) else None) != sig]
+            self.kept_needs.insert(0, a)
+        self.needs_actions = [a for a in p.actions if a.kind == "NEED"]
+        self.kept_needs = self.kept_needs[:max(0, 8 - len(self.needs_actions))]
+        self.needs = [self._need_ev(a) for a in self.needs_actions][:6]
         for a in p.actions:
             if status:
                 break
@@ -456,6 +489,16 @@ class Act:
                     "needs": sum(1 for a in p.actions if a.kind == "NEED"), "format_problems": len(p.problems),
                     "noise_lines": p.noise, "changed": list(out.changed), "replaced": list(out.replaced),
                     "idle": not out.applied and not ran and not any(a.kind in ("NEED", "RUN", "PROPOSE") for a in p.actions)})
+        acts = []
+        for a in p.actions:
+            if a.kind == "NEED":
+                s = f"NEED {a.need} {a.arg}"
+                if getattr(a, "lines", None):
+                    s += f" lines {a.lines[0]}-{a.lines[1]}"
+                acts.append(s[:120])
+            else:
+                acts.append(f"{a.kind} {a.arg}"[:120])
+        row["actions"] = acts
         return status, reason
 
     def _propose(self, a: Any) -> str:
