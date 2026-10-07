@@ -559,7 +559,8 @@ OWN_PARSER = {"ask": "ga.ask:main", "bridge": "ga.bridge:main", "ui": "ga.ui:mai
               "console": "ga.console.server:main",  # CMD-CON2
               "plan": "ga.plan.cli:main",  # CMD-GA40
               "llm": "ga.llm.report:main",  # R1: ga llm report --hour
-              "vm": "ga.vm.cli:main"}  # CMD-OPS1
+              "vm": "ga.vm.cli:main",  # CMD-OPS1
+              "ops": "ga.vm.ops:main"}  # VI-11c: ga ops tick (shadow, 0 model calls)
 
 
 def _own_argv(argv: list[str]) -> tuple[str, list[str]] | None:
