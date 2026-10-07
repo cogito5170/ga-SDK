@@ -558,6 +558,7 @@ OWN_PARSER = {"ask": "ga.ask:main", "bridge": "ga.bridge:main", "ui": "ga.ui:mai
               "agy-agent": "ga.backends.agy_agent:main",  # CMD-GA41 S4
               "console": "ga.console.server:main",  # CMD-CON2
               "plan": "ga.plan.cli:main",  # CMD-GA40
+              "llm": "ga.llm.report:main",  # R1: ga llm report --hour
               "vm": "ga.vm.cli:main"}  # CMD-OPS1
 
 

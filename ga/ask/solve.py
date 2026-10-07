@@ -79,7 +79,7 @@ class Watch:
             self.usage = inner.usage
 
     def run_turn(self, *a: Any, **kw: Any) -> Any:
-        turn = self.inner.run_turn(*a, **kw)
+        turn = self.inner.run_turn(*a, **kw)  # llm-scan: inside a turn the caller already took through ga.llm.run_turn
         from ..gemini import PlanError, TOOL_NAME, extract_plan
         try:
             plan = extract_plan(turn.text)

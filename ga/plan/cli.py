@@ -55,8 +55,8 @@ def cost_lines(backend: str, model: str, card_text: str) -> list[str]:
 
 
 def make_runner(backend: str, model: str, repo: Path) -> Any:
-    from .. import backends
-    return backends.create(backend, model, {}, {"cwd": str(repo), "timeout_s": 600.0})
+    from ..llm import create_runner
+    return create_runner(backend, model, {}, {"cwd": str(repo), "timeout_s": 600.0})
 
 
 def compare_main(argv: list[str], out: Callable[[str], None]) -> int:

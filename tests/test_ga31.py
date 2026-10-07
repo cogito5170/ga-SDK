@@ -12,6 +12,7 @@ D1  FINAL_TASK T1 on 3 fake nodes, and T4 with 0 tool calls and 0 peer messages
 import contextlib
 import io
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -626,7 +627,8 @@ class S5NoCCR(unittest.TestCase):
             "        assert w.read('A', 'state.json')['done']['CMD-T1']['verified']\n"
             "        assert not [m for m in sys.modules if 'remote' in m or m.startswith('mcp')], sys.modules\n"
             "unittest.main(argv=['x'])\n")
-        env = {"PATH": "/usr/bin:/bin", "HOME": str(w.tmp), "LANG": "C.UTF-8"}
+        env = {"PATH": "/usr/bin:/bin", "HOME": str(w.tmp), "LANG": "C.UTF-8",
+               **{k: os.environ[k] for k in ("GA_LLM_POLICY", "GA_LLM_HOME") if k in os.environ}}  # R1: tests/conftest.py
         p = subprocess.run([sys.executable, str(script)], env=env, capture_output=True, text=True, timeout=120)
         self.assertEqual(p.returncode, 0, p.stderr[-2000:])
         self.assertFalse([k for k in env if "CCR" in k or "CLAUDE" in k])

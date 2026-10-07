@@ -94,7 +94,8 @@ def with_route(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def turn(runner: Any, text: str) -> str:
-    t = runner.run_turn(text, None)
+    from .. import llm as L
+    t = L.run_turn(runner, text, None, purpose="plan", item_id="plan")
     return getattr(t, "answer", t if isinstance(t, str) else "")
 
 

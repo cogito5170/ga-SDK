@@ -51,10 +51,11 @@ def resolve(cli_backend: str | None, cli_model: str | None, cfg: dict[str, Any])
 
 
 def make_runner(backend: str, model: str, options: dict, root: Path, timeout_s: float) -> Any:
+    from ..llm import create_runner
     opts = dict(options)
     if backend == "claude_cli":
         opts["bare"] = True  # S3: tools off, INSTRUCTION as the system prompt; never ctx tools
-    return backends.create(backend, model, opts, {"cwd": str(root), "timeout_s": timeout_s})
+    return create_runner(backend, model, opts, {"cwd": str(root), "timeout_s": timeout_s})
 
 
 def is_korean(text: str) -> bool:

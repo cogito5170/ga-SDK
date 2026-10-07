@@ -377,10 +377,10 @@ class Node:
             ctx["on_progress"] = self._progress(rid, item)
         try:
             runner = self.get_backend(choice.backend).create(choice.model, dict(choice.options), ctx)
-            if getattr(runner, "bare", False):  # bare: the fixed instructions are the system prompt, the pack the prompt
-                turn = runner.run_turn(pack.text, None, system=how)
-            else:
-                turn = runner.run_turn(pack.text + "\n" + how, None)
+            from .. import llm as L
+            bare = getattr(runner, "bare", False)  # bare: the fixed instructions are the system prompt, the pack the prompt
+            turn = L.run_turn(runner, pack.text if bare else pack.text + "\n" + how, None, system=how if bare else None,
+                              purpose="build", item_id=str(item or job["id"]), model=choice.model)
             Router.check(choice, list(getattr(turn, "served", []) or []))
             res.answer, res.model = turn.answer, ",".join(turn.served)
             res.usage = usage_counts(turn.usage, getattr(turn, "usage_format", None))

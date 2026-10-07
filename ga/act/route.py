@@ -206,7 +206,8 @@ def triage(runner: Any, text: str, ladder: list[str]) -> tuple[dict[str, Any] | 
     """One triage turn: (route or None, tokens spent, why). A backend failure is a None route, never a crash."""
     from .loop import usage_counts
     try:
-        out = runner.run_turn(text, None)
+        from .. import llm as L
+        out = L.run_turn(runner, text, None, purpose="diagnosis", item_id="triage")
     except Exception as e:  # noqa: BLE001 - a failed triage falls back
         return None, tokens(text), f"triage failed: {type(e).__name__}"[:200]
     answer = getattr(out, "answer", out if isinstance(out, str) else "") or ""
