@@ -107,6 +107,7 @@ def run(name: str, argv: list[str], cwd: Path, timeout_s: float) -> Ran:
     try:
         env = clean_env()
         env["PYTHONDONTWRITEBYTECODE"] = "1"  # an edit of the same size in the same second must not hit a stale .pyc
+        env["GA_ACT_ISOLATE"] = str(cwd)  # ga/__init__ drops the editable-install finder: only the worktree's code runs
         p = subprocess.run(argv, cwd=str(cwd), env=env, stdin=subprocess.DEVNULL, capture_output=True,
                            text=True, timeout=timeout_s, shell=False)
     except subprocess.TimeoutExpired as e:
