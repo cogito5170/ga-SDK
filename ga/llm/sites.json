@@ -1,0 +1,50 @@
+[
+  {
+    "site": "act/loop.py::Act._call.turn",
+    "purpose": "build",
+    "ladder_step": "strong",
+    "why_no_rule": "Code generation and complex refactoring require semantic understanding of project context."
+  },
+  {
+    "site": "act/route.py::triage",
+    "purpose": "diagnosis",
+    "ladder_step": "cheap",
+    "why_no_rule": "Triaging tasks and estimating model requirements depends on open-ended task descriptions."
+  },
+  {
+    "site": "ask/model.py::one_turn",
+    "purpose": "opinion",
+    "ladder_step": "either",
+    "why_no_rule": "Answering arbitrary free-text questions requires general knowledge and natural language comprehension."
+  },
+  {
+    "site": "gemini.py::Supervisor._one_turn",
+    "purpose": "probe",
+    "ladder_step": "cheap",
+    "why_no_rule": "Supervising and probing task progress requires evaluating dynamic outputs against open-ended goals."
+  },
+  {
+    "site": "hub.py::MailHub._decide",
+    "purpose": "coordination",
+    "ladder_step": "cheap",
+    "why_no_rule": "Routing mail messages requires understanding conversational intent and multi-agent coordination state."
+  },
+  {
+    "site": "intake/engine.py::Intake.send",
+    "purpose": "intake",
+    "ladder_step": "cheap",
+    "why_no_rule": "Transforming unstructured human requests into structured task specifications requires semantic parsing."
+  },
+  {
+    "site": "net/node.py::Node._turn",
+    "purpose": "build",
+    "ladder_step": "strong",
+    "why_no_rule": "Generating peer node code edits and executing tasks requires full contextual reasoning and code generation."
+  },
+  {
+    "site": "plan/draft.py::turn",
+    "purpose": "plan",
+    "ladder_step": "strong",
+    "why_no_rule": "Drafting high-level directives from user requests requires deep architectural planning and synthesis."
+  }
+]
