@@ -71,6 +71,36 @@ Generated from ga/forms/registry.json. Do not edit.
 - `wait`
 - `ask_user`
 
+### JOURNAL_STATES
+
+- `PLANNED`
+- `DISPATCHED`
+- `ACTING`
+- `REPORTED`
+- `VERDICT`
+- `SEND_BACK`
+- `SHADOW`
+- `INTEGRATED`
+- `DEPLOYED`
+- `OBSERVED`
+- `BLOCKED`
+- `CANCELLED`
+
+### JOURNAL_EVENTS
+
+- `T1`
+- `T2`
+- `T3`
+- `T4`
+- `T5`
+- `T6`
+- `T6'`
+- `T7`
+- `T8`
+- `T9`
+- `T10`
+- `T11`
+
 ## Forms
 
 ### directive/1
@@ -236,4 +266,16 @@ Generated from ga/forms/registry.json. Do not edit.
 - `questions` (required)
 - `risks` (required)
 - `repo` (required)
+
+### journal/1
+
+- `id` (required)
+- `at` (required)
+- `item` (required)
+- `from_state` (required)
+- `to_state` (required)
+- `event` (required)
+- `guard` (required)
+- `inputs_hash` (required)
+- `record` (required)
 
