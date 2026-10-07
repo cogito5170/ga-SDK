@@ -1,0 +1,493 @@
+{
+ "schema": "forms-registry/1",
+ "enums": {
+  "NOTIFY_KINDS": [
+   "directive",
+   "report",
+   "verdict",
+   "question",
+   "ack",
+   "shadow",
+   "alert"
+  ],
+  "HANDLED_STATUS": [
+   "done",
+   "paused",
+   "declined"
+  ],
+  "BLOCKER_KINDS": [
+   "env",
+   "permission",
+   "credential",
+   "budget",
+   "dependency",
+   "design"
+  ],
+  "CHANGE_SIZES": [
+   "implementation",
+   "component",
+   "interface",
+   "architecture",
+   "baseline"
+  ],
+  "NEEDS": [
+   "credential",
+   "budget",
+   "new_repo",
+   "new_session"
+  ],
+  "VERDICT_CLASSES": [
+   "success",
+   "partial",
+   "failure",
+   "blocked",
+   "insufficient"
+  ],
+  "CAUSES": [
+   "implementation",
+   "requirement",
+   "dependency",
+   "measurement",
+   "environment",
+   "hub_directive"
+  ],
+  "NEXT_CHOICES": [
+   "continue",
+   "refine",
+   "verify",
+   "handoff",
+   "change_direction",
+   "wait",
+   "ask_user"
+  ]
+ },
+ "forms": {
+  "directive/1": {
+   "fields": {
+    "id": {
+     "required": true
+    },
+    "rev": {
+     "required": true
+    },
+    "supersedes": {
+     "required": false
+    },
+    "to": {
+     "required": true
+    },
+    "goal": {
+     "required": true
+    },
+    "why": {
+     "required": true
+    },
+    "scope": {
+     "required": true
+    },
+    "done_when": {
+     "required": true
+    },
+    "after": {
+     "required": false
+    },
+    "budget": {
+     "required": false
+    },
+    "change_size": {
+     "required": false
+    },
+    "contradicts": {
+     "required": false
+    }
+   }
+  },
+  "report/1": {
+   "fields": {
+    "from": {
+     "required": true
+    },
+    "handled": {
+     "required": true
+    },
+    "commits": {
+     "required": false
+    },
+    "tests": {
+     "required": false
+    },
+    "change_size": {
+     "required": false
+    },
+    "needs": {
+     "required": false
+    },
+    "exchanges": {
+     "required": false
+    }
+   }
+  },
+  "verdict/1": {
+   "fields": {
+    "class": {
+     "required": true
+    },
+    "subclass": {
+     "required": false
+    },
+    "cause": {
+     "required": false
+    },
+    "evidence": {
+     "required": true
+    },
+    "claims_vs_evidence": {
+     "required": true
+    },
+    "next": {
+     "required": true
+    },
+    "report_ref": {
+     "required": false
+    },
+    "round": {
+     "required": false
+    },
+    "note": {
+     "required": false
+    }
+   }
+  },
+  "round/1": {
+   "fields": {
+    "n": {
+     "required": true
+    },
+    "date": {
+     "required": true
+    },
+    "repos": {
+     "required": true
+    },
+    "directives": {
+     "required": true
+    },
+    "verdict": {
+     "required": true
+    },
+    "summary": {
+     "required": true
+    },
+    "next": {
+     "required": true
+    },
+    "notices": {
+     "required": false
+    },
+    "decisions": {
+     "required": false
+    }
+   }
+  },
+  "decision/1": {
+   "fields": {
+    "id": {
+     "required": true
+    },
+    "date": {
+     "required": true
+    },
+    "decision": {
+     "required": true
+    },
+    "basis": {
+     "required": true
+    },
+    "by": {
+     "required": true
+    },
+    "supersedes": {
+     "required": false
+    },
+    "scope": {
+     "required": false
+    }
+   }
+  },
+  "stage/1": {
+   "fields": {
+    "name": {
+     "required": true
+    },
+    "date": {
+     "required": true
+    },
+    "repos": {
+     "required": true
+    },
+    "established": {
+     "required": true
+    },
+    "deferred": {
+     "required": true
+    },
+    "decision": {
+     "required": false
+    }
+   }
+  },
+  "question/1": {
+   "fields": {
+    "gate": {
+     "required": true
+    },
+    "about": {
+     "required": true
+    },
+    "A": {
+     "required": true
+    },
+    "B": {
+     "required": true
+    },
+    "C": {
+     "required": true
+    },
+    "options": {
+     "required": true
+    },
+    "recommendation": {
+     "required": true
+    },
+    "refs": {
+     "required": false
+    }
+   }
+  },
+  "exchange/1": {
+   "fields": {
+    "from": {
+     "required": true
+    },
+    "to": {
+     "required": true
+    },
+    "why": {
+     "required": true
+    },
+    "asked": {
+     "required": true
+    },
+    "got": {
+     "required": true
+    },
+    "proposal": {
+     "required": false
+    }
+   }
+  },
+  "review/1": {
+   "fields": {
+    "id": {
+     "required": true
+    },
+    "date": {
+     "required": true
+    },
+    "by": {
+     "required": true
+    },
+    "repo": {
+     "required": true
+    },
+    "sha": {
+     "required": true
+    },
+    "class": {
+     "required": true
+    },
+    "cause": {
+     "required": false
+    },
+    "why": {
+     "required": true
+    },
+    "round": {
+     "required": false
+    },
+    "amends": {
+     "required": false
+    }
+   }
+  },
+  "directive/2": {
+   "fields": {
+    "id": {
+     "required": true
+    },
+    "rev": {
+     "required": true
+    },
+    "supersedes": {
+     "required": false
+    },
+    "to": {
+     "required": true
+    },
+    "goal": {
+     "required": true
+    },
+    "why": {
+     "required": true
+    },
+    "scope": {
+     "required": false
+    },
+    "done_when": {
+     "required": false
+    },
+    "refs": {
+     "required": false
+    },
+    "changes": {
+     "required": false
+    },
+    "after": {
+     "required": false
+    },
+    "budget": {
+     "required": false
+    },
+    "change_size": {
+     "required": false
+    },
+    "contradicts": {
+     "required": false
+    },
+    "note": {
+     "required": false
+    },
+    "model": {
+     "required": false
+    }
+   }
+  },
+  "report/2": {
+   "fields": {
+    "from": {
+     "required": true
+    },
+    "handled": {
+     "required": true
+    },
+    "commits": {
+     "required": false
+    },
+    "tests": {
+     "required": false
+    },
+    "change_size": {
+     "required": false
+    },
+    "needs": {
+     "required": false
+    },
+    "exchanges": {
+     "required": false
+    },
+    "items": {
+     "required": true
+    },
+    "results": {
+     "required": false
+    },
+    "blockers": {
+     "required": false
+    },
+    "deviations": {
+     "required": false
+    },
+    "proposals": {
+     "required": false
+    },
+    "note": {
+     "required": false
+    }
+   }
+  },
+  "notify/1": {
+   "fields": {
+    "to": {
+     "required": true
+    },
+    "kind": {
+     "required": true
+    },
+    "ref": {
+     "required": true
+    },
+    "id": {
+     "required": false
+    },
+    "shadow": {
+     "required": false
+    },
+    "note": {
+     "required": false
+    }
+   }
+  },
+  "task/1": {
+   "fields": {
+    "id": {
+     "required": true
+    },
+    "request": {
+     "required": true
+    },
+    "kind": {
+     "required": true
+    },
+    "goal": {
+     "required": true
+    },
+    "answer": {
+     "required": false
+    },
+    "decision": {
+     "required": false
+    },
+    "options": {
+     "required": false
+    },
+    "resolution": {
+     "required": false
+    },
+    "deliverables": {
+     "required": true
+    },
+    "constraints": {
+     "required": true
+    },
+    "acceptance": {
+     "required": true
+    },
+    "non_goals": {
+     "required": true
+    },
+    "assumptions": {
+     "required": true
+    },
+    "questions": {
+     "required": true
+    },
+    "risks": {
+     "required": true
+    },
+    "repo": {
+     "required": true
+    }
+   }
+  }
+ }
+}
