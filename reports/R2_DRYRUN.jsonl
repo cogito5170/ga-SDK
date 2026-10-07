@@ -1,0 +1,70 @@
+{"agree":null,"dry_run":null,"id":"CMD-GA41","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"718a2cd60a0699d264fbc300c5ed64a4c8a975d4"}
+{"agree":null,"dry_run":null,"id":"CMD-AGA4","reason":"not_reproducible: no sha recorded","recorded":"SEND_BACK","rev":1,"sha":""}
+{"agree":null,"dry_run":null,"id":"CMD-AGA4","reason":"not_reproducible: no sha recorded","recorded":"ACCEPT","rev":2,"sha":""}
+{"agree":null,"dry_run":null,"id":"CMD-CON1","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":1,"sha":"0980f049e4cf3769c9bea58db12c0afeb89960c0"}
+{"agree":null,"dry_run":null,"id":"CMD-CON1","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"2fcc3838b39bf66a43e0c498ac639b469287ce5c"}
+{"agree":null,"dry_run":null,"id":"CMD-CON2","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"0895ca507af64a98dcfc8e898f344022da712f3f"}
+{"agree":null,"dry_run":null,"id":"CMD-GA42","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":1,"sha":"7c4b3d850c368adb02f2d777affa80256ee8c334"}
+{"agree":null,"dry_run":null,"id":"CMD-GA39","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"507da93abc3c0471abfdc20e1ecb479a5d23edb8"}
+{"agree":null,"dry_run":null,"id":"CMD-OPS1","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":1,"sha":"abe8b47f8988977658425e9fdfc3437b5e54abed"}
+{"agree":null,"dry_run":null,"id":"CMD-GA40","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":1,"sha":"a20bf89a4fab57b32cef66a876b533bfdec0b18c"}
+{"agree":null,"dry_run":null,"id":"CMD-GA42","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":2,"sha":"c76ae50f7c4ce341079bf1351bd3326991e2f538"}
+{"agree":null,"dry_run":null,"id":"CMD-GA40","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"9c1554d79f856f9ef8dd2b449f0baf4b96baf129"}
+{"agree":null,"dry_run":null,"id":"CMD-OPS1","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"f1f00c8034c55d0ac2598a886748a93e60c79cc6"}
+{"agree":null,"dry_run":null,"id":"CMD-GA42","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":2,"sha":"545b3d26a40ff15a2dbb6f67507a916938a10351"}
+{"agree":null,"dry_run":null,"id":"CMD-CON1","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":2,"sha":"068681c263af79274752dbef5c17934ea8076d3b"}
+{"agree":null,"dry_run":null,"id":"CMD-CON3","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"ee25c516b62d9e986720267e4a9dccc107f29745"}
+{"agree":null,"dry_run":null,"id":"CMD-GA43","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"83fcceade025cb7a95e32503e91c606ec78a7b2a"}
+{"agree":null,"dry_run":null,"id":"CMD-AGA6","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"62fca39"}
+{"agree":null,"dry_run":null,"id":"CMD-GA44","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"155367b5d19631bff5b6b78d3b624c4990373dfb"}
+{"agree":null,"dry_run":null,"id":"CMD-OPS2","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"e4fdcfe352f551eaf3ffc6d4fa2d18aedf68369d"}
+{"agree":null,"dry_run":null,"id":"CMD-GA45","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"8d8a8f9789d3577362943e762a824d2a984caa3d"}
+{"agree":null,"dry_run":null,"id":"CMD-GA46","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"49d1c8424e7fb514e1ed1354a1f9391a8967e99e"}
+{"agree":null,"dry_run":null,"id":"CMD-GA47","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"2bc2f5f2d75475ee65f4f6ec1329ad55969d4dbf"}
+{"agree":null,"dry_run":null,"id":"CMD-GA48","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"e3648177f2cbad218c8d0827a5ad338500f132ba"}
+{"agree":null,"dry_run":null,"id":"CMD-GM1","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"36b7a72"}
+{"agree":null,"dry_run":null,"id":"CMD-GM2","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"7e36193"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG1","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"6c2460b"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG2","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"32ccca0"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG3","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"ded99d6"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG4","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"6c98ff2"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG5","reason":"not_reproducible: sha not reachable in this repository","recorded":"SEND_BACK","rev":1,"sha":"dec0ad8"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG6","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"1d6ec4a"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG7","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"6855f29"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG8","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"9d72e58"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG9","reason":"not_reproducible: sha not reachable in this repository","recorded":"SEND_BACK","rev":1,"sha":"cd18d21"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG10","reason":"not_reproducible: sha not reachable in this repository","recorded":"SEND_BACK","rev":1,"sha":"71e0d51"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG5","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":2,"sha":"d4c8333"}
+{"agree":null,"dry_run":null,"id":"CMD-GA49","reason":"not_reproducible: sha not reachable in this repository","recorded":"SEND_BACK","rev":1,"sha":"e6a25ea"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG9","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":2,"sha":"0fe0656"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG10","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":2,"sha":"6d9a494"}
+{"agree":null,"dry_run":null,"id":"CMD-GA49","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":2,"sha":"e8730f468f7d4e6c569d2b2d14f103ea4eb4d93e"}
+{"agree":null,"dry_run":null,"id":"CMD-GA49","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":3,"sha":"3d142aebbe357837bc3f6f209152d9cd0bb3b609"}
+{"agree":null,"dry_run":null,"id":"CMD-GA50","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":1,"sha":"cbf0a0bf32adb2502f1058c620e4b81a1c3314e6"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG11","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"4720d5f"}
+{"agree":null,"dry_run":null,"id":"CMD-GA50","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":2,"sha":"f3abeea4848b24a4c810434b9f9888de30597b6d"}
+{"agree":null,"dry_run":null,"id":"CMD-GA51","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"SEND_BACK","rev":2,"sha":"b03437384c1d280eac88436c9b04fca0116f4398"}
+{"agree":null,"dry_run":null,"id":"CMD-GA51","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":3,"sha":"f9671daa01cd5e733159b051b72e3dcd13f2d7e9"}
+{"agree":null,"dry_run":null,"id":"CMD-GA51","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":3,"sha":"f9671da"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG12","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"1723d8483d1f"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG12","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"1723d8483d1f"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG14","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"e3d2ede685e5"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG14","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"e3d2ede685e5"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG15","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"29bed35ed03a"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG15","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"29bed35ed03a"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG16","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"a63ee2353a92"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG16","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"a63ee2353a92"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG17","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"685d0597c9f2"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG17","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"685d0597c9f2"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG18","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"4baf27ad501f"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG18","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"4baf27ad501f"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG19","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"678383a21bdc"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG19","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"678383a21bdc"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG20","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"b7c78d63e928"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG20","reason":"not_reproducible: recorded INTEGRATED is not a verdict","recorded":"INTEGRATED","rev":1,"sha":"b7c78d63e928"}
+{"agree":null,"dry_run":null,"id":"CMD-GA52","reason":"not_reproducible: sha not reachable in this repository","recorded":"SEND_BACK","rev":1,"sha":"0c4f041"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG13","reason":"not_reproducible: sha not reachable in this repository","recorded":"ACCEPT","rev":1,"sha":"acf73522d479"}
+{"agree":null,"dry_run":null,"id":"CMD-TKG13","reason":"not_reproducible: sha not reachable in this repository","recorded":"SEND_BACK","rev":1,"sha":"acf73522d479"}
+{"agree":true,"dry_run":"ACCEPT","flaky":[],"id":"DEV-R0b","reason":"all executable checks pass; base and spec derived from the commit","recorded":"ACCEPT","rev":1,"sha":"b891bea057a06a7d0024c6f3867b66461b142f77"}
+{"agree":true,"dry_run":"ACCEPT","flaky":[],"id":"DEV-R0a","reason":"all executable checks pass; base and spec derived from the commit","recorded":"ACCEPT","rev":1,"sha":"759d87385437dd30ce44fe65ccaad461bc0121a5"}
+{"agree":null,"dry_run":null,"id":"DEV-R0FREEZE","reason":"not_reproducible: no acceptance-test path recorded and the commit adds no test file","recorded":"ACCEPT","rev":1,"sha":"8ead7893e4051ed82cfc357ccf7f52d1d812614b"}
